@@ -88,4 +88,4 @@ async function listLastDays(req, res) {
   });
 }
 
-module.exports = { listLastDays };
+module.exports = router;
