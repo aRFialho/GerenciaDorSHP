@@ -16,8 +16,9 @@ model Shop {
   tokens OAuthToken?
   orders Order[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
 }
 
 model OAuthToken {
@@ -92,4 +93,66 @@ model OrderAddressSnapshot {
 
   @@index([orderId, createdAt])
   @@index([addressHash])
+}
+
+model Product {
+  id Int @id @default(autoincrement())
+
+  shopId Int
+  shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  itemId      BigInt
+  status      String?
+  title       String?
+  description String? @db.Text
+
+  currency String?
+  priceMin Int?
+  priceMax Int?
+
+  stock Int?
+  sold  Int?
+
+  hasModel   Boolean?
+  brand      String?
+  categoryId BigInt?
+
+  shopeeUpdateTime DateTime?
+
+  images ProductImage[]
+  models ProductModel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([shopId, itemId])
+  @@index([shopId, status])
+}
+
+model ProductImage {
+  id Int @id @default(autoincrement())
+
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  url String
+
+  @@index([productId])
+}
+
+model ProductModel {
+  id Int @id @default(autoincrement())
+
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  modelId BigInt
+  name    String?
+  sku     String?
+  price   Int?
+  stock   Int?
+  sold    Int?
+
+  @@unique([productId, modelId])
+  @@index([productId])
 }

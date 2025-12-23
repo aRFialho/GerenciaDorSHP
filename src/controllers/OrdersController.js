@@ -1,87 +1,60 @@
-const { requestShopeeAuthed } = require("../services/ShopeeAuthedHttp");
+const prisma = require("../config/db");
 
-function parseRangeDays(v) {
-  const n = Number(v);
-  if ([7, 15, 30, 60].includes(n)) return n;
-  return 7;
-}
-
-function nowTs() {
-  return Math.floor(Date.now() / 1000);
-}
-
-function buildAlertsFromOrder(order) {
-  return {
-    addressChanged: false,
-    atRisk: false,
-    late: false,
-  };
-}
-
-async function listLastDays(req, res) {
+async function list(req, res) {
   const { shopId } = req.params;
-  const rangeDays = parseRangeDays(req.query.rangeDays);
-  const pageSize = req.query.pageSize
-    ? Math.min(Number(req.query.pageSize), 100)
-    : 50;
-  const cursor = req.query.cursor ? String(req.query.cursor) : "";
+  const limit = Math.min(Number(req.query.limit || 60), 200);
+  const status = req.query.status ? String(req.query.status) : null;
 
-  const timeTo = nowTs();
-  const timeFrom = timeTo - rangeDays * 24 * 60 * 60;
+  const shop = await prisma.shop.findUnique({
+    where: { shopId: BigInt(String(shopId)) },
+  });
+  if (!shop) return res.status(404).json({ error: "shop_not_found" });
 
-  const list = await requestShopeeAuthed({
-    method: "get",
-    path: "/api/v2/order/get_order_list",
-    shopId,
-    query: {
-      time_range_field: "update_time",
-      time_from: timeFrom,
-      time_to: timeTo,
-      page_size: pageSize,
-      cursor,
+  const where = {
+    shopId: shop.id,
+    ...(status ? { orderStatus: status } : {}),
+  };
+
+  const items = await prisma.order.findMany({
+    where,
+    orderBy: { shopeeUpdateTime: "desc" },
+    take: limit,
+    select: {
+      orderSn: true,
+      orderStatus: true,
+      shipByDate: true,
+      daysToShip: true,
+      shopeeCreateTime: true,
+      shopeeUpdateTime: true,
+      region: true,
+      currency: true,
     },
   });
 
-  const orderSnList =
-    list?.response?.order_sn_list || list?.order_sn_list || [];
+  res.json({ items });
+}
 
-  let details = { response: { order_list: [] } };
-  if (orderSnList.length > 0) {
-    details = await requestShopeeAuthed({
-      method: "get",
-      path: "/api/v2/order/get_order_detail",
-      shopId,
-      query: {
-        order_sn_list: JSON.stringify(orderSnList),
-        response_optional_fields: JSON.stringify([
-          "buyer_user_id",
-          "buyer_username",
-          "recipient_address",
-          "item_list",
-          "order_status",
-          "create_time",
-          "update_time",
-        ]),
-      },
-    });
-  }
+async function detail(req, res) {
+  const { shopId, orderSn } = req.params;
 
-  const orders = details?.response?.order_list || details?.order_list || [];
-  const enriched = orders.map((o) => ({
-    ...o,
-    alerts: buildAlertsFromOrder(o),
-  }));
+  const shop = await prisma.shop.findUnique({
+    where: { shopId: BigInt(String(shopId)) },
+  });
+  if (!shop) return res.status(404).json({ error: "shop_not_found" });
+
+  const order = await prisma.order.findUnique({
+    where: { shopId_orderSn: { shopId: shop.id, orderSn: String(orderSn) } },
+    include: {
+      addressSnapshots: { orderBy: { createdAt: "desc" }, take: 1 },
+    },
+  });
+
+  if (!order) return res.status(404).json({ error: "order_not_found" });
 
   res.json({
-    status: "ok",
-    shop_id: String(shopId),
-    rangeDays,
-    paging: {
-      cursor: list?.response?.next_cursor ?? list?.next_cursor ?? null,
-      more: list?.response?.more ?? list?.more ?? null,
-    },
-    orders: enriched,
+    order,
+    lastAddressSnapshot: order.addressSnapshots[0] || null,
   });
 }
 
-module.exports = { listLastDays };
+module.exports = { list, detail };
