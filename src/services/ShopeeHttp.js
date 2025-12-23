@@ -1,6 +1,7 @@
 const axios = require("axios");
 const { hmacSha256Hex } = require("../utils/crypto");
 const shopee = require("../config/shopee");
+const qs = require("qs");
 
 function nowTs() {
   return Math.floor(Date.now() / 1000);
@@ -56,6 +57,7 @@ async function requestShopee({
       method,
       url,
       params,
+      paramsSerializer: (p) => qs.stringify(p, { arrayFormat: "repeat" }),
       data: body,
       timeout: 20000,
     });
