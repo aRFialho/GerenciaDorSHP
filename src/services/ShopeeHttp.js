@@ -50,8 +50,7 @@ async function requestShopee({
 
   if (accessToken) params.access_token = accessToken;
   if (shopId !== undefined && shopId !== null) params.shop_id = shopId;
-  console.log("[ShopeeHttp] URL:", url);
-  console.log("[ShopeeHttp] Params:", params);
+
   try {
     const res = await axios({
       method,
