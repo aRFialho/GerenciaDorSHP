@@ -1,0 +1,79 @@
+<!-- frontend/index.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open Shopee Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="https://shopee.com.br/favicon.ico" type="image/x-icon">
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="https://shopee.com.br/assets/img/shopee-logo.svg" alt="Shopee Logo" class="shopee-logo">
+            <h1>Open Shopee Dashboard</h1>
+        </div>
+        <nav>
+            <button class="tab-button active" data-tab="orders">Pedidos</button>
+            <button class="tab-button" data-tab="products">Produtos</button>
+            <button class="tab-button" data-tab="auth">Autenticação</button>
+        </nav>
+    </header>
+
+    <main>
+        <div id="orders" class="tab-content active">
+            <h2>Meus Pedidos</h2>
+            <div class="input-group">
+                <label for="order-shop-id">Shop ID:</label>
+                <input type="number" id="order-shop-id" placeholder="Digite seu Shop ID">
+                <button id="sync-orders-btn" class="shopee-btn">Sincronizar Pedidos</button>
+            </div>
+            <div id="order-alerts" class="alerts-container">
+                <h3>Alertas de Pedidos</h3>
+                <div id="alerts-list">Nenhum alerta.</div>
+            </div>
+            <div id="orders-list" class="cards-container">
+                <p>Nenhum pedido sincronizado ainda. Sincronize para ver os dados.</p>
+            </div>
+        </div>
+
+        <div id="products" class="tab-content">
+            <h2>Meus Produtos</h2>
+            <div class="input-group">
+                <label for="product-shop-id">Shop ID:</label>
+                <input type="number" id="product-shop-id" placeholder="Digite seu Shop ID">
+                <button id="sync-products-btn" class="shopee-btn">Sincronizar Produtos</button>
+            </div>
+            <div id="products-list" class="cards-container">
+                <p>Nenhum produto sincronizado ainda. Sincronize para ver os dados.</p>
+            </div>
+        </div>
+
+        <div id="auth" class="tab-content">
+            <h2>Autenticação Shopee</h2>
+            <div class="input-group">
+                <label for="auth-shop-id">Shop ID:</label>
+                <input type="number" id="auth-shop-id" placeholder="Digite seu Shop ID">
+                <button id="connect-shopee-btn" class="shopee-btn">Conectar com Shopee</button>
+            </div>
+            <div id="auth-status" class="status-message"></div>
+            <div id="token-info" class="card token-card">
+                <h3>Informações do Token</h3>
+                <p><strong>Access Token:</strong> <span id="access-token">N/A</span></p>
+                <p><strong>Refresh Token:</strong> <span id="refresh-token">N/A</span></p>
+                <p><strong>Expira em:</strong> <span id="expire-time">N/A</span></p>
+                <p><strong>Última Atualização:</strong> <span id="token-updated-at">N/A</span></p>
+                <button id="refresh-token-btn" class="shopee-btn">Atualizar Token</button>
+            </div>
+        </div>
+    </main>
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Carregando...</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

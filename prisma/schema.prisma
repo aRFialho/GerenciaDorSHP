@@ -1,0 +1,114 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Shop {
+  id          Int      @id @default(autoincrement())
+  shop_id     Int      @unique // Shopee's shop_id
+  name        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tokens      Token[]
+  products    Product[]
+  orders      Order[]
+  alerts      Alert[]
+  syncLogs    SyncLog[]
+}
+
+model Token {
+  id            Int      @id @default(autoincrement())
+  shopId        Int
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  access_token  String
+  refresh_token String
+  expire_in     Int
+  // Optional: Store the original expire_time for better management
+  expire_time   DateTime // Calculated as now() + expire_in seconds
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Product {
+  id            Int      @id @default(autoincrement())
+  shopId        Int
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  item_id       BigInt   @unique // Shopee's item_id
+  product_name  String
+  description   String?
+  price         Float
+  stock         Int
+  rating_star   Float?
+  sales         Int?
+  views         Int?
+  images        String[] // Array of image URLs
+  attributes    Json?    // Ficha técnica (JSON object)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Order {
+  id              Int        @id @default(autoincrement())
+  shopId          Int
+  shop            Shop       @relation(fields: [shopId], references: [id])
+  order_sn        String     @unique // Shopee's order_sn
+  order_status    String
+  shipping_carrier String?
+  total_amount    Float
+  recipient_address Json?    // Full address details
+  // Add more fields as needed from Shopee API
+  pay_time        DateTime?
+  create_time     DateTime?
+  update_time     DateTime?
+  items           OrderItem[]
+  alerts          Alert[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model OrderItem {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  order       Order    @relation(fields: [orderId], references: [id])
+  item_id     BigInt   // Shopee's item_id
+  item_name   String
+  item_sku    String?
+  model_id    BigInt?
+  model_name  String?
+  model_sku   String?
+  variation_id BigInt?
+  variation_name String?
+  variation_sku String?
+  quantity    Int
+  unit_price  Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Alert {
+  id          Int      @id @default(autoincrement())
+  shopId      Int
+  shop        Shop     @relation(fields: [shopId], references: [id])
+  orderId     Int?
+  order       Order?   @relation(fields: [orderId], references: [id])
+  type        String   // e.g., "ADDRESS_CHANGE", "SHIPPING_DELAY_RISK"
+  message     String
+  is_resolved Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SyncLog {
+  id          Int      @id @default(autoincrement())
+  shopId      Int
+  shop        Shop     @relation(fields: [shopId], references: [id])
+  sync_type   String   // e.g., "PRODUCT", "ORDER"
+  status      String   // e.g., "SUCCESS", "FAILED"
+  message     String?
+  createdAt   DateTime @default(now())
+}
