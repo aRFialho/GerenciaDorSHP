@@ -27,12 +27,19 @@ function throwShopeeErrorIfPresent(data) {
 }
 
 async function exchangeCodeForToken({ code, shopId, mainAccountId }) {
+  const sid = Number(shopId);
+  if (!Number.isInteger(sid) || sid <= 0) {
+    const err = new Error("shop_id inválido no callback");
+    err.statusCode = 400;
+    throw err;
+  }
+
   const data = await requestShopee({
     method: "post",
     path: "/api/v2/auth/token/get",
     body: {
       code,
-      shop_id: Number(shopId),
+      shop_id: sid,
       main_account_id: mainAccountId ? Number(mainAccountId) : undefined,
     },
     signType: "auth",
@@ -55,7 +62,7 @@ async function exchangeCodeForToken({ code, shopId, mainAccountId }) {
   }
 
   await TokenRepository.saveTokens({
-    shopId,
+    shopId: sid,
     accessToken: payload.access_token,
     accessExpiresIn: payload.expire_in,
     refreshToken: payload.refresh_token,

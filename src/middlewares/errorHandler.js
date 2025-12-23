@@ -1,11 +1,8 @@
 function redactShopeePayload(shopee) {
   if (!shopee || typeof shopee !== "object") return shopee;
-
   const safe = { ...shopee };
-
   if (safe.access_token) safe.access_token = "[REDACTED]";
   if (safe.refresh_token) safe.refresh_token = "[REDACTED]";
-
   return safe;
 }
 
@@ -25,7 +22,10 @@ function errorHandler(err, req, res, next) {
     payload.error.shopee = redactShopeePayload(err.shopee);
   }
 
-  if (process.env.NODE_ENV !== "production") {
+  // Diagnóstico SEM stack: ajuda muito no Render
+  if (status === 500) {
+    payload.error.details = err.message;
+  } else if (process.env.NODE_ENV !== "production") {
     payload.error.details = err.message;
     payload.error.stack = err.stack;
   }
