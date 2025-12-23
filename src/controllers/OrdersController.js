@@ -30,10 +30,10 @@ async function listLastDays(req, res) {
   const timeFrom = timeTo - rangeDays * 24 * 60 * 60;
 
   const list = await requestShopeeAuthed({
-    method: "post",
+    method: "get",
     path: "/api/v2/order/get_order_list",
     shopId,
-    body: {
+    query: {
       time_range_field: "update_time",
       time_from: timeFrom,
       time_to: timeTo,
@@ -48,12 +48,12 @@ async function listLastDays(req, res) {
   let details = { response: { order_list: [] } };
   if (orderSnList.length > 0) {
     details = await requestShopeeAuthed({
-      method: "post",
+      method: "get",
       path: "/api/v2/order/get_order_detail",
       shopId,
-      body: {
-        order_sn_list: orderSnList,
-        response_optional_fields: [
+      query: {
+        order_sn_list: JSON.stringify(orderSnList),
+        response_optional_fields: JSON.stringify([
           "buyer_user_id",
           "buyer_username",
           "recipient_address",
@@ -61,7 +61,7 @@ async function listLastDays(req, res) {
           "order_status",
           "create_time",
           "update_time",
-        ],
+        ]),
       },
     });
   }

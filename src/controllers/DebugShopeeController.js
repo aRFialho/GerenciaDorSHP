@@ -12,10 +12,10 @@ async function orderList(req, res) {
   const timeFrom = timeTo - rangeDays * 24 * 60 * 60;
 
   const payload = await requestShopeeAuthed({
-    method: "post",
+    method: "get",
     path: "/api/v2/order/get_order_list",
     shopId,
-    body: {
+    query: {
       time_range_field: "update_time",
       time_from: timeFrom,
       time_to: timeTo,
@@ -38,18 +38,18 @@ async function orderDetail(req, res) {
   }
 
   const payload = await requestShopeeAuthed({
-    method: "post",
+    method: "get",
     path: "/api/v2/order/get_order_detail",
     shopId,
-    body: {
-      order_sn_list: [orderSn],
-      response_optional_fields: [
+    query: {
+      order_sn_list: JSON.stringify([orderSn]),
+      response_optional_fields: JSON.stringify([
         "recipient_address",
         "order_status",
         "create_time",
         "update_time",
         "item_list",
-      ],
+      ]),
     },
   });
 
