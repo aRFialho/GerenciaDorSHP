@@ -1,3 +1,14 @@
+function redactShopeePayload(shopee) {
+  if (!shopee || typeof shopee !== "object") return shopee;
+
+  const safe = { ...shopee };
+
+  if (safe.access_token) safe.access_token = "[REDACTED]";
+  if (safe.refresh_token) safe.refresh_token = "[REDACTED]";
+
+  return safe;
+}
+
 function errorHandler(err, req, res, next) {
   const status =
     err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -11,7 +22,7 @@ function errorHandler(err, req, res, next) {
 
   if (err.shopee) {
     payload.error.type = "shopee_error";
-    payload.error.shopee = err.shopee;
+    payload.error.shopee = redactShopeePayload(err.shopee);
   }
 
   if (process.env.NODE_ENV !== "production") {

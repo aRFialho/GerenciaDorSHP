@@ -1,6 +1,31 @@
 const { requestShopee } = require("./ShopeeHttp");
 const TokenRepository = require("../repositories/TokenRepository");
 
+function normalizeShopeePayload(data) {
+  if (!data) return null;
+
+  // Formato comum: { data: { ... } }
+  if (data.data && typeof data.data === "object") return data.data;
+
+  // Formato que você recebeu: { access_token, refresh_token, expire_in, ... }
+  return data;
+}
+
+function throwShopeeErrorIfPresent(data) {
+  // Só trate como erro quando houver sinal real de erro no body
+  const hasErrorMessage =
+    typeof data?.message === "string" && data.message.trim().length > 0;
+  const hasErrorField =
+    typeof data?.error === "string" && data.error.trim().length > 0;
+
+  if (hasErrorMessage || hasErrorField) {
+    const err = new Error("Shopee API error");
+    err.statusCode = 502;
+    err.shopee = data;
+    throw err;
+  }
+}
+
 async function exchangeCodeForToken({ code, shopId, mainAccountId }) {
   const data = await requestShopee({
     method: "post",
@@ -13,17 +38,19 @@ async function exchangeCodeForToken({ code, shopId, mainAccountId }) {
     signType: "auth",
   });
 
-  if (data && !data.data && (data.message || data.error || data.request_id)) {
-    const err = new Error("Shopee API error");
-    err.statusCode = 502;
-    err.shopee = data;
-    throw err;
-  }
+  throwShopeeErrorIfPresent(data);
 
-  const payload = data && data.data ? data.data : null;
-  if (!payload) {
+  const payload = normalizeShopeePayload(data);
+
+  if (
+    !payload ||
+    !payload.access_token ||
+    !payload.refresh_token ||
+    !payload.expire_in
+  ) {
     const err = new Error("Resposta inválida da Shopee (token/get)");
     err.statusCode = 502;
+    err.shopee = data;
     throw err;
   }
 
@@ -56,17 +83,19 @@ async function refreshAccessToken({ shopId }) {
     signType: "auth",
   });
 
-  if (data && !data.data && (data.message || data.error || data.request_id)) {
-    const err = new Error("Shopee API error");
-    err.statusCode = 502;
-    err.shopee = data;
-    throw err;
-  }
+  throwShopeeErrorIfPresent(data);
 
-  const payload = data && data.data ? data.data : null;
-  if (!payload) {
+  const payload = normalizeShopeePayload(data);
+
+  if (
+    !payload ||
+    !payload.access_token ||
+    !payload.refresh_token ||
+    !payload.expire_in
+  ) {
     const err = new Error("Resposta inválida da Shopee (access_token/get)");
     err.statusCode = 502;
+    err.shopee = data;
     throw err;
   }
 
