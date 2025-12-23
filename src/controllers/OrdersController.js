@@ -11,10 +11,9 @@ function nowTs() {
 }
 
 function buildAlertsFromOrder(order) {
-  // Placeholder: encaixar suas regras reais de "alerta de endereço" e "atraso"
-  // Quando você colar suas funções atuais, eu conecto aqui.
   return {
-    address: false,
+    addressChanged: false,
+    atRisk: false,
     late: false,
   };
 }
@@ -25,12 +24,11 @@ async function listLastDays(req, res) {
   const pageSize = req.query.pageSize
     ? Math.min(Number(req.query.pageSize), 100)
     : 50;
-  const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
+  const cursor = req.query.cursor ? String(req.query.cursor) : "";
 
   const timeTo = nowTs();
   const timeFrom = timeTo - rangeDays * 24 * 60 * 60;
 
-  // 1) listar order_sn
   const list = await requestShopeeAuthed({
     method: "post",
     path: "/api/v2/order/get_order_list",
@@ -40,14 +38,13 @@ async function listLastDays(req, res) {
       time_from: timeFrom,
       time_to: timeTo,
       page_size: pageSize,
-      cursor: cursor || "",
+      cursor,
     },
   });
 
   const orderSnList =
     list?.response?.order_sn_list || list?.order_sn_list || [];
 
-  // 2) detalhes (em lote)
   let details = { response: { order_list: [] } };
   if (orderSnList.length > 0) {
     details = await requestShopeeAuthed({
@@ -70,7 +67,6 @@ async function listLastDays(req, res) {
   }
 
   const orders = details?.response?.order_list || details?.order_list || [];
-
   const enriched = orders.map((o) => ({
     ...o,
     alerts: buildAlertsFromOrder(o),
