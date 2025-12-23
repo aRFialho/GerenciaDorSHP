@@ -6,7 +6,6 @@ const productsRoutes = require("./products.routes");
 const debugRoutes = require("./debug.routes");
 
 const router = express.Router();
-const ordersRoutes = require("./orders.routes");
 
 if (process.env.ENABLE_DEBUG_ROUTES === "true") {
   router.use(debugRoutes);
