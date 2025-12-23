@@ -8,26 +8,88 @@ datasource db {
 }
 
 model Shop {
-  id          Int          @id @default(autoincrement())
-  shopId      BigInt       @unique
-  region      String?
-  status      String       @default("UNKNOWN")
+  id     Int     @id @default(autoincrement())
+  shopId BigInt  @unique
+  region String?
+  status String  @default("UNKNOWN")
 
-  tokens      OAuthToken?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  tokens OAuthToken?
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model OAuthToken {
-  id                  Int      @id @default(autoincrement())
-  shopId              Int      @unique
-  shop                Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  id     Int  @id @default(autoincrement())
+  shopId Int  @unique
+  shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  accessToken         String?  @db.Text
-  accessTokenExpiresAt DateTime?
-  refreshToken        String?  @db.Text
+  accessToken           String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshToken          String?   @db.Text
   refreshTokenExpiresAt DateTime?
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id Int @id @default(autoincrement())
+
+  shopId Int
+  shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  orderSn     String
+  orderStatus String?
+  region      String?
+  currency    String?
+
+  daysToShip Int?
+  shipByDate DateTime?
+
+  shopeeCreateTime DateTime?
+  shopeeUpdateTime DateTime?
+
+  bookingSn             String?
+  cod                   Boolean?
+  advancePackage        Boolean?
+  hotListingOrder       Boolean?
+  isBuyerShopCollection Boolean?
+  messageToSeller       String?  @db.Text
+
+  reverseShippingFee Int?
+
+  addressSnapshots OrderAddressSnapshot[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([shopId, orderSn])
+  @@index([shopId, orderStatus])
+  @@index([shopId, shipByDate])
+}
+
+model OrderAddressSnapshot {
+  id Int @id @default(autoincrement())
+
+  orderId Int
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  name        String?
+  phone       String?
+  town        String?
+  district    String?
+  city        String?
+  state       String?
+  region      String?
+  zipcode     String?
+  fullAddress String? @db.Text
+
+  addressHash String
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([addressHash])
 }

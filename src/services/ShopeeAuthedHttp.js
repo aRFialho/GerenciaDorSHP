@@ -44,7 +44,7 @@ async function requestShopeeAuthed({ method, path, query, body, shopId }) {
       query,
       body,
       accessToken,
-      shopId: Number(shopId),
+      shopId: String(shopId),
       signType: "api",
     });
   } catch (err) {
@@ -58,7 +58,7 @@ async function requestShopeeAuthed({ method, path, query, body, shopId }) {
         query,
         body,
         accessToken: refreshed.access_token,
-        shopId: Number(shopId),
+        shopId: String(shopId),
         signType: "api",
       });
     }

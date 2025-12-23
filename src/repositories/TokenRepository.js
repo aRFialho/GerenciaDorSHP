@@ -1,17 +1,41 @@
 const prisma = require("../config/db");
 
-async function upsertShop(shopId, region) {
+function toBigIntShopId(shopId) {
   if (shopId === undefined || shopId === null) {
-    const err = new Error("shopId ausente ao salvar tokens");
-    err.statusCode = 500;
+    const err = new Error("shopId ausente");
+    err.statusCode = 400;
     throw err;
   }
 
+  const s = String(shopId).trim();
+  if (!s) {
+    const err = new Error("shopId vazio");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  try {
+    return BigInt(s);
+  } catch {
+    const err = new Error(
+      "shopId inválido (não foi possível converter para BigInt)"
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+}
+
+async function upsertShop(shopId, region) {
+  const shopeeShopId = toBigIntShopId(shopId);
+
   return prisma.shop.upsert({
-    where: { shopId: BigInt(shopId) },
-    update: { region: region || undefined, status: "AUTHORIZED" },
+    where: { shopId: shopeeShopId },
+    update: {
+      region: region || undefined,
+      status: "AUTHORIZED",
+    },
     create: {
-      shopId: BigInt(shopId),
+      shopId: shopeeShopId,
       region: region || null,
       status: "AUTHORIZED",
     },
@@ -36,7 +60,7 @@ async function saveTokens({
     : null;
 
   return prisma.oAuthToken.upsert({
-    where: { shopId: shop.id },
+    where: { shopId: shop.id }, // FK para Shop.id (Int)
     update: {
       accessToken: accessToken || undefined,
       accessTokenExpiresAt,
@@ -54,12 +78,15 @@ async function saveTokens({
 }
 
 async function getTokensByShopId(shopId) {
+  const shopeeShopId = toBigIntShopId(shopId);
+
   const shop = await prisma.shop.findUnique({
-    where: { shopId: BigInt(shopId) },
+    where: { shopId: shopeeShopId },
     include: { tokens: true },
   });
 
   if (!shop || !shop.tokens) return null;
+
   return { shop, tokens: shop.tokens };
 }
 
