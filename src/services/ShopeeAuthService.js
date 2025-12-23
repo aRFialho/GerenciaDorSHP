@@ -3,14 +3,15 @@ const TokenRepository = require("../repositories/TokenRepository");
 
 async function exchangeCodeForToken({ code, shopId, mainAccountId }) {
   const data = await requestShopee({
-    method: "post",
-    path: "/api/v2/auth/token/get",
-    body: {
-      code,
-      shop_id: Number(shopId),
-      main_account_id: mainAccountId ? Number(mainAccountId) : undefined
-    }
-  });
+   method: "post",
+   path: "/api/v2/auth/token/get",
+   body: {
+    code,
+    shop_id: Number(shopId),
+    main_account_id: mainAccountId ? Number(mainAccountId) : undefined
+  },
+  signType: "auth"
+});
 
   const payload = data && data.data ? data.data : null;
   if (!payload) {
