@@ -8,6 +8,11 @@ const errorHandler = require("./middlewares/errorHandler");
 const routes = require("./routes");
 const env = require("./config/env");
 
+// BigInt -> JSON (uma vez só)
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 function createApp() {
   const app = express();
 

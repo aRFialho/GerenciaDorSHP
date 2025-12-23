@@ -171,4 +171,17 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
   };
 }
 
+async function mapLimit(list, limit, fn) {
+  const ret = [];
+  const executing = new Set();
+  for (const item of list) {
+    const p = Promise.resolve().then(() => fn(item));
+    ret.push(p);
+    executing.add(p);
+    p.finally(() => executing.delete(p));
+    if (executing.size >= limit) await Promise.race(executing);
+  }
+  return Promise.allSettled(ret);
+}
+
 module.exports = { syncProductsForShop };
