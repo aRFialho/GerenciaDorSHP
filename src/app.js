@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
+const path = require("path");
 
 const requestLogger = require("./middlewares/requestLogger");
 const errorHandler = require("./middlewares/errorHandler");
@@ -20,15 +21,19 @@ function createApp() {
 
   app.use(requestLogger());
 
-  app.get("/", (req, res) => {
+  app.get("/status", (req, res) => {
     res.json({
       name: "DAVANTTI Shopee API",
       apiBaseUrl: env.API_BASE_URL,
-      status: "running"
+      status: "running",
     });
   });
 
   app.use(routes);
+
+  app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "index.html"));
+  });
 
   app.use(errorHandler);
 
