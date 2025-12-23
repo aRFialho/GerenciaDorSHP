@@ -42,14 +42,14 @@ async function orderDetail(req, res) {
     path: "/api/v2/order/get_order_detail",
     shopId,
     query: {
-      order_sn_list: JSON.stringify([orderSn]),
-      response_optional_fields: JSON.stringify([
+      order_sn_list: [orderSn],
+      response_optional_fields: [
         "recipient_address",
         "order_status",
         "create_time",
         "update_time",
         "item_list",
-      ]),
+      ],
     },
   });
 
