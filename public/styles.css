@@ -116,3 +116,16 @@ body {
 @media (max-width: 640px) {
   .grid { grid-template-columns: 1fr; }
 }
+.btn {
+  border: 1px solid rgba(238, 77, 45, 0.7);
+  background: rgba(238, 77, 45, 0.18);
+  color: rgba(255,255,255,0.95);
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.btn:hover {
+  background: rgba(238, 77, 45, 0.26);
+}
