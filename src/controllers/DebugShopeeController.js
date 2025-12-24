@@ -5,7 +5,7 @@ function nowTs() {
 }
 
 async function orderList(req, res) {
-  const { shopId } = req.params;
+  const shopId = normalizeNumericId(req.params.shopId, "shopId");
   const rangeDays = req.query.rangeDays ? Number(req.query.rangeDays) : 7;
 
   const timeTo = nowTs();
@@ -28,7 +28,7 @@ async function orderList(req, res) {
 }
 
 async function orderDetail(req, res) {
-  const { shopId } = req.params;
+  const shopId = normalizeNumericId(req.params.shopId, "shopId");
   const orderSn = String(req.query.order_sn || "").trim();
 
   if (!orderSn) {
@@ -65,7 +65,7 @@ async function orderDetail(req, res) {
 }
 
 async function orderDetailRaw(req, res) {
-  const { shopId, orderSn } = req.params;
+  const shopId = normalizeNumericId(req.params.shopId, "shopId");
 
   const payload = await requestShopeeAuthed({
     method: "get",
@@ -93,5 +93,16 @@ async function orderDetailRaw(req, res) {
 
   res.json(payload);
 }
+function normalizeNumericId(value, fieldName) {
+  const raw = String(value ?? "").trim();
 
+  // aceita só dígitos
+  if (!/^\d+$/.test(raw)) {
+    const err = new Error(`${fieldName} inválido (deve conter apenas dígitos)`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  return raw;
+}
 module.exports = { orderList, orderDetail, orderDetailRaw };
