@@ -1,10 +1,28 @@
 const prisma = require("../config/db");
-const { requestShopeeAuthed } = require("./ShopeeAuthedHttp");
+const ShopeeProductService = require("./ShopeeProductService");
 
 function chunk(arr, size) {
   const out = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
+}
+
+async function mapLimit(list, limit, fn) {
+  const ret = [];
+  const executing = new Set();
+
+  for (const item of list) {
+    const p = Promise.resolve().then(() => fn(item));
+    ret.push(p);
+    executing.add(p);
+    p.finally(() => executing.delete(p));
+
+    if (executing.size >= limit) {
+      await Promise.race(executing);
+    }
+  }
+
+  return Promise.allSettled(ret);
 }
 
 async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
@@ -18,6 +36,11 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
     throw err;
   }
 
+  const MODEL_CONCURRENCY = Math.max(
+    1,
+    Number(process.env.MODEL_FETCH_CONCURRENCY || 6)
+  );
+
   let offset = 0;
   let hasNext = true;
 
@@ -25,16 +48,11 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
   let upserted = 0;
 
   while (hasNext) {
-    // Shopee: lista de itens
-    const list = await requestShopeeAuthed({
-      method: "get",
-      path: "/api/v2/product/get_item_list",
-      shopId: String(shopeeShopId),
-      query: {
-        offset,
-        page_size: pageSize,
-        item_status: "NORMAL",
-      },
+    const list = await ShopeeProductService.getItemList({
+      shopId: shopeeShopId,
+      offset,
+      pageSize,
+      itemStatus: "NORMAL",
     });
 
     const items = list?.response?.item || [];
@@ -49,17 +67,41 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
       continue;
     }
 
-    // Shopee: detalhes base em lote (20)
     for (const batch of chunk(itemIds, 20)) {
-      const details = await requestShopeeAuthed({
-        method: "get",
-        path: "/api/v2/product/get_item_base_info",
-        shopId: String(shopeeShopId),
-        query: { item_id_list: batch },
+      const details = await ShopeeProductService.getItemBaseInfo({
+        shopId: shopeeShopId,
+        itemIdList: batch,
       });
 
       const baseList = details?.response?.item_list || [];
 
+      // 1) Pré-busca modelos em paralelo (apenas quem tem variação)
+      const withModel = baseList.filter((p) => p?.has_model && p?.item_id);
+
+      const modelResults = await mapLimit(
+        withModel,
+        MODEL_CONCURRENCY,
+        async (p) => {
+          const resp = await ShopeeProductService.getModelList({
+            shopId: shopeeShopId,
+            itemId: p.item_id,
+          });
+
+          return {
+            item_id: String(p.item_id),
+            models: resp?.response?.model || [],
+          };
+        }
+      );
+
+      const modelsByItemId = new Map();
+      for (const r of modelResults) {
+        if (r.status === "fulfilled") {
+          modelsByItemId.set(r.value.item_id, r.value.models);
+        }
+      }
+
+      // 2) Persistência no DB
       for (const p of baseList) {
         const itemId = BigInt(String(p.item_id));
 
@@ -103,7 +145,7 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
 
         upserted += 1;
 
-        // Imagens: regrava o conjunto (simples e consistente)
+        // Imagens
         if (Array.isArray(p.image?.image_url_list)) {
           await prisma.productImage.deleteMany({
             where: { productId: product.id },
@@ -120,20 +162,13 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
           }
         }
 
-        // Modelos/variações: busca e regrava
+        // Modelos
+        await prisma.productModel.deleteMany({
+          where: { productId: product.id },
+        });
+
         if (p.has_model) {
-          const modelsResp = await requestShopeeAuthed({
-            method: "get",
-            path: "/api/v2/product/get_model_list",
-            shopId: String(shopeeShopId),
-            query: { item_id: String(p.item_id) },
-          });
-
-          const modelList = modelsResp?.response?.model || [];
-
-          await prisma.productModel.deleteMany({
-            where: { productId: product.id },
-          });
+          const modelList = modelsByItemId.get(String(p.item_id)) || [];
 
           if (modelList.length) {
             await prisma.productModel.createMany({
@@ -150,11 +185,6 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
               skipDuplicates: true,
             });
           }
-        } else {
-          // se não tem modelo, garante que não sobra lixo antigo
-          await prisma.productModel.deleteMany({
-            where: { productId: product.id },
-          });
         }
       }
     }
@@ -169,19 +199,6 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
     shop_id: String(shopeeShopId),
     summary: { fetched, upserted },
   };
-}
-
-async function mapLimit(list, limit, fn) {
-  const ret = [];
-  const executing = new Set();
-  for (const item of list) {
-    const p = Promise.resolve().then(() => fn(item));
-    ret.push(p);
-    executing.add(p);
-    p.finally(() => executing.delete(p));
-    if (executing.size >= limit) await Promise.race(executing);
-  }
-  return Promise.allSettled(ret);
 }
 
 module.exports = { syncProductsForShop };

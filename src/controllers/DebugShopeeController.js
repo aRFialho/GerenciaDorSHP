@@ -52,8 +52,28 @@ async function orderDetail(req, res) {
       ],
     },
   });
+  async function orderDetailRaw(req, res) {
+    const { shopId, orderSn } = req.params;
 
+    const payload = await requestShopeeAuthed({
+      method: "get",
+      path: "/api/v2/order/get_order_detail",
+      shopId,
+      query: {
+        order_sn_list: [String(orderSn)],
+        response_optional_fields: [
+          "recipient_address",
+          "order_status",
+          "create_time",
+          "update_time",
+          "item_list",
+        ],
+      },
+    });
+
+    res.json(payload);
+  }
   res.json(payload);
 }
 
-module.exports = { orderList, orderDetail };
+module.exports = { orderList, orderDetail, orderDetailRaw };

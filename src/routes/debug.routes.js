@@ -11,5 +11,8 @@ router.get(
   "/debug/shops/:shopId/orders/detail",
   DebugShopeeController.orderDetail
 );
-
+router.get(
+  "/debug/shops/:shopId/orders/:orderSn/raw",
+  DebugShopeeController.orderDetailRaw
+);
 module.exports = router;
