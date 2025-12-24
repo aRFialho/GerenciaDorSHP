@@ -37,11 +37,15 @@ async function requestShopee({
   shopId,
   signType = "api",
 }) {
-  if (!shopee.PARTNER_ID || !shopee.PARTNER_KEY) {
+  const partnerId = shopee.PARTNER_ID;
+  const partnerKey = shopee.PARTNER_KEY;
+
+  if (!partnerId || !partnerKey) {
     const e = new Error("Config Shopee ausente: PARTNER_ID/PARTNER_KEY");
     e.statusCode = 500;
     throw e;
   }
+
   const timestamp = nowTs();
   const signature = sign({ path, timestamp, accessToken, shopId, signType });
 
@@ -49,21 +53,35 @@ async function requestShopee({
 
   const params = {
     ...query,
-    partner_id: Number(shopee.PARTNER_ID),
+    partner_id: Number(partnerId),
     timestamp,
     sign: signature,
   };
 
   if (accessToken) params.access_token = accessToken;
-  if (shopId !== undefined && shopId !== null) params.shop_id = shopId;
+  if (shopId !== undefined && shopId !== null) params.shop_id = Number(shopId);
+
+  let data = body;
+
+  // ✅ garante compatibilidade com endpoints de AUTH que exigem partner_id no body
+  if (
+    signType === "auth" &&
+    data &&
+    typeof data === "object" &&
+    !Array.isArray(data)
+  ) {
+    data = { partner_id: Number(partnerId), ...data };
+  }
+
   console.log("[ShopeeHttp] URL:", url);
+
   try {
     const res = await axios({
       method,
       url,
       params,
       paramsSerializer: (p) => qs.stringify(p, { arrayFormat: "repeat" }),
-      data: body,
+      data,
       timeout: 20000,
     });
     return res.data;
