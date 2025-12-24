@@ -229,3 +229,11 @@ body {
   border-color: rgba(255,255,255,0.18);
   background: rgba(255,255,255,0.06);
 }
+.product-cover{
+  width:100%;
+  aspect-ratio:1/1;
+  border-radius:12px;
+  margin:10px 0;
+  border:1px solid rgba(255,255,255,0.10);
+  object-fit:cover;
+}

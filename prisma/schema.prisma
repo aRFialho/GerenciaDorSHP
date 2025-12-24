@@ -105,10 +105,11 @@ model Product {
   status      String?
   title       String?
   description String? @db.Text
-
-  currency String?
-  priceMin Int?
-  priceMax Int?
+  ratingStar  Float?
+  ratingCount Int?
+  currency    String?
+  priceMin    Int?
+  priceMax    Int?
 
   stock Int?
   sold  Int?
@@ -130,12 +131,12 @@ model Product {
 }
 
 model ProductImage {
-  id Int @id @default(autoincrement())
-
+  id        Int     @id @default(autoincrement())
   productId Int
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  url String
+  url     String
+  imageId String? // <- novo: o id retornado pelo upload
 
   @@index([productId])
 }
@@ -146,12 +147,14 @@ model ProductModel {
   productId Int
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  modelId BigInt
-  name    String?
-  sku     String?
-  price   Int?
-  stock   Int?
-  sold    Int?
+  modelId     BigInt
+  name        String?
+  sku         String?
+  price       Int?
+  stock       Int?
+  sold        Int?
+  ratingStar  Float?
+  ratingCount Int?
 
   @@unique([productId, modelId])
   @@index([productId])

@@ -226,17 +226,22 @@ async function loadProducts() {
         const stock = escapeHtml(p.stock ?? "—");
         const sold = escapeHtml(p.sold ?? "—");
         const img = p.images?.[0]?.url ? escapeHtml(p.images[0].url) : "";
+        const ratingStar = p.ratingStar ?? null;
+        const ratingCount = p.ratingCount ?? null;
 
+        const ratingText =
+          ratingStar == null
+            ? "⭐ —"
+            : `⭐ ${Number(ratingStar).toFixed(1)}${
+                ratingCount != null ? ` (${ratingCount})` : ""
+              }`;
         return `
           <div class="card clickable" data-item-id="${itemId}">
             <div class="card-title">${title}</div>
-            ${
-              img
-                ? `<img src="${img}" alt="" style="width:100%; border-radius:12px; margin:10px 0; border:1px solid rgba(255,255,255,0.10);" />`
-                : ""
-            }
+            ${img ? `<img class="product-cover" src="${img}" alt="" />` : ""}
             <div class="muted">Item ID: ${itemId}</div>
             <div class="muted">Status: ${status}</div>
+            <div class="muted">${escapeHtml(ratingText)}</div>
             <div class="muted">Estoque: ${stock} • Vendidos: ${sold}</div>
           </div>
         `;

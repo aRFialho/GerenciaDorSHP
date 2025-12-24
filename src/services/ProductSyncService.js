@@ -118,6 +118,8 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
             priceMax: p.price_info?.[0]?.current_price ?? null,
             stock: p.stock_info_v2?.summary_info?.total_available_stock ?? null,
             sold: p.sold ?? null,
+            ratingStar: p.rating?.rating_star ?? null,
+            ratingCount: p.rating?.rating_count ?? null,
             hasModel: p.has_model ?? null,
             brand: p.brand?.name || null,
             categoryId: p.category_id ? BigInt(String(p.category_id)) : null,
@@ -134,6 +136,8 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
             stock:
               p.stock_info_v2?.summary_info?.total_available_stock ?? undefined,
             sold: p.sold ?? undefined,
+            ratingStar: p.rating?.rating_star ?? null,
+            ratingCount: p.rating?.rating_count ?? null,
             hasModel: p.has_model ?? undefined,
             brand: p.brand?.name || null,
             categoryId: p.category_id ? BigInt(String(p.category_id)) : null,
