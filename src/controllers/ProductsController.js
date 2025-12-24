@@ -61,31 +61,78 @@ async function persistImagesFromUpdateItemResponse(productId, updated) {
 /* ---------------- Products (DB) ---------------- */
 async function list(req, res) {
   const { shopId } = req.params;
-  const limit = Math.min(Number(req.query.limit || 60), 200);
 
   const shop = await getShopOr404(res, shopId);
   if (!shop) return;
 
-  const items = await prisma.product.findMany({
-    where: { shopId: shop.id },
-    orderBy: { updatedAt: "desc" },
-    take: limit,
-    select: {
-      itemId: true,
-      status: true,
-      title: true,
-      stock: true,
-      sold: true,
-      ratingStar: true,
-      ratingCount: true,
-      priceMin: true,
-      priceMax: true,
-      currency: true,
-      images: { take: 1, select: { url: true } },
-    },
+  // paginação
+  const pageRaw = Number(req.query.page || 1);
+  const page =
+    Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+
+  const pageSizeRaw =
+    req.query.pageSize != null ? Number(req.query.pageSize) : null;
+
+  // compat: se não vier page/pageSize, aceita limit (cap 200) como pageSize e page=1
+  const usingLegacyLimit =
+    req.query.page == null &&
+    req.query.pageSize == null &&
+    req.query.limit != null;
+  const legacyLimitRaw = usingLegacyLimit ? Number(req.query.limit) : null;
+
+  let pageSize;
+  if (usingLegacyLimit) {
+    pageSize = Math.min(200, Math.max(1, Math.floor(legacyLimitRaw || 60)));
+  } else if ([25, 50, 100].includes(pageSizeRaw)) {
+    pageSize = pageSizeRaw;
+  } else {
+    pageSize = 50;
+  }
+
+  const skip = (page - 1) * pageSize;
+  const take = pageSize;
+
+  const [total, rows] = await Promise.all([
+    prisma.product.count({ where: { shopId: shop.id } }),
+    prisma.product.findMany({
+      where: { shopId: shop.id },
+      orderBy: { updatedAt: "desc" },
+      skip,
+      take,
+      select: {
+        itemId: true,
+        status: true,
+        title: true,
+        sold: true,
+        ratingStar: true,
+        ratingCount: true,
+        priceMin: true,
+        priceMax: true,
+        currency: true,
+        hasModel: true,
+        stock: true,
+        images: { take: 1, select: { url: true } },
+        models: { select: { stock: true } }, // só para somar
+      },
+    }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const items = rows.map((p) => {
+    const totalStock = p.hasModel
+      ? (p.models || []).reduce((acc, m) => acc + (Number(m.stock) || 0), 0)
+      : p.stock ?? null;
+
+    // remove `models` da resposta (só era usado para somar)
+    const { models, ...rest } = p;
+    return { ...rest, totalStock };
   });
 
-  res.json({ items });
+  res.json({
+    items,
+    meta: { page, pageSize, total, totalPages },
+  });
 }
 
 async function detail(req, res) {

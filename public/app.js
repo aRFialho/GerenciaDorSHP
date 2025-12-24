@@ -1,4 +1,7 @@
 const SHOP_ID = "348584331"; // ajuste se quiser tornar dinâmico depois
+let PRODUCTS_PAGE = 1;
+let PRODUCTS_PAGE_SIZE = 50;
+let PRODUCTS_TOTAL_PAGES = 1;
 
 function $(sel) {
   return document.querySelector(sel);
@@ -209,10 +212,21 @@ async function loadProducts() {
   grid.innerHTML = `<div class="card"><div class="muted">Carregando produtos...</div></div>`;
 
   try {
-    // precisa existir no backend: GET /shops/:shopId/products  (DB)
-    const data = await apiGet(`/shops/${SHOP_ID}/products?limit=60`);
+    const data = await apiGet(
+      `/shops/${SHOP_ID}/products?page=${PRODUCTS_PAGE}&pageSize=${PRODUCTS_PAGE_SIZE}`
+    );
 
     const items = data.items || data.products || [];
+    const meta = data.meta || {};
+
+    PRODUCTS_TOTAL_PAGES = meta.totalPages || 1;
+    setText(
+      "products-page-info",
+      `Página ${
+        meta.page || PRODUCTS_PAGE
+      } de ${PRODUCTS_TOTAL_PAGES} • Total: ${meta.total ?? "—"}`
+    );
+
     if (!items.length) {
       grid.innerHTML = `<div class="card"><div class="muted">Nenhum produto encontrado no banco. Clique em "Sincronizar Produtos".</div></div>`;
       return;
@@ -223,18 +237,39 @@ async function loadProducts() {
         const itemId = escapeHtml(p.itemId ?? p.item_id);
         const title = escapeHtml(p.title || p.item_name || "Sem título");
         const status = escapeHtml(p.status || p.item_status || "—");
-        const stock = escapeHtml(p.stock ?? "—");
+
+        const stockValue = p.totalStock ?? p.stock;
+        const stock = escapeHtml(stockValue ?? "—");
+
         const sold = escapeHtml(p.sold ?? "—");
         const img = p.images?.[0]?.url ? escapeHtml(p.images[0].url) : "";
+
         const ratingStar = p.ratingStar ?? null;
         const ratingCount = p.ratingCount ?? null;
 
+        const ratingStarNum = ratingStar == null ? null : Number(ratingStar);
         const ratingText =
-          ratingStar == null
+          ratingStarNum == null || Number.isNaN(ratingStarNum)
             ? "⭐ —"
-            : `⭐ ${Number(ratingStar).toFixed(1)}${
+            : `⭐ ${ratingStarNum.toFixed(1)}${
                 ratingCount != null ? ` (${ratingCount})` : ""
               }`;
+
+        // preço (quando backend devolver priceMin/priceMax)
+        const currency = p.currency || "";
+        const priceMin = p.priceMin ?? null;
+        const priceMax = p.priceMax ?? null;
+
+        let priceText = "Preço: —";
+        if (priceMin != null && priceMax != null) {
+          priceText =
+            priceMin === priceMax
+              ? `Preço: ${escapeHtml(currency)} ${escapeHtml(priceMin)}`
+              : `Preço: ${escapeHtml(currency)} ${escapeHtml(
+                  priceMin
+                )} – ${escapeHtml(priceMax)}`;
+        }
+
         return `
           <div class="card clickable" data-item-id="${itemId}">
             <div class="card-title">${title}</div>
@@ -242,6 +277,7 @@ async function loadProducts() {
             <div class="muted">Item ID: ${itemId}</div>
             <div class="muted">Status: ${status}</div>
             <div class="muted">${escapeHtml(ratingText)}</div>
+            <div class="muted">${priceText}</div>
             <div class="muted">Estoque: ${stock} • Vendidos: ${sold}</div>
           </div>
         `;
@@ -291,7 +327,7 @@ async function openProductDetail(itemId) {
     if (Array.isArray(p.images) && p.images.length) {
       html += `<div style="margin-top:14px; font-weight:800;">Imagens</div>`;
       html +=
-        `<div class="grid" style="grid-template-columns: repeat(3, minmax(0, 1fr));">` +
+        `<div class="grid-3">` +
         p.images
           .slice(0, 6)
           .map(
@@ -374,13 +410,40 @@ function initSyncButtons() {
     });
   }
 }
+function initProductsToolbar() {
+  const sel = $("#products-page-size");
+  const prev = $("#products-prev");
+  const next = $("#products-next");
 
+  if (sel) {
+    sel.value = String(PRODUCTS_PAGE_SIZE);
+    sel.addEventListener("change", async () => {
+      PRODUCTS_PAGE_SIZE = Number(sel.value);
+      PRODUCTS_PAGE = 1;
+      await loadProducts();
+    });
+  }
+
+  if (prev) {
+    prev.addEventListener("click", async () => {
+      PRODUCTS_PAGE = Math.max(1, PRODUCTS_PAGE - 1);
+      await loadProducts();
+    });
+  }
+
+  if (next) {
+    next.addEventListener("click", async () => {
+      PRODUCTS_PAGE = Math.min(PRODUCTS_TOTAL_PAGES, PRODUCTS_PAGE + 1);
+      await loadProducts();
+    });
+  }
+}
 /* ---------------- Boot ---------------- */
 async function boot() {
   initTabs();
   initModal();
   initSyncButtons();
-
+  initProductsToolbar();
   // Carrega auth status básico (se você tiver endpoint, plugamos)
   setText("auth-status", "Dashboard pronto. Use as abas para ver dados.");
 

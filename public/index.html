@@ -45,6 +45,22 @@
          <button id="btn-sync-products" class="btn" style="margin-top:10px;">Sincronizar Produtos</button>
          <div id="products-sync-status" class="muted" style="margin-top:10px;"></div>
         </div>
+        <div class="card">
+  <div class="card-title">Visualização</div>
+  <div class="products-toolbar">
+    <label class="muted">Por página:</label>
+    <select id="products-page-size" class="select">
+      <option value="25">25</option>
+      <option value="50" selected>50</option>
+      <option value="100">100</option>
+    </select>
+
+    <button id="products-prev" class="btn">Anterior</button>
+    <button id="products-next" class="btn">Próxima</button>
+
+    <div id="products-page-info" class="muted"></div>
+  </div>
+</div>
         <div id="products-grid" class="grid"></div>
       </section>
 
