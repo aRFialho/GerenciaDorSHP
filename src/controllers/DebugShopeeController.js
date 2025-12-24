@@ -44,43 +44,53 @@ async function orderDetail(req, res) {
     query: {
       order_sn_list: [orderSn],
       response_optional_fields: [
+        "buyer_user_id",
+        "buyer_username",
+        "buyer_cpf_id",
         "recipient_address",
         "order_status",
         "create_time",
         "update_time",
+        "pay_time",
+        "payment_method",
+        "payment_info",
+        "invoice_data",
         "item_list",
+        "total_amount",
       ],
     },
   });
-  async function orderDetailRaw(req, res) {
-    const { shopId, orderSn } = req.params;
 
-    const payload = await requestShopeeAuthed({
-      method: "get",
-      path: "/api/v2/order/get_order_detail",
-      shopId,
-      query: {
-        order_sn_list: [String(orderSn)],
-        response_optional_fields: [
-          "buyer_user_id",
-          "buyer_username",
-          "buyer_cpf_id",
-          "recipient_address",
-          "order_status",
-          "create_time",
-          "update_time",
-          "pay_time",
-          "payment_method",
-          "payment_info",
-          "invoice_data",
-          "item_list",
-          "total_amount",
-        ],
-      },
-    });
+  res.json(payload);
+}
 
-    res.json(payload);
-  }
+async function orderDetailRaw(req, res) {
+  const { shopId, orderSn } = req.params;
+
+  const payload = await requestShopeeAuthed({
+    method: "get",
+    path: "/api/v2/order/get_order_detail",
+    shopId,
+    query: {
+      order_sn_list: [String(orderSn)],
+      response_optional_fields: [
+        "buyer_user_id",
+        "buyer_username",
+        "buyer_cpf_id",
+        "recipient_address",
+        "order_status",
+        "create_time",
+        "update_time",
+        "pay_time",
+        "payment_method",
+        "payment_info",
+        "invoice_data",
+        "item_list",
+        "total_amount",
+      ],
+    },
+  });
+
   res.json(payload);
 }
 
