@@ -8,18 +8,20 @@ const EnvSchema = z.object({
   API_BASE_URL: z.string().url(),
   SHOPEE_API_BASE: z.string().url(),
 
-  SHOPEE_PARTNER_ID: z.string().optional(),
-  SHOPEE_PARTNER_KEY: z.string().optional(),
-  SHOPEE_REDIRECT_URL: z.string().url().optional(),
+  SHOPEE_PARTNER_ID: z.coerce.number().int().positive(),
+  SHOPEE_PARTNER_KEY: z.string().min(10),
+  SHOPEE_REDIRECT_URL: z.string().url(),
 
   DATABASE_URL: z.string().optional(),
-  REDIS_URL: z.string().optional()
+  REDIS_URL: z.string().optional(),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+  const issues = parsed.error.issues
+    .map((i) => `${i.path.join(".")}: ${i.message}`)
+    .join("; ");
   throw new Error(`Variáveis de ambiente inválidas: ${issues}`);
 }
 

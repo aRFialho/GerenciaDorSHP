@@ -37,6 +37,11 @@ async function requestShopee({
   shopId,
   signType = "api",
 }) {
+  if (!shopee.PARTNER_ID || !shopee.PARTNER_KEY) {
+    const e = new Error("Config Shopee ausente: PARTNER_ID/PARTNER_KEY");
+    e.statusCode = 500;
+    throw e;
+  }
   const timestamp = nowTs();
   const signature = sign({ path, timestamp, accessToken, shopId, signType });
 
@@ -44,7 +49,7 @@ async function requestShopee({
 
   const params = {
     ...query,
-    partner_id: shopee.PARTNER_ID,
+    partner_id: Number(shopee.PARTNER_ID),
     timestamp,
     sign: signature,
   };
