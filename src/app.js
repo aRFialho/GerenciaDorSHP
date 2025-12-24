@@ -18,7 +18,17 @@ function createApp() {
 
   app.disable("x-powered-by");
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          "img-src": ["'self'", "data:", "https:"],
+        },
+      },
+    })
+  );
   app.use(cors());
 
   app.use(express.json({ limit: "1mb" }));
