@@ -2,6 +2,9 @@ const SHOP_ID = "348584331"; // ajuste se quiser tornar dinâmico depois
 let PRODUCTS_PAGE = 1;
 let PRODUCTS_PAGE_SIZE = 50;
 let PRODUCTS_TOTAL_PAGES = 1;
+let PRODUCTS_Q = "";
+let PRODUCTS_SORT_BY = "updatedAt"; // updatedAt | createdAt | sold
+let PRODUCTS_SORT_DIR = "desc"; // asc | desc
 
 function $(sel) {
   return document.querySelector(sel);
@@ -226,7 +229,18 @@ async function loadProducts() {
         meta.page || PRODUCTS_PAGE
       } de ${PRODUCTS_TOTAL_PAGES} • Total: ${meta.total ?? "—"}`
     );
+    PRODUCTS_PAGE = meta.page || PRODUCTS_PAGE;
+    PRODUCTS_TOTAL_PAGES = meta.totalPages || 1;
 
+    const prev = $("#products-prev");
+    const next = $("#products-next");
+    const first = $("#products-first");
+    const last = $("#products-last");
+
+    if (prev) prev.disabled = PRODUCTS_PAGE <= 1;
+    if (first) first.disabled = PRODUCTS_PAGE <= 1;
+    if (next) next.disabled = PRODUCTS_PAGE >= PRODUCTS_TOTAL_PAGES;
+    if (last) last.disabled = PRODUCTS_PAGE >= PRODUCTS_TOTAL_PAGES;
     if (!items.length) {
       grid.innerHTML = `<div class="card"><div class="muted">Nenhum produto encontrado no banco. Clique em "Sincronizar Produtos".</div></div>`;
       return;
@@ -305,10 +319,14 @@ async function openProductDetail(itemId) {
 
   try {
     // precisa existir no backend: GET /shops/:shopId/products/:itemId  (DB com models)
-    const data = await apiGet(
-      `/shops/${SHOP_ID}/products/${encodeURIComponent(itemId)}`
-    );
-    const p = data.product || data;
+    const qs =
+      `page=${PRODUCTS_PAGE}` +
+      `&pageSize=${PRODUCTS_PAGE_SIZE}` +
+      `&q=${encodeURIComponent(PRODUCTS_Q)}` +
+      `&sortBy=${encodeURIComponent(PRODUCTS_SORT_BY)}` +
+      `&sortDir=${encodeURIComponent(PRODUCTS_SORT_DIR)}`;
+
+    const data = await apiGet(`/shops/${SHOP_ID}/products?${qs}`);
 
     let html = "";
     html += `<div style="margin-bottom:10px;">
@@ -411,14 +429,71 @@ function initSyncButtons() {
   }
 }
 function initProductsToolbar() {
-  const sel = $("#products-page-size");
+  const pageSizeSel = $("#products-page-size");
+  const sortBySel = $("#products-sort-by");
+  const sortDirSel = $("#products-sort-dir");
+
+  const qInput = $("#products-q");
+  const btnSearch = $("#products-search");
+  const btnClear = $("#products-clear");
+
+  const first = $("#products-first");
   const prev = $("#products-prev");
   const next = $("#products-next");
+  const last = $("#products-last");
 
-  if (sel) {
-    sel.value = String(PRODUCTS_PAGE_SIZE);
-    sel.addEventListener("change", async () => {
-      PRODUCTS_PAGE_SIZE = Number(sel.value);
+  if (pageSizeSel) {
+    pageSizeSel.value = String(PRODUCTS_PAGE_SIZE);
+    pageSizeSel.addEventListener("change", async () => {
+      PRODUCTS_PAGE_SIZE = Number(pageSizeSel.value);
+      PRODUCTS_PAGE = 1;
+      await loadProducts();
+    });
+  }
+
+  if (sortBySel) {
+    sortBySel.value = PRODUCTS_SORT_BY;
+    sortBySel.addEventListener("change", async () => {
+      PRODUCTS_SORT_BY = String(sortBySel.value || "updatedAt");
+      PRODUCTS_PAGE = 1;
+      await loadProducts();
+    });
+  }
+
+  if (sortDirSel) {
+    sortDirSel.value = PRODUCTS_SORT_DIR;
+    sortDirSel.addEventListener("change", async () => {
+      PRODUCTS_SORT_DIR = String(sortDirSel.value || "desc");
+      PRODUCTS_PAGE = 1;
+      await loadProducts();
+    });
+  }
+
+  const doSearch = async () => {
+    PRODUCTS_Q = String(qInput?.value || "").trim();
+    PRODUCTS_PAGE = 1;
+    await loadProducts();
+  };
+
+  if (btnSearch) btnSearch.addEventListener("click", doSearch);
+
+  if (qInput) {
+    qInput.addEventListener("keydown", async (e) => {
+      if (e.key === "Enter") await doSearch();
+    });
+  }
+
+  if (btnClear) {
+    btnClear.addEventListener("click", async () => {
+      if (qInput) qInput.value = "";
+      PRODUCTS_Q = "";
+      PRODUCTS_PAGE = 1;
+      await loadProducts();
+    });
+  }
+
+  if (first) {
+    first.addEventListener("click", async () => {
       PRODUCTS_PAGE = 1;
       await loadProducts();
     });
@@ -434,6 +509,13 @@ function initProductsToolbar() {
   if (next) {
     next.addEventListener("click", async () => {
       PRODUCTS_PAGE = Math.min(PRODUCTS_TOTAL_PAGES, PRODUCTS_PAGE + 1);
+      await loadProducts();
+    });
+  }
+
+  if (last) {
+    last.addEventListener("click", async () => {
+      PRODUCTS_PAGE = PRODUCTS_TOTAL_PAGES;
       await loadProducts();
     });
   }

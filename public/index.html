@@ -45,7 +45,7 @@
          <button id="btn-sync-products" class="btn" style="margin-top:10px;">Sincronizar Produtos</button>
          <div id="products-sync-status" class="muted" style="margin-top:10px;"></div>
         </div>
-        <div class="card">
+<div class="card">
   <div class="card-title">Visualização</div>
   <div class="products-toolbar">
     <label class="muted">Por página:</label>
@@ -55,8 +55,26 @@
       <option value="100">100</option>
     </select>
 
+    <label class="muted">Ordenar por:</label>
+    <select id="products-sort-by" class="select">
+      <option value="updatedAt">Atualização</option>
+      <option value="createdAt">Criação</option>
+      <option value="sold">Vendas</option>
+    </select>
+
+    <select id="products-sort-dir" class="select">
+      <option value="desc" selected>↓ (maior → menor / mais recente)</option>
+      <option value="asc">↑ (menor → maior / mais antigo)</option>
+    </select>
+
+    <input id="products-q" class="input" placeholder="Buscar por ID, SKU ou Nome..." />
+    <button id="products-search" class="btn">Buscar</button>
+    <button id="products-clear" class="btn">Limpar</button>
+
+    <button id="products-first" class="btn">Primeira</button>
     <button id="products-prev" class="btn">Anterior</button>
     <button id="products-next" class="btn">Próxima</button>
+    <button id="products-last" class="btn">Última</button>
 
     <div id="products-page-info" class="muted"></div>
   </div>

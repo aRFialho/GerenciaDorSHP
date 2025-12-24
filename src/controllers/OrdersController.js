@@ -10,9 +10,20 @@ async function list(req, res) {
   });
   if (!shop) return res.status(404).json({ error: "shop_not_found" });
 
+  const q = String(req.query.q || "").trim();
+  const qDigitsOnly = /^\d+$/.test(q);
+
   const where = {
     shopId: shop.id,
-    ...(status ? { orderStatus: status } : {}),
+    ...(q
+      ? {
+          OR: [
+            ...(qDigitsOnly ? [{ itemId: BigInt(q) }] : []),
+            { title: { contains: q, mode: "insensitive" } },
+            { models: { some: { sku: { contains: q, mode: "insensitive" } } } },
+          ],
+        }
+      : {}),
   };
 
   const items = await prisma.order.findMany({

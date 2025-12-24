@@ -118,7 +118,14 @@ async function list(req, res) {
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const sortBy = String(req.query.sortBy || "updatedAt");
+  const sortDir =
+    String(req.query.sortDir || "desc") === "asc" ? "asc" : "desc";
 
+  let orderBy = { updatedAt: "desc" };
+  if (sortBy === "sold") orderBy = { sold: sortDir };
+  if (sortBy === "createdAt") orderBy = { createdAt: sortDir };
+  if (sortBy === "updatedAt") orderBy = { updatedAt: sortDir };
   const items = rows.map((p) => {
     const totalStock = p.hasModel
       ? (p.models || []).reduce((acc, m) => acc + (Number(m.stock) || 0), 0)
