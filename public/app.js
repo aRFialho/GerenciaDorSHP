@@ -6,6 +6,15 @@ let PRODUCTS_Q = "";
 let PRODUCTS_SORT_BY = "updatedAt"; // updatedAt | createdAt | sold
 let PRODUCTS_SORT_DIR = "desc"; // asc | desc
 
+function formatBRLFromCents(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return (n / 100).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
 function $(sel) {
   return document.querySelector(sel);
 }
@@ -227,14 +236,15 @@ async function loadProducts() {
     const items = data.items || data.products || [];
     const meta = data.meta || {};
 
-    setText(
-      "products-page-info",
-      `Página ${
-        meta.page || PRODUCTS_PAGE
-      } de ${PRODUCTS_TOTAL_PAGES} • Total: ${meta.total ?? "—"}`
-    );
     PRODUCTS_PAGE = meta.page || PRODUCTS_PAGE;
     PRODUCTS_TOTAL_PAGES = meta.totalPages || 1;
+
+    setText(
+      "products-page-info",
+      `Página ${PRODUCTS_PAGE} de ${PRODUCTS_TOTAL_PAGES} • Total: ${
+        meta.total ?? "—"
+      }`
+    );
 
     const prev = $("#products-prev");
     const next = $("#products-next");
@@ -280,12 +290,13 @@ async function loadProducts() {
 
         let priceText = "Preço: —";
         if (priceMin != null && priceMax != null) {
+          const pmin = formatBRLFromCents(priceMin);
+          const pmax = formatBRLFromCents(priceMax);
+
           priceText =
             priceMin === priceMax
-              ? `Preço: ${escapeHtml(currency)} ${escapeHtml(priceMin)}`
-              : `Preço: ${escapeHtml(currency)} ${escapeHtml(
-                  priceMin
-                )} – ${escapeHtml(priceMax)}`;
+              ? `Preço: ${escapeHtml(pmin)}`
+              : `Preço: ${escapeHtml(pmin)} – ${escapeHtml(pmax)}`;
         }
 
         return `
@@ -388,7 +399,9 @@ async function openProductDetail(itemId) {
               <div class="muted">Estoque: ${escapeHtml(
                 m.stock ?? "—"
               )} • Vendidos: ${escapeHtml(m.sold ?? "—")}</div>
-              <div class="muted">Preço: ${escapeHtml(m.price ?? "—")}</div>
+              <div class="muted">Preço: ${escapeHtml(
+                formatBRLFromCents(m.price)
+              )}</div>
             </div>
           `;
         })

@@ -86,7 +86,12 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
             shopId: shopeeShopId,
             itemId: p.item_id,
           });
-
+          if (String(p.item_id) === "23393415543") {
+            console.log(
+              "DEBUG model_list:",
+              JSON.stringify(resp?.response, null, 2)
+            );
+          }
           return {
             item_id: String(p.item_id),
             models: resp?.response?.model || [],
@@ -103,6 +108,9 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
 
       // 2) Persistência no DB
       for (const p of baseList) {
+        if (String(p.item_id) === "23393415543") {
+          console.log(JSON.stringify(p, null, 2));
+        }
         const itemId = BigInt(String(p.item_id));
 
         const product = await prisma.product.upsert({
