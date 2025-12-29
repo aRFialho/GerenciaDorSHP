@@ -6,11 +6,13 @@ let PRODUCTS_Q = "";
 let PRODUCTS_SORT_BY = "updatedAt"; // updatedAt | createdAt | sold
 let PRODUCTS_SORT_DIR = "desc"; // asc | desc
 
-function formatBRLPriceWithFixedCents(value, cents = 90) {
+function formatBRLFixed90(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
-  const total = n + cents / 100;
-  return total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return (n + 0.9).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 }
 
 function $(sel) {
@@ -288,8 +290,8 @@ async function loadProducts() {
 
         let priceText = "Preço: —";
         if (priceMin != null && priceMax != null) {
-          const pmin = formatBRLFromCents(priceMin);
-          const pmax = formatBRLFromCents(priceMax);
+          const pmin = formatBRLFixed90(priceMin);
+          const pmax = formatBRLFixed90(priceMax);
 
           priceText =
             priceMin === priceMax
@@ -357,6 +359,72 @@ async function openProductDetail(itemId) {
     html += `<div style="margin-top:14px; font-weight:800;">Descrição</div>`;
     html += `<div class="card">${escapeHtml(extra.description || "—")}</div>`;
 
+    const attrs = extra.attributes;
+    if (Array.isArray(attrs) && attrs.length) {
+      html += `<div style="margin-top:14px; font-weight:800;">Ficha técnica</div>`;
+
+      html += attrs
+        .map((a) => {
+          const name =
+            a?.original_attribute_name ||
+            a?.attribute_name ||
+            a?.attribute_id ||
+            "—";
+
+          const values = Array.isArray(a?.attribute_value_list)
+            ? a.attribute_value_list
+                .map((v) => v?.original_value_name || v?.value || "")
+                .filter(Boolean)
+                .join(", ")
+            : "";
+
+          return `<div class="card">${escapeHtml(name)}: ${escapeHtml(
+            values || "—"
+          )}</div>`;
+        })
+        .join("");
+    }
+    if (extra.daysToShip != null || Array.isArray(extra.logistics)) {
+      html += `<div style="margin-top:14px; font-weight:800;">Envio</div>`;
+
+      if (extra.daysToShip != null) {
+        html += `<div class="card">Days to ship: ${escapeHtml(
+          extra.daysToShip
+        )}</div>`;
+      }
+
+      if (Array.isArray(extra.logistics) && extra.logistics.length) {
+        html += extra.logistics
+          .map((l) => {
+            const name = l?.logistic_name || "—";
+            const enabled = l?.enabled ? "Sim" : "Não";
+            const fee =
+              l?.estimated_shipping_fee != null
+                ? String(l.estimated_shipping_fee)
+                : "—";
+            return `<div class="card">${escapeHtml(name)} • Ativo: ${escapeHtml(
+              enabled
+            )} • Frete estimado: ${escapeHtml(fee)}</div>`;
+          })
+          .join("");
+      }
+    }
+    if (extra.dimension || extra.weight != null) {
+      html += `<div style="margin-top:14px; font-weight:800;">Dimensões / Peso</div>`;
+
+      if (extra.dimension) {
+        const d = extra.dimension;
+        html += `<div class="card">Pacote: ${escapeHtml(
+          d.package_length ?? "—"
+        )} x ${escapeHtml(d.package_width ?? "—")} x ${escapeHtml(
+          d.package_height ?? "—"
+        )}</div>`;
+      }
+
+      if (extra.weight != null) {
+        html += `<div class="card">Peso: ${escapeHtml(extra.weight)} kg</div>`;
+      }
+    }
     // Link Shopee (placeholder por enquanto)
     if (extra.itemUrl) {
       html += `<div style="margin-top:14px; font-weight:800;">Link Shopee</div>`;
@@ -398,7 +466,7 @@ async function openProductDetail(itemId) {
                 m.stock ?? "—"
               )} • Vendidos: ${escapeHtml(m.sold ?? "—")}</div>
               <div class="muted">Preço: ${escapeHtml(
-                formatBRLFromCents(m.price)
+                formatBRLFixed90(m.price)
               )}</div>
             </div>
           `;

@@ -535,10 +535,12 @@ async function fullDetail(req, res) {
   return res.json({
     product: { ...product, totalStock },
     extra: {
-      description,
-      attributes: null,
-      shipping: null,
-      dimensions: null,
+      description: product.description || null,
+      attributes: product.attributes || null,
+      logistics: product.logistics || null,
+      dimension: product.dimension || null,
+      weight: product.weight ?? null,
+      daysToShip: product.daysToShip ?? null,
       itemUrl: null,
     },
   });

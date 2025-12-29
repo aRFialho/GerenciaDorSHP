@@ -114,6 +114,10 @@ model Product {
   stock       Int?
   sold        Int?
   attributes  Json?
+  logistics   Json?
+  dimension   Json?
+  weight      Float?
+  daysToShip  Int?
   hasModel    Boolean?
   brand       String?
   categoryId  BigInt?
