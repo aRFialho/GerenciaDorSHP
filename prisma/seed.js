@@ -4,9 +4,10 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 async function main() {
-  const superAdminEmail = "cadastro6@drossiinteriores".toLowerCase().trim();
-  const superAdminPassword =
-    process.env.SUPER_ADMIN_PASSWORD || "ChangeMe_12345";
+  const superAdminEmail = "cadastro6@drossiinteriores.com.br"
+    .toLowerCase()
+    .trim();
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || "Alfenas@123";
 
   // 1) Conta Legacy (sem upsert, porque Account.name não é unique)
   let legacy = await prisma.account.findFirst({ where: { name: "Legacy" } });
