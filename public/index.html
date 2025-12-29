@@ -39,69 +39,80 @@
 
       <section id="tab-products" class="tab-panel">
         <h2>Produtos</h2>
+
         <div class="card">
-         <div class="card-title">Sincronização</div>
-         <div class="muted">Sincroniza apenas quando solicitado (sob demanda).</div>
-         <button id="btn-sync-products" class="btn" style="margin-top:10px;">Sincronizar Produtos</button>
-         <div id="products-sync-status" class="muted" style="margin-top:10px;"></div>
+          <div class="card-title">Sincronização</div>
+          <div class="muted">Sincroniza apenas quando solicitado (sob demanda).</div>
+          <button id="btn-sync-products" class="btn" style="margin-top:10px;">Sincronizar Produtos</button>
+          <div id="products-sync-status" class="muted" style="margin-top:10px;"></div>
         </div>
-<div class="card">
-  <div class="card-title">Visualização</div>
-  <div class="products-toolbar">
-    <label class="muted">Por página:</label>
-    <select id="products-page-size" class="select">
-      <option value="25">25</option>
-      <option value="50" selected>50</option>
-      <option value="100">100</option>
-    </select>
 
-    <label class="muted">Ordenar por:</label>
-    <select id="products-sort-by" class="select">
-      <option value="updatedAt">Atualização</option>
-      <option value="createdAt">Criação</option>
-      <option value="sold">Vendas</option>
-    </select>
+        <div class="card">
+          <div class="card-title">Visualização</div>
+          <div class="products-toolbar">
+            <label class="muted">Por página:</label>
+            <select id="products-page-size" class="select">
+              <option value="25">25</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+            </select>
 
-    <select id="products-sort-dir" class="select">
-      <option value="desc" selected>↓ (maior → menor / mais recente)</option>
-      <option value="asc">↑ (menor → maior / mais antigo)</option>
-    </select>
+            <label class="muted">Ordenar por:</label>
+            <select id="products-sort-by" class="select">
+              <option value="updatedAt">Atualização</option>
+              <option value="createdAt">Criação</option>
+              <option value="sold">Vendas</option>
+            </select>
 
-    <input id="products-q" class="input" placeholder="Buscar por ID, SKU ou Nome..." />
-    <button id="products-search" class="btn">Buscar</button>
-    <button id="products-clear" class="btn">Limpar</button>
+            <select id="products-sort-dir" class="select">
+              <option value="desc" selected>↓ (maior → menor / mais recente)</option>
+              <option value="asc">↑ (menor → maior / mais antigo)</option>
+            </select>
 
-    <button id="products-first" class="btn">Primeira</button>
-    <button id="products-prev" class="btn">Anterior</button>
-    <button id="products-next" class="btn">Próxima</button>
-    <button id="products-last" class="btn">Última</button>
+            <input id="products-q" class="input" placeholder="Buscar por ID, SKU ou Nome..." />
+            <button id="products-search" class="btn">Buscar</button>
+            <button id="products-clear" class="btn">Limpar</button>
+          </div>
+        </div>
 
-    <div id="products-page-info" class="muted"></div>
-  </div>
-</div>
         <div id="products-grid" class="grid"></div>
+
+        <div class="card products-pagination">
+          <div class="products-toolbar" style="justify-content: space-between;">
+            <div id="products-page-info" class="muted"></div>
+
+            <div class="products-pager-actions">
+              <button id="products-first" class="btn">Primeira</button>
+              <button id="products-prev" class="btn">Anterior</button>
+              <button id="products-next" class="btn">Próxima</button>
+              <button id="products-last" class="btn">Última</button>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section id="tab-orders" class="tab-panel">
         <h2>Pedidos</h2>
         <div class="card">
-         <div class="card-title">Alertas</div>
-         <div class="muted">Troca de endereço e risco de atraso.</div>
-         <button id="btn-sync-orders" class="btn" style="margin-top:10px;">Sincronizar Pedidos</button>
-         <div id="orders-sync-status" class="muted" style="margin-top:10px;"></div>
+          <div class="card-title">Alertas</div>
+          <div class="muted">Troca de endereço e risco de atraso.</div>
+          <button id="btn-sync-orders" class="btn" style="margin-top:10px;">Sincronizar Pedidos</button>
+          <div id="orders-sync-status" class="muted" style="margin-top:10px;"></div>
         </div>
         <div id="orders-grid" class="grid"></div>
       </section>
     </main>
-<div id="modal-overlay" class="modal-overlay" style="display:none;">
-  <div class="modal">
-    <div class="modal-header">
-      <div id="modal-title" class="modal-title">Detalhes</div>
-      <button id="modal-close" class="modal-close">Fechar</button>
+
+    <div id="modal-overlay" class="modal-overlay" style="display:none;">
+      <div class="modal">
+        <div class="modal-header">
+          <div id="modal-title" class="modal-title">Detalhes</div>
+          <button id="modal-close" class="modal-close">Fechar</button>
+        </div>
+        <div id="modal-body" class="modal-body"></div>
+      </div>
     </div>
-    <div id="modal-body" class="modal-body"></div>
-  </div>
-</div>
+
     <script src="/app.js"></script>
   </body>
 </html>
