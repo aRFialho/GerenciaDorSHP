@@ -54,15 +54,31 @@ async function onLoginSubmit(e) {
   }
 }
 
+async function onRegisterClick() {
+  const accountName = ($("#accountName")?.value || "").trim();
+  const email = ($("#email")?.value || "").trim();
+  const password = ($("#password")?.value || "").trim();
+
+  if (!accountName || !email || !password) {
+    setMsg("Para registrar: informe nome da conta, e-mail e senha.", "error");
+    return;
+  }
+
+  try {
+    setMsg("Registrando...", "info");
+    await apiPost("/auth/register", { accountName, email, password });
+    window.location.href = "/?tab=auth&startOauth=1";
+  } catch (err) {
+    setMsg(String(err?.message || "Falha no registro."), "error");
+  }
+}
+
 function bootLogin() {
-  // IDs esperados no login.html:
-  // - form#login-form
-  // - input#email
-  // - input#password
-  // - div#login-msg
-  // - a#forgot (opcional)
   const form = $("#login-form");
   if (form) form.addEventListener("submit", onLoginSubmit);
+
+  const btnRegister = $("#btn-register");
+  if (btnRegister) btnRegister.addEventListener("click", onRegisterClick);
 
   const forgot = $("#forgot");
   if (forgot) {

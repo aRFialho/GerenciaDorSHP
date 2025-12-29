@@ -6,7 +6,7 @@ const sessionRoutes = require("./session.routes");
 const ordersRoutes = require("./orders.routes");
 const productsRoutes = require("./products.routes");
 const debugRoutes = require("./debug.routes");
-
+const adminRoutes = require("./admin.routes");
 const { sessionAuth } = require("../middlewares/sessionAuth");
 
 const router = express.Router();
@@ -24,6 +24,7 @@ router.use(sessionAuth);
 router.use(healthRoutes);
 router.use(authLocalRoutes);
 router.use(authRoutes);
+router.use(adminRoutes);
 router.use(ordersRoutes);
 router.use(productsRoutes);
 

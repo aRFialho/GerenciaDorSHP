@@ -69,8 +69,13 @@ function initTabs() {
       // garante loja ativa antes de carregar módulos
       await ensureShopSelected();
 
+      if (tab === "products" || tab === "orders") {
+        await ensureShopSelected();
+      }
+
       if (tab === "products") loadProducts();
       if (tab === "orders") loadOrders();
+      if (tab === "admin") loadAdmin();
     });
   });
 }
@@ -123,6 +128,7 @@ async function loadMe() {
 
   const viewStatus = document.getElementById("auth-status-view");
   if (viewStatus) viewStatus.textContent = $("#auth-status")?.textContent || "";
+  const role = String(data?.user?.role || "");
 }
 
 async function ensureShopSelected() {
@@ -737,6 +743,157 @@ function initProductsToolbar() {
     });
   }
 }
+function initHeaderButtons() {
+  const btnSwitch = document.getElementById("btn-switch-shop");
+  const btnLogout = document.getElementById("btn-logout");
+
+  if (btnSwitch) {
+    btnSwitch.addEventListener("click", async () => {
+      try {
+        await loadMe();
+        const shops = Array.isArray(ME?.shops) ? ME.shops : [];
+        if (shops.length <= 1) return;
+        await promptSelectShop(shops);
+      } catch (e) {
+        openModal("Erro", `<div class="muted">${escapeHtml(e.message)}</div>`);
+      }
+    });
+  }
+
+  if (btnLogout) {
+    btnLogout.addEventListener("click", async () => {
+      try {
+        await apiPost("/auth/logout");
+      } catch (_) {}
+      window.location.href = "/login";
+    });
+  }
+}
+
+function getQueryParam(name) {
+  const u = new URL(window.location.href);
+  return u.searchParams.get(name);
+}
+
+function activateTab(tab) {
+  const tabs = $all(".tab");
+  const panels = $all(".tab-panel");
+
+  tabs.forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  panels.forEach((p) => p.classList.toggle("active", p.id === `tab-${tab}`));
+}
+
+async function startShopeeOauthFlowIfRequested() {
+  const tab = getQueryParam("tab");
+  const startOauth = getQueryParam("startOauth");
+
+  if (tab === "auth") activateTab("auth");
+  if (startOauth !== "1") return;
+
+  try {
+    const data = await apiGet("/auth/url");
+    const url = data?.url || data?.authUrl || data?.data?.url || null;
+
+    const preview = document.getElementById("auth-url-preview");
+    if (preview)
+      preview.textContent = url ? url : "Não foi possível gerar o link.";
+
+    if (url) window.location.href = url;
+  } catch (e) {
+    const preview = document.getElementById("auth-url-preview");
+    if (preview) preview.textContent = `Erro ao gerar link: ${e.message}`;
+  }
+}
+
+async function loadAdmin() {
+  const root = document.getElementById("admin-root");
+  if (!root) return;
+
+  root.innerHTML = `<div class="muted">Carregando...</div>`;
+
+  try {
+    await loadMe();
+    const role = String(ME?.user?.role || "");
+
+    if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+      root.innerHTML = `<div class="muted">Sem permissão.</div>`;
+      return;
+    }
+
+    // 1) Sempre mostra usuários da conta
+    const usersData = await apiGet("/admin/users");
+    const users = Array.isArray(usersData?.users) ? usersData.users : [];
+
+    let html = `<div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start;">`;
+
+    html += `<div class="card" style="flex:1; min-width:320px;">
+      <div class="card-title">Usuários da Conta</div>
+      <div class="muted" style="margin-top:6px;">Crie usuários e gerencie roles (ADMIN/MANAGER/VIEWER).</div>
+      <div style="margin-top:10px;">${
+        users.length
+          ? users
+              .map(
+                (u) =>
+                  `<div class="muted" style="margin-top:6px;">${escapeHtml(
+                    u.email
+                  )} • ${escapeHtml(u.role)}</div>`
+              )
+              .join("")
+          : `<div class="muted" style="margin-top:10px;">Nenhum usuário.</div>`
+      }</div>
+    </div>`;
+
+    // 2) SUPER_ADMIN: mostra contas globais
+    if (role === "SUPER_ADMIN") {
+      const accData = await apiGet("/admin-global/accounts");
+      const accounts = Array.isArray(accData?.accounts) ? accData.accounts : [];
+
+      html += `<div class="card" style="flex:1; min-width:320px;">
+        <div class="card-title">Admin Global • Accounts</div>
+        <div class="muted" style="margin-top:6px;">Visão geral das contas.</div>
+        <div style="margin-top:10px;">${
+          accounts.length
+            ? accounts
+                .map(
+                  (a) =>
+                    `<div class="muted" style="margin-top:6px;">#${escapeHtml(
+                      String(a.id)
+                    )} • ${escapeHtml(a.name)}</div>`
+                )
+                .join("")
+            : `<div class="muted" style="margin-top:10px;">Nenhuma conta.</div>`
+        }</div>
+      </div>`;
+    }
+
+    html += `</div>`;
+    root.innerHTML = html;
+  } catch (e) {
+    root.innerHTML = `<div class="muted">Erro no Admin: ${escapeHtml(
+      e.message
+    )}</div>`;
+  }
+}
+
+function initAuthTab() {
+  const btn = document.getElementById("btn-auth-url");
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    const preview = document.getElementById("auth-url-preview");
+    if (preview) preview.textContent = "Gerando link...";
+
+    try {
+      const data = await apiGet("/auth/url");
+      const url = data?.url || data?.authUrl || data?.data?.url || null;
+      if (preview)
+        preview.textContent = url ? url : "Não foi possível gerar o link.";
+      if (url) window.location.href = url;
+    } catch (e) {
+      if (preview) preview.textContent = `Erro: ${e.message}`;
+    }
+  });
+}
 
 /* ---------------- Boot ---------------- */
 async function boot() {
@@ -745,13 +902,14 @@ async function boot() {
   initSyncButtons();
   initProductsToolbar();
   initSwitchShopShortcut();
+  initHeaderButtons();
+  initAuthTab();
 
   try {
     await loadMe();
     await ensureShopSelected();
+    await startShopeeOauthFlowIfRequested();
   } catch (e) {
-    // se não logado, /me retorna 401, e a página / já deveria redirecionar /login,
-    // mas deixamos fallback:
     setText("auth-status", "Não autenticado. Recarregue a página.");
   }
 }

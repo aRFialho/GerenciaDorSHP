@@ -21,8 +21,10 @@
 
       <div class="ml-topbar__right">
         <div class="header-pill">
-          <span class="dot"></span>
-          <span id="auth-status">Dashboard pronto. Use as abas para ver dados.</span>
+         <span class="dot"></span>
+         <span id="auth-status">Carregando...</span>
+         <button id="btn-switch-shop" class="btn btn-ghost" style="margin-left:10px;">Trocar loja</button>
+         <button id="btn-logout" class="btn btn-ghost" style="margin-left:8px;">Sair</button>
         </div>
       </div>
     </header>
@@ -37,6 +39,11 @@
           <button class="tab ml-nav-item active" data-tab="auth">
             <span class="ml-nav-item__label">Autenticação</span>
             <span class="ml-nav-item__hint muted">Token / status</span>
+          </button>
+
+          <button id="admin-tab-btn" class="tab ml-nav-item" data-tab="admin" style="display:none;">
+           <span class="ml-nav-item__label">Admin</span>
+           <span class="ml-nav-item__hint muted">Usuários / Acessos</span>
           </button>
 
           <button class="tab ml-nav-item" data-tab="products">
@@ -65,7 +72,19 @@
             <h2>Autenticação</h2>
             <div class="page-subtitle muted">Controle de acesso e status da integração.</div>
           </div>
+<!-- ADMIN -->
+      <section id="tab-admin" class="tab-panel">
+       <div class="page-title">
+        <h2 id="admin-title">Admin</h2>
+        <div class="page-subtitle muted">Gerenciamento de usuários e acessos.</div>
+       </div>
 
+       <div class="section-card">
+        <div class="section-card__body" id="admin-root">
+         <div class="muted">Carregando...</div>
+        </div>
+       </div>
+      </section>
           <div class="section-card">
             <div class="section-card__header">
               <div>

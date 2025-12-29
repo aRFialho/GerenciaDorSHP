@@ -155,4 +155,114 @@ router.post(
   }
 );
 
+router.post("/auth/register", async (req, res, next) => {
+  try {
+    const accountName = String(req.body?.accountName || "").trim();
+    const email = String(req.body?.email || "")
+      .trim()
+      .toLowerCase();
+    const password = String(req.body?.password || "");
+
+    if (!accountName || !email || !password) {
+      return res.status(400).json({
+        error: "bad_request",
+        message: "Informe nome da conta, e-mail e senha.",
+      });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(409).json({
+        error: "email_in_use",
+        message: "Este e-mail já está em uso.",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const account = await prisma.account.create({
+      data: { name: accountName },
+      select: { id: true, name: true },
+    });
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        role: "ADMIN",
+        accountId: account.id,
+      },
+      select: { id: true, email: true, role: true, accountId: true },
+    });
+
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+    const session = await prisma.session.create({
+      data: {
+        userId: user.id,
+        activeShopId: null,
+        expiresAt,
+      },
+    });
+
+    setSessionCookie(res, session.id);
+
+    return res.json({ ok: true, account, user });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post("/auth/register", async (req, res, next) => {
+  try {
+    const accountName = String(req.body?.accountName || "").trim();
+    const email = String(req.body?.email || "")
+      .trim()
+      .toLowerCase();
+    const password = String(req.body?.password || "");
+
+    if (!accountName || !email || !password) {
+      return res.status(400).json({
+        error: "bad_request",
+        message: "Informe nome da conta, e-mail e senha.",
+      });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(409).json({
+        error: "email_in_use",
+        message: "Este e-mail já está em uso.",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const account = await prisma.account.create({
+      data: { name: accountName },
+      select: { id: true, name: true },
+    });
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        role: "ADMIN",
+        accountId: account.id,
+      },
+      select: { id: true, email: true, role: true, accountId: true },
+    });
+
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+    const session = await prisma.session.create({
+      data: { userId: user.id, activeShopId: null, expiresAt },
+    });
+
+    setSessionCookie(res, session.id);
+
+    return res.json({ ok: true, account, user });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 module.exports = router;
