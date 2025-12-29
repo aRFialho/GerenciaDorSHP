@@ -6,13 +6,11 @@ let PRODUCTS_Q = "";
 let PRODUCTS_SORT_BY = "updatedAt"; // updatedAt | createdAt | sold
 let PRODUCTS_SORT_DIR = "desc"; // asc | desc
 
-function formatBRLFromCents(value) {
+function formatBRLPriceWithFixedCents(value, cents = 90) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
-  return (n / 100).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
+  const total = n + cents / 100;
+  return total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function $(sel) {

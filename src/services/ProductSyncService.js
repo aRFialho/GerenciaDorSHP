@@ -123,7 +123,9 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
             itemId,
             status: p.item_status || null,
             title: p.item_name || null,
-            description: null,
+            description: p.description || null,
+            itemSku: p.item_sku || null,
+            brand: p.brand?.original_brand_name || null,
             currency: p.currency || null,
             priceMin: p.price_info?.[0]?.current_price ?? null,
             priceMax: p.price_info?.[0]?.current_price ?? null,
@@ -132,7 +134,6 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
             ratingStar: p.rating?.rating_star ?? null,
             ratingCount: p.rating?.rating_count ?? null,
             hasModel: p.has_model ?? null,
-            brand: p.brand?.name || null,
             categoryId: p.category_id ? BigInt(String(p.category_id)) : null,
             shopeeUpdateTime: p.update_time
               ? new Date(Number(p.update_time) * 1000)
@@ -144,7 +145,10 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
               : undefined,
             status: p.item_status || null,
             title: p.item_name || null,
-            currency: p.currency || null,
+            description: p.description ?? undefined,
+            itemSku: p.item_sku ?? undefined,
+            brand: p.brand?.original_brand_name || null,
+            currency: p.currency ?? undefined,
             priceMin: p.price_info?.[0]?.current_price ?? undefined,
             priceMax: p.price_info?.[0]?.current_price ?? undefined,
             stock:
@@ -153,7 +157,6 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
             ratingStar: p.rating?.rating_star ?? null,
             ratingCount: p.rating?.rating_count ?? null,
             hasModel: p.has_model ?? undefined,
-            brand: p.brand?.name || null,
             categoryId: p.category_id ? BigInt(String(p.category_id)) : null,
             shopeeUpdateTime: p.update_time
               ? new Date(Number(p.update_time) * 1000)

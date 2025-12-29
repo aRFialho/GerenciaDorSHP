@@ -104,19 +104,19 @@ model Product {
   itemId      BigInt
   status      String?
   title       String?
-  description String? @db.Text
+  description String?  @db.Text
   ratingStar  Float?
   ratingCount Int?
   currency    String?
   priceMin    Int?
   priceMax    Int?
-
-  stock Int?
-  sold  Int?
-
-  hasModel   Boolean?
-  brand      String?
-  categoryId BigInt?
+  itemSku     String?
+  stock       Int?
+  sold        Int?
+  attributes  Json?
+  hasModel    Boolean?
+  brand       String?
+  categoryId  BigInt?
 
   shopeeCreateTime DateTime?
   shopeeUpdateTime DateTime?
