@@ -1,14 +1,37 @@
 const prisma = require("../config/db");
 
-async function list(req, res) {
-  const { shopId } = req.params;
-  const limit = Math.min(Number(req.query.limit || 60), 200);
-  const status = req.query.status ? String(req.query.status) : null;
+async function getActiveShopOrFail(req, res) {
+  if (!req.auth) {
+    res.status(401).json({ error: "unauthorized" });
+    return null;
+  }
 
-  const shop = await prisma.shop.findUnique({
-    where: { shopId: BigInt(String(shopId)) },
+  const shopDbId = req.auth.activeShopId || null;
+  if (!shopDbId) {
+    res.status(409).json({
+      error: "select_shop_required",
+      message: "Selecione uma loja para continuar.",
+    });
+    return null;
+  }
+
+  const shop = await prisma.shop.findFirst({
+    where: { id: shopDbId, accountId: req.auth.accountId },
   });
-  if (!shop) return res.status(404).json({ error: "shop_not_found" });
+
+  if (!shop) {
+    res.status(404).json({ error: "shop_not_found" });
+    return null;
+  }
+
+  return shop;
+}
+
+async function list(req, res) {
+  const shop = await getActiveShopOrFail(req, res);
+  if (!shop) return;
+
+  const limit = Math.min(Number(req.query.limit || 60), 200);
 
   const q = String(req.query.q || "").trim();
   const qDigitsOnly = /^\d+$/.test(q);
@@ -46,18 +69,14 @@ async function list(req, res) {
 }
 
 async function detail(req, res) {
-  const { shopId, orderSn } = req.params;
+  const { orderSn } = req.params;
 
-  const shop = await prisma.shop.findUnique({
-    where: { shopId: BigInt(String(shopId)) },
-  });
-  if (!shop) return res.status(404).json({ error: "shop_not_found" });
+  const shop = await getActiveShopOrFail(req, res);
+  if (!shop) return;
 
   const order = await prisma.order.findUnique({
     where: { shopId_orderSn: { shopId: shop.id, orderSn: String(orderSn) } },
-    include: {
-      addressSnapshots: { orderBy: { createdAt: "desc" }, take: 1 },
-    },
+    include: { addressSnapshots: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
 
   if (!order) return res.status(404).json({ error: "order_not_found" });

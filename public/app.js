@@ -1,10 +1,16 @@
-const SHOP_ID = "348584331"; // ajuste se quiser tornar dinâmico depois
 let PRODUCTS_PAGE = 1;
 let PRODUCTS_PAGE_SIZE = 50;
 let PRODUCTS_TOTAL_PAGES = 1;
 let PRODUCTS_Q = "";
-let PRODUCTS_SORT_BY = "updatedAt"; // updatedAt | createdAt | sold
-let PRODUCTS_SORT_DIR = "desc"; // asc | desc
+let PRODUCTS_SORT_BY = "updatedAt";
+let PRODUCTS_SORT_DIR = "desc";
+
+let ME = null; // cache do /me
+let ACTIVE_SHOP_ID = null; // Shop.id (DB) vindo da sessão
+
+// Para Opção A: manter rotas /shops/:shopId/... mas backend ignora.
+// Usamos um placeholder fixo só para completar a URL.
+const SHOP_PATH_PLACEHOLDER = "active";
 
 function formatBRLFixed90(value) {
   const n = Number(value);
@@ -28,17 +34,22 @@ function setText(id, text) {
 }
 
 async function apiGet(path) {
-  const r = await fetch(path);
+  const r = await fetch(path, { credentials: "include" });
   const text = await r.text();
   if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
-  return JSON.parse(text);
+  return text ? JSON.parse(text) : null;
 }
 
-async function apiPost(path) {
-  const r = await fetch(path, { method: "POST" });
+async function apiPost(path, body) {
+  const r = await fetch(path, {
+    method: "POST",
+    credentials: "include",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
   const text = await r.text();
   if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
-  return JSON.parse(text);
+  return text ? JSON.parse(text) : null;
 }
 
 /* ---------------- Tabs ---------------- */
@@ -47,13 +58,16 @@ function initTabs() {
   const panels = $all(".tab-panel");
 
   tabs.forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const tab = btn.dataset.tab;
 
       tabs.forEach((b) => b.classList.toggle("active", b === btn));
       panels.forEach((p) =>
         p.classList.toggle("active", p.id === `tab-${tab}`)
       );
+
+      // garante loja ativa antes de carregar módulos
+      await ensureShopSelected();
 
       if (tab === "products") loadProducts();
       if (tab === "orders") loadOrders();
@@ -96,14 +110,123 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
+/* ---------------- Auth + Shop Select ---------------- */
+async function loadMe() {
+  const data = await apiGet("/me");
+  ME = data;
+  ACTIVE_SHOP_ID = data?.activeShopId ?? null;
+
+  const accountName = data?.account?.name ? String(data.account.name) : "—";
+  const email = data?.user?.email ? String(data.user.email) : "—";
+
+  setText("auth-status", `Conta: ${accountName} • Usuário: ${email}`);
+
+  const viewStatus = document.getElementById("auth-status-view");
+  if (viewStatus) viewStatus.textContent = $("#auth-status")?.textContent || "";
+}
+
+async function ensureShopSelected() {
+  if (!ME) {
+    await loadMe();
+  }
+
+  const shops = Array.isArray(ME?.shops) ? ME.shops : [];
+  const active = ME?.activeShopId ?? null;
+
+  // 0 lojas: ainda não vinculou Shopee
+  if (shops.length === 0) {
+    openModal(
+      "Conectar Shopee",
+      `<div class="muted">Nenhuma loja vinculada a esta conta ainda.</div>
+       <div class="muted" style="margin-top:10px;">Conecte sua Shopee na aba Autenticação.</div>`
+    );
+    return;
+  }
+
+  // 1 loja: se não estiver ativa, seleciona automaticamente
+  if (shops.length === 1 && !active) {
+    await apiPost("/auth/select-shop", { shopId: shops[0].id });
+    await loadMe();
+    return;
+  }
+
+  // 2 lojas: se não tiver ativa, pede seleção via popup
+  if (shops.length > 1 && !active) {
+    await promptSelectShop(shops);
+    await loadMe();
+    return;
+  }
+}
+
+async function promptSelectShop(shops) {
+  const optionsHtml = shops
+    .map((s) => {
+      const title = s.shopId
+        ? `ShopId Shopee: ${escapeHtml(String(s.shopId))}`
+        : "Loja";
+      const region = s.region ? ` • ${escapeHtml(String(s.region))}` : "";
+      const status = s.status ? ` • ${escapeHtml(String(s.status))}` : "";
+      return `
+        <button class="btn btn-primary" data-select-shop="${escapeHtml(
+          String(s.id)
+        )}" style="width:100%; margin-top:10px;">
+          ${title}${region}${status}
+        </button>
+      `;
+    })
+    .join("");
+
+  openModal(
+    "Selecione a loja",
+    `<div class="muted">Esta conta possui mais de uma loja vinculada. Escolha qual deseja acessar agora.</div>
+     <div style="margin-top:12px;">${optionsHtml}</div>`
+  );
+
+  $all("[data-select-shop]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const shopId = Number(btn.getAttribute("data-select-shop"));
+      try {
+        await apiPost("/auth/select-shop", { shopId });
+        closeModal();
+      } catch (e) {
+        $("#modal-body").innerHTML =
+          `<div class="muted">Erro ao selecionar loja: ${escapeHtml(
+            e.message
+          )}</div>` + `<div style="margin-top:12px;">${optionsHtml}</div>`;
+      }
+    });
+  });
+}
+
+/* “Trocar conta/loja” no topo (por enquanto clicando no status) */
+function initSwitchShopShortcut() {
+  const el = $("#auth-status");
+  if (!el) return;
+
+  el.style.cursor = "pointer";
+  el.title = "Clique para trocar a loja";
+
+  el.addEventListener("click", async () => {
+    try {
+      await loadMe();
+      const shops = Array.isArray(ME?.shops) ? ME.shops : [];
+      if (shops.length <= 1) return;
+      await promptSelectShop(shops);
+    } catch (_) {}
+  });
+}
+
 /* ---------------- Orders (DB) ---------------- */
 async function loadOrders() {
   const grid = $("#orders-grid");
   grid.innerHTML = `<div class="card"><div class="muted">Carregando pedidos...</div></div>`;
 
   try {
-    // precisa existir no backend: GET /shops/:shopId/orders  (DB)
-    const data = await apiGet(`/shops/${SHOP_ID}/orders?limit=60`);
+    await ensureShopSelected();
+
+    const data = await apiGet(
+      `/shops/${SHOP_PATH_PLACEHOLDER}/orders?limit=60`
+    );
 
     const items = data.items || data.orders || [];
     if (!items.length) {
@@ -153,9 +276,10 @@ async function openOrderDetail(orderSn) {
   );
 
   try {
-    // precisa existir no backend: GET /shops/:shopId/orders/:orderSn  (DB)
+    await ensureShopSelected();
+
     const data = await apiGet(
-      `/shops/${SHOP_ID}/orders/${encodeURIComponent(orderSn)}`
+      `/shops/${SHOP_PATH_PLACEHOLDER}/orders/${encodeURIComponent(orderSn)}`
     );
 
     const order = data.order || data;
@@ -224,6 +348,8 @@ async function loadProducts() {
   grid.innerHTML = `<div class="card"><div class="muted">Carregando produtos...</div></div>`;
 
   try {
+    await ensureShopSelected();
+
     const qs =
       `page=${PRODUCTS_PAGE}` +
       `&pageSize=${PRODUCTS_PAGE_SIZE}` +
@@ -231,7 +357,7 @@ async function loadProducts() {
       `&sortBy=${encodeURIComponent(PRODUCTS_SORT_BY)}` +
       `&sortDir=${encodeURIComponent(PRODUCTS_SORT_DIR)}`;
 
-    const data = await apiGet(`/shops/${SHOP_ID}/products?${qs}`);
+    const data = await apiGet(`/shops/${SHOP_PATH_PLACEHOLDER}/products?${qs}`);
 
     const items = data.items || data.products || [];
     const meta = data.meta || {};
@@ -255,6 +381,7 @@ async function loadProducts() {
     if (first) first.disabled = PRODUCTS_PAGE <= 1;
     if (next) next.disabled = PRODUCTS_PAGE >= PRODUCTS_TOTAL_PAGES;
     if (last) last.disabled = PRODUCTS_PAGE >= PRODUCTS_TOTAL_PAGES;
+
     if (!items.length) {
       grid.innerHTML = `<div class="card"><div class="muted">Nenhum produto encontrado no banco. Clique em "Sincronizar Produtos".</div></div>`;
       return;
@@ -283,8 +410,6 @@ async function loadProducts() {
                 ratingCount != null ? ` (${ratingCount})` : ""
               }`;
 
-        // preço (quando backend devolver priceMin/priceMax)
-        const currency = p.currency || "";
         const priceMin = p.priceMin ?? null;
         const priceMax = p.priceMax ?? null;
 
@@ -320,7 +445,9 @@ async function loadProducts() {
       });
     });
   } catch (e) {
-    grid.innerHTML = `<div class="card"><div class="muted">Erro ao carregar produtos: ${escapeHtml(
+    $(
+      "#products-grid"
+    ).innerHTML = `<div class="card"><div class="muted">Erro ao carregar produtos: ${escapeHtml(
       e.message
     )}</div></div>`;
   }
@@ -333,8 +460,12 @@ async function openProductDetail(itemId) {
   );
 
   try {
+    await ensureShopSelected();
+
     const data = await apiGet(
-      `/shops/${SHOP_ID}/products/${encodeURIComponent(itemId)}/full`
+      `/shops/${SHOP_PATH_PLACEHOLDER}/products/${encodeURIComponent(
+        itemId
+      )}/full`
     );
 
     const p = data.product || data;
@@ -350,14 +481,12 @@ async function openProductDetail(itemId) {
     html += kv("Currency", escapeHtml(p.currency || "—"));
     html += `</div>`;
 
-    // Descrição (Shopee extra info)
     html += `<div style="margin-top:14px; font-weight:800;">Descrição</div>`;
     html += `<div class="card">${escapeHtml(extra.description || "—")}</div>`;
 
     const attrs = extra.attributes;
     if (Array.isArray(attrs) && attrs.length) {
       html += `<div style="margin-top:14px; font-weight:800;">Ficha técnica</div>`;
-
       html += attrs
         .map((a) => {
           const name =
@@ -379,6 +508,7 @@ async function openProductDetail(itemId) {
         })
         .join("");
     }
+
     if (extra.daysToShip != null || Array.isArray(extra.logistics)) {
       html += `<div style="margin-top:14px; font-weight:800;">Envio</div>`;
 
@@ -404,6 +534,7 @@ async function openProductDetail(itemId) {
           .join("");
       }
     }
+
     if (extra.dimension || extra.weight != null) {
       html += `<div style="margin-top:14px; font-weight:800;">Dimensões / Peso</div>`;
 
@@ -420,15 +551,7 @@ async function openProductDetail(itemId) {
         html += `<div class="card">Peso: ${escapeHtml(extra.weight)} kg</div>`;
       }
     }
-    // Link Shopee (placeholder por enquanto)
-    if (extra.itemUrl) {
-      html += `<div style="margin-top:14px; font-weight:800;">Link Shopee</div>`;
-      html += `<div class="card"><a href="${escapeHtml(
-        extra.itemUrl
-      )}" target="_blank" rel="noopener noreferrer">Abrir na Shopee</a></div>`;
-    }
 
-    // Imagens
     if (Array.isArray(p.images) && p.images.length) {
       html += `<div style="margin-top:14px; font-weight:800;">Imagens</div>`;
       html +=
@@ -445,7 +568,6 @@ async function openProductDetail(itemId) {
         `</div>`;
     }
 
-    // Variações (inclui vendas por variação)
     if (Array.isArray(p.models) && p.models.length) {
       html += `<div style="margin-top:14px; font-weight:800;">Variações</div>`;
       html += p.models
@@ -490,7 +612,9 @@ function initSyncButtons() {
     btnOrders.addEventListener("click", async () => {
       setText("orders-sync-status", "Sincronizando pedidos...");
       try {
-        const res = await apiPost(`/shops/${SHOP_ID}/orders/sync?rangeDays=7`);
+        const res = await apiPost(
+          `/shops/${SHOP_PATH_PLACEHOLDER}/orders/sync?rangeDays=7`
+        );
         setText(
           "orders-sync-status",
           `OK • Processados: ${res?.summary?.processed ?? "—"}`
@@ -506,7 +630,9 @@ function initSyncButtons() {
     btnProducts.addEventListener("click", async () => {
       setText("products-sync-status", "Sincronizando produtos...");
       try {
-        const res = await apiPost(`/shops/${SHOP_ID}/products/sync`);
+        const res = await apiPost(
+          `/shops/${SHOP_PATH_PLACEHOLDER}/products/sync`
+        );
         setText(
           "products-sync-status",
           `OK • Upserted: ${res?.summary?.upserted ?? "—"}`
@@ -518,6 +644,7 @@ function initSyncButtons() {
     });
   }
 }
+
 function initProductsToolbar() {
   const pageSizeSel = $("#products-page-size");
   const sortBySel = $("#products-sort-by");
@@ -610,18 +737,23 @@ function initProductsToolbar() {
     });
   }
 }
+
 /* ---------------- Boot ---------------- */
 async function boot() {
   initTabs();
   initModal();
   initSyncButtons();
   initProductsToolbar();
-  // Carrega auth status básico (se você tiver endpoint, plugamos)
-  setText("auth-status", "Dashboard pronto. Use as abas para ver dados.");
+  initSwitchShopShortcut();
 
-  // Pré-carregar pedidos/produtos opcional:
-  // await loadOrders();
-  // await loadProducts();
+  try {
+    await loadMe();
+    await ensureShopSelected();
+  } catch (e) {
+    // se não logado, /me retorna 401, e a página / já deveria redirecionar /login,
+    // mas deixamos fallback:
+    setText("auth-status", "Não autenticado. Recarregue a página.");
+  }
 }
 
 boot();

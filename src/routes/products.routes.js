@@ -2,8 +2,9 @@ const express = require("express");
 const ProductsController = require("../controllers/ProductsController");
 const ProductSyncController = require("../controllers/ProductSyncController");
 const uploadImages = require("../middlewares/uploadImages");
-
+const { requireAuth } = require("../middlewares/sessionAuth");
 const router = express.Router();
+router.use(requireAuth);
 
 router.get(
   "/shops/:shopId/products/performance",

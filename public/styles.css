@@ -439,3 +439,16 @@ body{
   border-color:rgba(255,255,255,0.18);
   background:rgba(255,255,255,0.06);
 }
+/* --- Shop switch modal/buttons --- */
+#auth-status{user-select:none}
+#auth-status:hover{opacity:.9;text-decoration:underline}
+
+.btn{cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.btn-primary{background:linear-gradient(135deg,#ff6a00,#ff2e93);border:0;color:#fff}
+.btn-primary:hover{filter:brightness(1.05)}
+.btn-primary:active{transform:translateY(1px)}
+
+#modal-overlay{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#modal-body .muted{line-height:1.35}

@@ -15,10 +15,12 @@ enum Role {
 }
 
 model Account {
-  id        Int      @id @default(autoincrement())
-  name      String
-  users     User[]
-  shops     Shop[]
+  id   Int    @id @default(autoincrement())
+  name String
+
+  users User[]
+  shops Shop[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -34,21 +36,26 @@ model User {
   accountId Int
   account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  sessions Session[]
+  // Sessões normais (login)
+  sessions Session[] @relation("UserSessions")
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  sessions  Session[]
+  // Sessões onde este usuário é o "realUser" (impersonation)
+  impersonations Session[] @relation("SessionRealUser")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([accountId, role])
 }
 
 model Session {
-  id     String @id @default(cuid())
-  userId Int
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
 
-  // Loja ativa (Shop.id)
+  // Usuário logado (ou usuário "atuando", caso impersonation esteja ativo)
+  userId Int
+  user   User @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Loja ativa (Shop.id) para resolver as rotas /shops/:shopId/... ignorando :shopId
   activeShopId Int?
   activeShop   Shop? @relation(fields: [activeShopId], references: [id], onDelete: SetNull)
 
@@ -67,14 +74,15 @@ model Session {
 
 /**
  * ===== Seus models atuais (com ajustes mínimos) =====
+ * Observação: accountId está nullable (Int?) para preservar dados no Render na primeira migration.
+ * Depois do backfill, você torna obrigatório (Int).
  */
-
 model Shop {
   id Int @id @default(autoincrement())
 
-  // Vínculo multi-tenant
-  accountId Int
-  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  // Vínculo multi-tenant (Migration 1: nullable / Migration 2: obrigatório)
+  accountId Int?
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   shopId BigInt  @unique
   region String?
@@ -92,7 +100,8 @@ model Shop {
 }
 
 model OAuthToken {
-  id     Int  @id @default(autoincrement())
+  id Int @id @default(autoincrement())
+
   shopId Int  @unique
   shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 

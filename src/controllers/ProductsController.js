@@ -20,14 +20,37 @@ function dedupPreserveOrder(arr) {
   return out;
 }
 
-async function getShopOr404(res, shopId) {
-  const shop = await prisma.shop.findUnique({
-    where: { shopId: BigInt(String(shopId)) },
+function getActiveShopDbId(req) {
+  return req.auth?.activeShopId || null;
+}
+
+async function getActiveShopOrFail(req, res) {
+  if (!req.auth) {
+    res.status(401).json({ error: "unauthorized" });
+    return null;
+  }
+
+  const shopDbId = getActiveShopDbId(req);
+  if (!shopDbId) {
+    res.status(409).json({
+      error: "select_shop_required",
+      message: "Selecione uma loja para continuar.",
+    });
+    return null;
+  }
+
+  const shop = await prisma.shop.findFirst({
+    where: {
+      id: shopDbId,
+      accountId: req.auth.accountId,
+    },
   });
+
   if (!shop) {
     res.status(404).json({ error: "shop_not_found" });
     return null;
   }
+
   return shop;
 }
 
@@ -61,9 +84,7 @@ async function persistImagesFromUpdateItemResponse(productId, updated) {
 
 /* ---------------- Products (DB) ---------------- */
 async function list(req, res) {
-  const { shopId } = req.params;
-
-  const shop = await getShopOr404(res, shopId);
+  const shop = await getActiveShopOrFail(req, res);
   if (!shop) return;
 
   // paginação
@@ -108,6 +129,7 @@ async function list(req, res) {
     "shopeeCreateTime",
     "sold",
   ]);
+
   const orderBy = allowedSort.has(sortBy)
     ? { [sortBy]: sortDir }
     : { updatedAt: "desc" };
@@ -148,7 +170,7 @@ async function list(req, res) {
         models: { select: { stock: true } }, // só para somar
         createdAt: true,
         updatedAt: true,
-        shopeeCreateTime: true, // só existe se você adicionar no Prisma
+        shopeeCreateTime: true,
       },
     }),
   ]);
@@ -171,9 +193,9 @@ async function list(req, res) {
 }
 
 async function detail(req, res) {
-  const { shopId, itemId } = req.params;
+  const { itemId } = req.params;
 
-  const shop = await getShopOr404(res, shopId);
+  const shop = await getActiveShopOrFail(req, res);
   if (!shop) return;
 
   const product = await prisma.product.findUnique({
@@ -194,25 +216,29 @@ async function detail(req, res) {
 /* ---------------- CRUD (Shopee write) ---------------- */
 async function updateItem(req, res, next) {
   try {
-    const { shopId, itemId } = req.params;
-    if (!onlyDigits(shopId))
-      return res.status(400).json({ error: "shopId_invalid" });
+    const { itemId } = req.params;
     if (!onlyDigits(itemId))
       return res.status(400).json({ error: "itemId_invalid" });
 
-    const shop = await getShopOr404(res, shopId);
+    const shop = await getActiveShopOrFail(req, res);
     if (!shop) return;
 
+    const shopeeShopId = String(shop.shopId);
     const body = { ...req.body, item_id: Number(itemId) };
-    const result = await ShopeeProductWriteService.updateItem({ shopId, body });
 
-    // Opcional: atualizar imagens/descrição no DB a partir do retorno
+    const result = await ShopeeProductWriteService.updateItem({
+      shopId: shopeeShopId,
+      body,
+    });
+
+    // Opcional: atualizar imagens no DB a partir do retorno
     const product = await prisma.product.findUnique({
       where: {
         shopId_itemId: { shopId: shop.id, itemId: BigInt(String(itemId)) },
       },
       select: { id: true },
     });
+
     if (product) {
       await persistImagesFromUpdateItemResponse(product.id, result);
     }
@@ -225,17 +251,21 @@ async function updateItem(req, res, next) {
 
 async function updatePrice(req, res, next) {
   try {
-    const { shopId, itemId } = req.params;
-    if (!onlyDigits(shopId))
-      return res.status(400).json({ error: "shopId_invalid" });
+    const { itemId } = req.params;
     if (!onlyDigits(itemId))
       return res.status(400).json({ error: "itemId_invalid" });
 
+    const shop = await getActiveShopOrFail(req, res);
+    if (!shop) return;
+
+    const shopeeShopId = String(shop.shopId);
     const body = { ...req.body, item_id: Number(itemId) };
+
     const result = await ShopeeProductWriteService.updatePrice({
-      shopId,
+      shopId: shopeeShopId,
       body,
     });
+
     return res.json({ status: "ok", result });
   } catch (err) {
     return next(err);
@@ -244,17 +274,21 @@ async function updatePrice(req, res, next) {
 
 async function updateStock(req, res, next) {
   try {
-    const { shopId, itemId } = req.params;
-    if (!onlyDigits(shopId))
-      return res.status(400).json({ error: "shopId_invalid" });
+    const { itemId } = req.params;
     if (!onlyDigits(itemId))
       return res.status(400).json({ error: "itemId_invalid" });
 
+    const shop = await getActiveShopOrFail(req, res);
+    if (!shop) return;
+
+    const shopeeShopId = String(shop.shopId);
     const body = { ...req.body, item_id: Number(itemId) };
+
     const result = await ShopeeProductWriteService.updateStock({
-      shopId,
+      shopId: shopeeShopId,
       body,
     });
+
     return res.json({ status: "ok", result });
   } catch (err) {
     return next(err);
@@ -263,19 +297,17 @@ async function updateStock(req, res, next) {
 
 /* ---------------- Images ---------------- */
 /**
- * Replace total (já existe na sua rota /images):
+ * Replace total:
  * - faz upload
  * - faz update_item com image_id_list somente das novas
  */
 async function uploadAndApplyImages(req, res, next) {
   try {
-    const { shopId, itemId } = req.params;
-    if (!onlyDigits(shopId))
-      return res.status(400).json({ error: "shopId_invalid" });
+    const { itemId } = req.params;
     if (!onlyDigits(itemId))
       return res.status(400).json({ error: "itemId_invalid" });
 
-    const shop = await getShopOr404(res, shopId);
+    const shop = await getActiveShopOrFail(req, res);
     if (!shop) return;
 
     const files = req.files || [];
@@ -306,8 +338,9 @@ async function uploadAndApplyImages(req, res, next) {
       image: { image_id_list: imageIds },
     };
 
+    const shopeeShopId = String(shop.shopId);
     const updated = await ShopeeProductWriteService.updateItem({
-      shopId,
+      shopId: shopeeShopId,
       body: updateBody,
     });
 
@@ -317,6 +350,7 @@ async function uploadAndApplyImages(req, res, next) {
       },
       select: { id: true },
     });
+
     if (product) {
       await persistImagesFromUpdateItemResponse(product.id, updated);
     }
@@ -333,13 +367,11 @@ async function uploadAndApplyImages(req, res, next) {
  */
 async function addImages(req, res, next) {
   try {
-    const { shopId, itemId } = req.params;
-    if (!onlyDigits(shopId))
-      return res.status(400).json({ error: "shopId_invalid" });
+    const { itemId } = req.params;
     if (!onlyDigits(itemId))
       return res.status(400).json({ error: "itemId_invalid" });
 
-    const shop = await getShopOr404(res, shopId);
+    const shop = await getActiveShopOrFail(req, res);
     if (!shop) return;
 
     const files = req.files || [];
@@ -388,10 +420,12 @@ async function addImages(req, res, next) {
       image: { image_id_list: finalIds },
     };
 
+    const shopeeShopId = String(shop.shopId);
     const updated = await ShopeeProductWriteService.updateItem({
-      shopId,
+      shopId: shopeeShopId,
       body: updateBody,
     });
+
     await persistImagesFromUpdateItemResponse(product.id, updated);
 
     return res.json({ status: "ok", uploaded, updated });
@@ -402,13 +436,11 @@ async function addImages(req, res, next) {
 
 async function removeImages(req, res, next) {
   try {
-    const { shopId, itemId } = req.params;
-    if (!onlyDigits(shopId))
-      return res.status(400).json({ error: "shopId_invalid" });
+    const { itemId } = req.params;
     if (!onlyDigits(itemId))
       return res.status(400).json({ error: "itemId_invalid" });
 
-    const shop = await getShopOr404(res, shopId);
+    const shop = await getActiveShopOrFail(req, res);
     if (!shop) return;
 
     const removeImageIds = Array.isArray(req.body?.removeImageIds)
@@ -445,10 +477,12 @@ async function removeImages(req, res, next) {
       image: { image_id_list: finalIds },
     };
 
+    const shopeeShopId = String(shop.shopId);
     const updated = await ShopeeProductWriteService.updateItem({
-      shopId,
+      shopId: shopeeShopId,
       body: updateBody,
     });
+
     await persistImagesFromUpdateItemResponse(product.id, updated);
 
     return res.json({ status: "ok", updated });
@@ -463,9 +497,8 @@ function isYyyyMmDd(v) {
 
 async function performance(req, res, next) {
   try {
-    const { shopId } = req.params;
-    if (!onlyDigits(shopId))
-      return res.status(400).json({ error: "shopId_invalid" });
+    const shop = await getActiveShopOrFail(req, res);
+    if (!shop) return;
 
     const periodType = String(req.query.periodType || "").trim();
     const startDate = String(req.query.startDate || "").trim();
@@ -488,8 +521,9 @@ async function performance(req, res, next) {
     const channel = String(req.query.channel || "AllChannel");
     const itemId = req.query.itemId ? String(req.query.itemId) : null;
 
+    const shopeeShopId = String(shop.shopId);
     const result = await ShopeeAmsService.getProductPerformance({
-      shopId,
+      shopId: shopeeShopId,
       periodType,
       startDate,
       endDate,
@@ -507,8 +541,9 @@ async function performance(req, res, next) {
 }
 
 async function fullDetail(req, res) {
-  const { shopId, itemId } = req.params;
-  const shop = await getShopOr404(res, shopId);
+  const { itemId } = req.params;
+
+  const shop = await getActiveShopOrFail(req, res);
   if (!shop) return;
 
   const product = await prisma.product.findUnique({
@@ -525,8 +560,9 @@ async function fullDetail(req, res) {
 
   let description = product.description || null;
   try {
+    const shopeeShopId = String(shop.shopId);
     const extra = await ShopeeProductService.getItemExtraInfo({
-      shopId,
+      shopId: shopeeShopId,
       itemId,
     });
     description = extra?.response?.description || description;
