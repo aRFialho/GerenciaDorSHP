@@ -32,4 +32,18 @@ async function getModelList({ shopId, itemId }) {
   });
 }
 
-module.exports = { getItemList, getItemBaseInfo, getModelList };
+async function getItemExtraInfo({ shopId, itemId }) {
+  return requestShopeeAuthed({
+    method: "get",
+    path: "/api/v2/product/get_item_extra_info",
+    shopId: String(shopId),
+    query: { item_id: String(itemId) },
+  });
+}
+
+module.exports = {
+  getItemList,
+  getItemBaseInfo,
+  getModelList,
+  getItemExtraInfo,
+};

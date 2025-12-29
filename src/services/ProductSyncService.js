@@ -108,6 +108,9 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
         const product = await prisma.product.upsert({
           where: { shopId_itemId: { shopId: shopRow.id, itemId } },
           create: {
+            shopeeCreateTime: p.create_time
+              ? new Date(Number(p.create_time) * 1000)
+              : null,
             shopId: shopRow.id,
             itemId,
             status: p.item_status || null,
@@ -128,6 +131,9 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
               : null,
           },
           update: {
+            shopeeCreateTime: p.create_time
+              ? new Date(Number(p.create_time) * 1000)
+              : undefined,
             status: p.item_status || null,
             title: p.item_name || null,
             currency: p.currency || null,

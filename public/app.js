@@ -312,6 +312,13 @@ async function loadProducts() {
 }
 
 async function openProductDetail(itemId) {
+  const data = await apiGet(
+    `/shops/${SHOP_ID}/products/${encodeURIComponent(itemId)}/full`
+  );
+  const p = data.product || data;
+  const extra = data.extra || {};
+  html += `<div style="margin-top:14px; font-weight:800;">Descrição</div>`;
+  html += `<div class="card">${escapeHtml(extra.description || "—")}</div>`;
   openModal(
     `Produto ${escapeHtml(itemId)}`,
     `<div class="muted">Carregando detalhes...</div>`

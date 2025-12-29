@@ -2,6 +2,7 @@ const prisma = require("../config/db");
 const ShopeeProductWriteService = require("../services/ShopeeProductWriteService");
 const ShopeeMediaService = require("../services/ShopeeMediaService");
 const ShopeeAmsService = require("../services/ShopeeAmsService");
+const ShopeeProductService = require("../services/ShopeeProductService");
 
 function onlyDigits(v) {
   return /^\d+$/.test(String(v ?? "").trim());
@@ -78,6 +79,7 @@ async function list(req, res) {
     req.query.page == null &&
     req.query.pageSize == null &&
     req.query.limit != null;
+
   const legacyLimitRaw = usingLegacyLimit ? Number(req.query.limit) : null;
 
   let pageSize;
@@ -92,11 +94,42 @@ async function list(req, res) {
   const skip = (page - 1) * pageSize;
   const take = pageSize;
 
+  // busca + ordenação (TEM que vir antes do findMany)
+  const q = String(req.query.q || "").trim();
+  const qDigitsOnly = /^\d+$/.test(q);
+
+  const sortBy = String(req.query.sortBy || "updatedAt");
+  const sortDir =
+    String(req.query.sortDir || "desc") === "asc" ? "asc" : "desc";
+
+  const allowedSort = new Set([
+    "updatedAt",
+    "createdAt",
+    "shopeeCreateTime",
+    "sold",
+  ]);
+  const orderBy = allowedSort.has(sortBy)
+    ? { [sortBy]: sortDir }
+    : { updatedAt: "desc" };
+
+  const where = {
+    shopId: shop.id,
+    ...(q
+      ? {
+          OR: [
+            ...(qDigitsOnly ? [{ itemId: BigInt(q) }] : []),
+            { title: { contains: q, mode: "insensitive" } },
+            { models: { some: { sku: { contains: q, mode: "insensitive" } } } },
+          ],
+        }
+      : {}),
+  };
+
   const [total, rows] = await Promise.all([
-    prisma.product.count({ where: { shopId: shop.id } }),
+    prisma.product.count({ where }),
     prisma.product.findMany({
-      where: { shopId: shop.id },
-      orderBy: { updatedAt: "desc" },
+      where,
+      orderBy,
       skip,
       take,
       select: {
@@ -113,25 +146,20 @@ async function list(req, res) {
         stock: true,
         images: { take: 1, select: { url: true } },
         models: { select: { stock: true } }, // só para somar
+        createdAt: true,
+        updatedAt: true,
+        shopeeCreateTime: true, // só existe se você adicionar no Prisma
       },
     }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const sortBy = String(req.query.sortBy || "updatedAt");
-  const sortDir =
-    String(req.query.sortDir || "desc") === "asc" ? "asc" : "desc";
 
-  let orderBy = { updatedAt: "desc" };
-  if (sortBy === "sold") orderBy = { sold: sortDir };
-  if (sortBy === "createdAt") orderBy = { createdAt: sortDir };
-  if (sortBy === "updatedAt") orderBy = { updatedAt: sortDir };
   const items = rows.map((p) => {
     const totalStock = p.hasModel
       ? (p.models || []).reduce((acc, m) => acc + (Number(m.stock) || 0), 0)
       : p.stock ?? null;
 
-    // remove `models` da resposta (só era usado para somar)
     const { models, ...rest } = p;
     return { ...rest, totalStock };
   });
@@ -477,9 +505,49 @@ async function performance(req, res, next) {
     return next(err);
   }
 }
+
+async function fullDetail(req, res) {
+  const { shopId, itemId } = req.params;
+  const shop = await getShopOr404(res, shopId);
+  if (!shop) return;
+
+  const product = await prisma.product.findUnique({
+    where: {
+      shopId_itemId: { shopId: shop.id, itemId: BigInt(String(itemId)) },
+    },
+    include: { images: true, models: { orderBy: { modelId: "asc" } } },
+  });
+  if (!product) return res.status(404).json({ error: "product_not_found" });
+
+  const totalStock = product.hasModel
+    ? (product.models || []).reduce((acc, m) => acc + (Number(m.stock) || 0), 0)
+    : product.stock ?? null;
+
+  let description = product.description || null;
+  try {
+    const extra = await ShopeeProductService.getItemExtraInfo({
+      shopId,
+      itemId,
+    });
+    description = extra?.response?.description || description;
+  } catch (_) {}
+
+  return res.json({
+    product: { ...product, totalStock },
+    extra: {
+      description,
+      attributes: null,
+      shipping: null,
+      dimensions: null,
+      itemUrl: null,
+    },
+  });
+}
+
 module.exports = {
   list,
   detail,
+  fullDetail,
   updateItem,
   updatePrice,
   updateStock,
