@@ -5,7 +5,7 @@ const env = require("./config/env");
 
 const app = createApp();
 
-app.use(express.static(path.join(__dirname, "..", "public")));
+app.use(express.static(path.join(__dirname, "..", "public"), { index: false }));
 
 app.use((err, req, res, next) => {
   const status = err.statusCode || 500;

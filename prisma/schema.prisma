@@ -7,18 +7,88 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+model Account {
+  id        Int      @id @default(autoincrement())
+  name      String
+  users     User[]
+  shops     Shop[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model User {
+  id           Int    @id @default(autoincrement())
+  email        String @unique
+  passwordHash String
+  role         Role   @default(VIEWER)
+
+  accountId Int
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  sessions Session[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  sessions  Session[]
+
+  @@index([accountId, role])
+}
+
+model Session {
+  id     String @id @default(cuid())
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Loja ativa (Shop.id)
+  activeShopId Int?
+  activeShop   Shop? @relation(fields: [activeShopId], references: [id], onDelete: SetNull)
+
+  // Impersonation (para SUPER_ADMIN)
+  realUserId    Int?
+  realUser      User?   @relation("SessionRealUser", fields: [realUserId], references: [id], onDelete: SetNull)
+  impersonating Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([userId])
+  @@index([activeShopId])
+  @@index([expiresAt])
+}
+
+/**
+ * ===== Seus models atuais (com ajustes mínimos) =====
+ */
+
 model Shop {
-  id     Int     @id @default(autoincrement())
+  id Int @id @default(autoincrement())
+
+  // Vínculo multi-tenant
+  accountId Int
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
   shopId BigInt  @unique
   region String?
   status String  @default("UNKNOWN")
 
-  tokens OAuthToken?
-  orders Order[]
+  tokens   OAuthToken?
+  orders   Order[]
+  products Product[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  products  Product[]
+  sessions  Session[]
+
+  @@index([accountId])
 }
 
 model OAuthToken {
@@ -141,7 +211,7 @@ model ProductImage {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   url     String
-  imageId String? // <- novo: o id retornado pelo upload
+  imageId String?
 
   @@index([productId])
 }
