@@ -215,14 +215,18 @@ async function loadProducts() {
   grid.innerHTML = `<div class="card"><div class="muted">Carregando produtos...</div></div>`;
 
   try {
-    const data = await apiGet(
-      `/shops/${SHOP_ID}/products?page=${PRODUCTS_PAGE}&pageSize=${PRODUCTS_PAGE_SIZE}`
-    );
+    const qs =
+      `page=${PRODUCTS_PAGE}` +
+      `&pageSize=${PRODUCTS_PAGE_SIZE}` +
+      `&q=${encodeURIComponent(PRODUCTS_Q)}` +
+      `&sortBy=${encodeURIComponent(PRODUCTS_SORT_BY)}` +
+      `&sortDir=${encodeURIComponent(PRODUCTS_SORT_DIR)}`;
+
+    const data = await apiGet(`/shops/${SHOP_ID}/products?${qs}`);
 
     const items = data.items || data.products || [];
     const meta = data.meta || {};
 
-    PRODUCTS_TOTAL_PAGES = meta.totalPages || 1;
     setText(
       "products-page-info",
       `Página ${
@@ -312,30 +316,21 @@ async function loadProducts() {
 }
 
 async function openProductDetail(itemId) {
-  const data = await apiGet(
-    `/shops/${SHOP_ID}/products/${encodeURIComponent(itemId)}/full`
-  );
-  const p = data.product || data;
-  const extra = data.extra || {};
-  html += `<div style="margin-top:14px; font-weight:800;">Descrição</div>`;
-  html += `<div class="card">${escapeHtml(extra.description || "—")}</div>`;
   openModal(
     `Produto ${escapeHtml(itemId)}`,
     `<div class="muted">Carregando detalhes...</div>`
   );
 
   try {
-    // precisa existir no backend: GET /shops/:shopId/products/:itemId  (DB com models)
-    const qs =
-      `page=${PRODUCTS_PAGE}` +
-      `&pageSize=${PRODUCTS_PAGE_SIZE}` +
-      `&q=${encodeURIComponent(PRODUCTS_Q)}` +
-      `&sortBy=${encodeURIComponent(PRODUCTS_SORT_BY)}` +
-      `&sortDir=${encodeURIComponent(PRODUCTS_SORT_DIR)}`;
+    const data = await apiGet(
+      `/shops/${SHOP_ID}/products/${encodeURIComponent(itemId)}/full`
+    );
 
-    const data = await apiGet(`/shops/${SHOP_ID}/products?${qs}`);
+    const p = data.product || data;
+    const extra = data.extra || {};
 
     let html = "";
+
     html += `<div style="margin-bottom:10px;">
       <span class="badge">${escapeHtml(p.title || "Produto")}</span>
       <span class="badge gray" style="margin-left:8px;">Item ID: ${escapeHtml(
@@ -345,10 +340,23 @@ async function openProductDetail(itemId) {
 
     html += kv("Status", escapeHtml(p.status || "—"));
     html += kv("Brand", escapeHtml(p.brand || "—"));
-    html += kv("Stock", escapeHtml(p.stock ?? "—"));
-    html += kv("Sold", escapeHtml(p.sold ?? "—"));
+    html += kv("Stock", escapeHtml(p.totalStock ?? p.stock ?? "—"));
+    html += kv("Sold (total)", escapeHtml(p.sold ?? "—"));
     html += kv("Currency", escapeHtml(p.currency || "—"));
 
+    // Descrição (Shopee extra info)
+    html += `<div style="margin-top:14px; font-weight:800;">Descrição</div>`;
+    html += `<div class="card">${escapeHtml(extra.description || "—")}</div>`;
+
+    // Link Shopee (placeholder por enquanto)
+    if (extra.itemUrl) {
+      html += `<div style="margin-top:14px; font-weight:800;">Link Shopee</div>`;
+      html += `<div class="card"><a href="${escapeHtml(
+        extra.itemUrl
+      )}" target="_blank" rel="noopener noreferrer">Abrir na Shopee</a></div>`;
+    }
+
+    // Imagens
     if (Array.isArray(p.images) && p.images.length) {
       html += `<div style="margin-top:14px; font-weight:800;">Imagens</div>`;
       html +=
@@ -365,6 +373,7 @@ async function openProductDetail(itemId) {
         `</div>`;
     }
 
+    // Variações (inclui vendas por variação)
     if (Array.isArray(p.models) && p.models.length) {
       html += `<div style="margin-top:14px; font-weight:800;">Variações</div>`;
       html += p.models

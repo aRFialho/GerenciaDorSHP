@@ -12,6 +12,7 @@ router.get(
 router.get("/shops/:shopId/products", ProductsController.list);
 router.get("/shops/:shopId/products/:itemId", ProductsController.detail);
 router.post("/shops/:shopId/products/sync", ProductSyncController.sync);
+
 router.get(
   "/shops/:shopId/products/:itemId/full",
   ProductsController.fullDetail
