@@ -342,18 +342,13 @@ async function openProductDetail(itemId) {
 
     let html = "";
 
-    html += `<div style="margin-bottom:10px;">
-      <span class="badge">${escapeHtml(p.title || "Produto")}</span>
-      <span class="badge gray" style="margin-left:8px;">Item ID: ${escapeHtml(
-        String(p.itemId)
-      )}</span>
-    </div>`;
-
+    html += `<div class="product-detail-grid">`;
     html += kv("Status", escapeHtml(p.status || "—"));
     html += kv("Brand", escapeHtml(p.brand || "—"));
     html += kv("Stock", escapeHtml(p.totalStock ?? p.stock ?? "—"));
     html += kv("Sold (total)", escapeHtml(p.sold ?? "—"));
     html += kv("Currency", escapeHtml(p.currency || "—"));
+    html += `</div>`;
 
     // Descrição (Shopee extra info)
     html += `<div style="margin-top:14px; font-weight:800;">Descrição</div>`;

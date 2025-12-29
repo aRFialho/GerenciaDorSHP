@@ -190,10 +190,15 @@ body {
 }
 
 .modal-body{
+  margin: 10px 0;
   padding: 14px;
   color: var(--text);
   max-height: calc(100vh - 180px);
   overflow: auto;
+}
+
+.modal-body .card {
+  line-height: 1.35;
 }
 
 .kv {
@@ -256,3 +261,105 @@ body {
   .grid-3{ grid-template-columns: 1fr; }
 }
 .input{border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);padding:10px 12px;border-radius:10px;min-width:280px;}
+/* =========================
+   PRODUCTS GRID (80% width)
+   ========================= */
+
+/* Deixa a área de produtos mais “cheia” sem estourar */
+#tab-products .container {
+  max-width: 1400px; /* opcional: dá mais respiro em telas grandes */
+}
+
+/* O grid atual é .grid (5 colunas). Vamos sobrescrever só para #products-grid */
+#products-grid.grid {
+  width: min(80vw, 1400px);
+  margin: 0 auto;
+
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* Responsivo: 2 colunas e 1 coluna */
+@media (max-width: 1100px) {
+  #products-grid.grid {
+    width: min(92vw, 1000px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  #products-grid.grid {
+    width: min(96vw, 520px);
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================
+   CARD ALIGNMENT
+   ========================= */
+
+#products-grid .card {
+  margin: 0;                 /* tira o margin vertical (grid já tem gap) */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 360px;         /* deixa todos “parecidos” */
+}
+
+/* Título com quebra consistente e sem “estourar” card */
+#products-grid .card-title {
+  line-height: 1.25;
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;     /* 2 linhas e corta o resto */
+  overflow: hidden;
+}
+
+/* Imagem com altura fixa para alinhar tudo */
+#products-grid .product-cover {
+  height: 190px;             /* controla alinhamento vertical */
+  aspect-ratio: auto;        /* sobrescreve seu 1:1 para ficar retangular */
+  object-fit: cover;
+  margin: 10px 0;
+}
+
+/* Garante que o bloco de infos fique “colado” embaixo */
+#products-grid .card .muted:last-child {
+  margin-top: auto;
+}
+/* =========================
+   MODAL BIGGER
+   ========================= */
+.modal {
+  width: min(1100px, 96vw);  /* maior que 920px */
+}
+
+/* =========================
+   TWO-COLUMN INFO GRID
+   ========================= */
+.product-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin: 12px 0 14px;
+}
+
+/* Em telas menores, volta para 1 coluna */
+@media (max-width: 820px) {
+  .product-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dentro da grid, não queremos a linha separadora a cada kv */
+.product-detail-grid .kv {
+  border-bottom: none;
+  padding: 8px 0;
+}
+
+/* Ajusta a largura da label para caber bem */
+.product-detail-grid .kv {
+  grid-template-columns: 170px 1fr;
+}
