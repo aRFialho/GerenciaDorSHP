@@ -1,9 +1,12 @@
 let chartCpcDaily = null;
 let chartCpcCampaign = null;
-
+let selectedCpcCampaignId = null;
 let cachedCampaignSeries = {};
 let cachedCampaignSettings = new Map();
 let gmsPager = { offset: 0, limit: 50, hasNext: false, total: null };
+let lastGmsDeletedItemIds = [];
+let lastCpcCampaignRows = [];
+let lastGmsItemRows = [];
 
 function fmtMoney(v) {
   const n = Number(v);
@@ -48,6 +51,8 @@ async function apiPost(url, body) {
 function ensureDefaultDates() {
   const fromEl = document.getElementById("adsDateFrom");
   const toEl = document.getElementById("adsDateTo");
+  if (!fromEl || !toEl) return;
+
   if (!fromEl.value || !toEl.value) {
     const now = new Date();
     const to = new Date(now);
@@ -59,9 +64,12 @@ function ensureDefaultDates() {
 }
 
 function getDates() {
-  const dateFrom = document.getElementById("adsDateFrom").value;
-  const dateTo = document.getElementById("adsDateTo").value;
-  return { dateFrom, dateTo };
+  const fromEl = document.getElementById("adsDateFrom");
+  const toEl = document.getElementById("adsDateTo");
+  return {
+    dateFrom: fromEl ? fromEl.value : "",
+    dateTo: toEl ? toEl.value : "",
+  };
 }
 
 function safeDestroyChart(ch) {
@@ -70,8 +78,10 @@ function safeDestroyChart(ch) {
 }
 
 function renderLineChart(canvasId, labels, datasets) {
-  const ctx = document.getElementById(canvasId);
-  return new Chart(ctx, {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return null;
+
+  return new Chart(canvas, {
     type: "line",
     data: { labels, datasets },
     options: {
@@ -88,34 +98,209 @@ function setText(id, text) {
   if (el) el.textContent = text;
 }
 
+function setDisabled(id, disabled) {
+  const el = document.getElementById(id);
+  if (el) el.disabled = Boolean(disabled);
+}
+
+function openModal(title, html) {
+  const overlay = document.getElementById("modal-overlay");
+  const t = document.getElementById("modal-title");
+  const b = document.getElementById("modal-body");
+  const close = document.getElementById("modal-close");
+
+  if (!overlay || !t || !b || !close) return;
+
+  t.textContent = title;
+  b.innerHTML = html;
+  overlay.style.display = "flex";
+
+  const onClose = () => {
+    overlay.style.display = "none";
+    close.removeEventListener("click", onClose);
+    overlay.removeEventListener("click", onOverlay);
+  };
+
+  const onOverlay = (e) => {
+    if (e.target === overlay) onClose();
+  };
+
+  close.addEventListener("click", onClose);
+  overlay.addEventListener("click", onOverlay);
+}
+
+function val(id) {
+  return document.getElementById(id)?.value;
+}
+function csvEscape(v) {
+  const s = String(v ?? "");
+  if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function downloadCsv(filename, headers, rows) {
+  const lines = [];
+  lines.push(headers.map(csvEscape).join(","));
+  for (const row of rows) {
+    lines.push(row.map(csvEscape).join(","));
+  }
+
+  const blob = new Blob([lines.join("\n")], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  URL.revokeObjectURL(url);
+}
+function exportCpcCampaignsCsv() {
+  if (!lastCpcCampaignRows.length)
+    return alert("Nada para exportar. Clique em Atualizar primeiro.");
+  const { dateFrom, dateTo } = getDates();
+  const filename = `cpc-campaigns-${dateFrom}-to-${dateTo}.csv`;
+
+  const headers = [
+    "campaign_id",
+    "ad_name",
+    "ad_type",
+    "campaign_status",
+    "placement",
+    "budget",
+    "impression",
+    "clicks",
+    "expense",
+    "direct_gmv",
+    "direct_roas",
+    "direct_acos_pct",
+  ];
+
+  const rows = lastCpcCampaignRows.map((x) => [
+    x.campaign_id,
+    x.ad_name,
+    x.ad_type,
+    x.campaign_status,
+    x.placement,
+    x.budget,
+    x.impression,
+    x.clicks,
+    x.expense,
+    x.direct_gmv,
+    x.direct_roas != null ? Number(x.direct_roas).toFixed(4) : "",
+    x.direct_acos_pct != null ? Number(x.direct_acos_pct).toFixed(4) : "",
+  ]);
+
+  downloadCsv(filename, headers, rows);
+}
+
+function exportGmsItemsCsv() {
+  if (!lastGmsItemRows.length)
+    return alert("Nada para exportar. Clique em Atualizar primeiro.");
+  const { dateFrom, dateTo } = getDates();
+  const filename = `gms-items-${dateFrom}-to-${dateTo}.csv`;
+
+  const headers = [
+    "item_id",
+    "title",
+    "impression",
+    "clicks",
+    "expense",
+    "broad_gmv",
+    "broad_roi",
+    "broad_cir",
+    "broad_order",
+  ];
+
+  const rows = lastGmsItemRows.map((x) => [
+    x.item_id,
+    x.title,
+    x.impression,
+    x.clicks,
+    x.expense,
+    x.broad_gmv,
+    x.broad_roi != null ? Number(x.broad_roi).toFixed(4) : "",
+    x.broad_cir != null ? Number(x.broad_cir).toFixed(4) : "",
+    x.broad_order,
+  ]);
+
+  downloadCsv(filename, headers, rows);
+}
 document.addEventListener("DOMContentLoaded", () => {
   ensureDefaultDates();
-  const btn = document.getElementById("btnAdsReload");
-  if (btn) btn.addEventListener("click", () => loadAdsAll());
+  const btnExportCpc = document.getElementById("btnExportCpcCampaignsCsv");
+  if (btnExportCpc)
+    btnExportCpc.addEventListener("click", () => exportCpcCampaignsCsv());
+  const btnExportGmsDeleted = document.getElementById("btnExportGmsDeletedCsv");
+  if (btnExportGmsDeleted)
+    btnExportGmsDeleted.addEventListener("click", () => exportGmsDeletedCsv());
+  const btnExportGms = document.getElementById("btnExportGmsItemsCsv");
+  if (btnExportGms)
+    btnExportGms.addEventListener("click", () => exportGmsItemsCsv());
+  const btnReload = document.getElementById("btnAdsReload");
+  if (btnReload) btnReload.addEventListener("click", () => loadAdsAll());
+  const btnExportCpcLinked = document.getElementById(
+    "btnExportCpcLinkedItemsCsv"
+  );
+  if (btnExportCpcLinked)
+    btnExportCpcLinked.addEventListener("click", () =>
+      exportCpcLinkedItemsCsv()
+    );
   const prev = document.getElementById("btnGmsPrev");
   const next = document.getElementById("btnGmsNext");
   if (prev) prev.addEventListener("click", () => gmsPagePrev());
   if (next) next.addEventListener("click", () => gmsPageNext());
+
+  const btnCreate = document.getElementById("btnGmsCreate");
+  const btnEdit = document.getElementById("btnGmsEdit");
+  if (btnCreate)
+    btnCreate.addEventListener("click", () => openGmsCreateModal());
+  if (btnEdit) btnEdit.addEventListener("click", () => openGmsEditModal());
 });
+
+// Auto-load ao abrir a aba Ads
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest?.(".tab[data-tab='ads']");
+  if (!btn) return;
+  setTimeout(() => loadAdsAll(), 0);
+});
+
 async function loadAdsAll() {
-  const { dateFrom, dateTo } = getDates();
-
-  // CPC limita 1 mês; se passar, corta automaticamente para últimos 30 dias
-  const from = new Date(dateFrom);
-  const to = new Date(dateTo);
-  const diffDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24));
-  let cpcDateFrom = dateFrom;
-  let cpcDateTo = dateTo;
-
-  if (Number.isFinite(diffDays) && diffDays > 31) {
-    const cutTo = new Date(to);
-    const cutFrom = new Date(to);
-    cutFrom.setDate(cutFrom.getDate() - 30);
-    cpcDateTo = cutTo.toISOString().slice(0, 10);
-    cpcDateFrom = cutFrom.toISOString().slice(0, 10);
+  const btn = document.getElementById("btnAdsReload");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Carregando...";
   }
 
   try {
+    let { dateFrom, dateTo } = getDates();
+    if (!dateFrom || !dateTo) {
+      ensureDefaultDates();
+      ({ dateFrom, dateTo } = getDates());
+      if (!dateFrom || !dateTo) throw new Error("Datas inválidas.");
+    }
+
+    const from = new Date(dateFrom);
+    const to = new Date(dateTo);
+    const diffDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24));
+
+    let cpcDateFrom = dateFrom;
+    let cpcDateTo = dateTo;
+
+    if (Number.isFinite(diffDays) && diffDays > 31) {
+      const cutTo = new Date(to);
+      const cutFrom = new Date(to);
+      cutFrom.setDate(cutFrom.getDate() - 30);
+      cpcDateTo = cutTo.toISOString().slice(0, 10);
+      cpcDateFrom = cutFrom.toISOString().slice(0, 10);
+    }
+
     await Promise.all([
       loadCpcBalance(),
       loadCpcDaily(cpcDateFrom, cpcDateTo),
@@ -124,8 +309,17 @@ async function loadAdsAll() {
     ]);
   } catch (e) {
     alert(e.message || String(e));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Atualizar";
+    }
   }
 }
+
+/* ===========================
+   CPC
+=========================== */
 
 async function loadCpcBalance() {
   const j = await apiGet("/shops/active/ads/balance");
@@ -139,6 +333,7 @@ async function loadCpcDaily(dateFrom, dateTo) {
       dateFrom
     )}&dateTo=${encodeURIComponent(dateTo)}`
   );
+
   const series = j?.response?.series || [];
   const totals = j?.response?.totals || {};
 
@@ -181,15 +376,16 @@ async function loadCpcDaily(dateFrom, dateTo) {
 }
 
 async function loadCpcCampaigns(dateFrom, dateTo) {
+  selectedCpcCampaignId = null;
   const perf = await apiGet(
     `/shops/active/ads/campaigns/performance/daily?dateFrom=${encodeURIComponent(
       dateFrom
     )}&dateTo=${encodeURIComponent(dateTo)}&adType=all`
   );
+
   const campaigns = perf?.response?.campaigns || [];
   cachedCampaignSeries = perf?.response?.seriesByCampaignId || {};
 
-  // Pega settings em lotes (100)
   const ids = campaigns.map((c) => c.campaign_id).filter(Boolean);
   cachedCampaignSettings = new Map();
 
@@ -204,8 +400,8 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
     for (const c of list) cachedCampaignSettings.set(String(c.campaign_id), c);
   }
 
-  // Render tabela
   const tbody = document.querySelector("#tblCpcCampaigns tbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   for (const row of campaigns) {
@@ -239,11 +435,35 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
     tr.addEventListener("click", () => selectCampaign(row.campaign_id));
     tbody.appendChild(tr);
   }
+  lastCpcCampaignRows = campaigns.map((row) => {
+    const set = cachedCampaignSettings.get(String(row.campaign_id));
+    const common = set?.common_info || {};
+    const m = row.metrics || {};
 
+    const directRoas =
+      m.expense && m.direct_gmv ? m.direct_gmv / m.expense : null;
+    const directAcos = m.direct_gmv ? (m.expense / m.direct_gmv) * 100 : null;
+
+    return {
+      campaign_id: row.campaign_id,
+      ad_name: common.ad_name || row.ad_name || "",
+      ad_type: common.ad_type || row.ad_type || "",
+      campaign_status: common.campaign_status || "",
+      placement: common.campaign_placement || row.campaign_placement || "",
+      budget: common.campaign_budget ?? null,
+      impression: m.impression ?? 0,
+      clicks: m.clicks ?? 0,
+      expense: m.expense ?? 0,
+      direct_gmv: m.direct_gmv ?? 0,
+      direct_roas: directRoas,
+      direct_acos_pct: directAcos,
+    };
+  });
   if (campaigns.length) selectCampaign(campaigns[0].campaign_id);
 }
 
 function selectCampaign(campaignId) {
+  selectedCpcCampaignId = String(campaignId);
   const id = String(campaignId);
   const set = cachedCampaignSettings.get(id);
   const common = set?.common_info || {};
@@ -252,7 +472,6 @@ function selectCampaign(campaignId) {
     common.ad_name ? `${common.ad_name} (#${id})` : `#${id}`
   );
 
-  // KPIs simples (a partir da série)
   const series = cachedCampaignSeries[id] || [];
   const totals = series.reduce(
     (a, x) => {
@@ -270,7 +489,6 @@ function selectCampaign(campaignId) {
   setText("cpcCampExpense", fmtMoney(totals.expense));
   setText("cpcCampDirectGmv", fmtMoney(totals.direct_gmv));
 
-  // Chart campanha
   const labels = series.map((x) => x.date);
   const ds = [
     {
@@ -302,8 +520,8 @@ function selectCampaign(campaignId) {
   chartCpcCampaign = safeDestroyChart(chartCpcCampaign);
   chartCpcCampaign = renderLineChart("chartCpcCampaign", labels, ds);
 
-  // Produtos vinculados (settings)
   const tbody = document.querySelector("#tblCpcCampaignItems tbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   const itemIds = common.item_id_list || [];
@@ -330,23 +548,86 @@ function selectCampaign(campaignId) {
   }
 }
 
-async function loadGmsAll(dateFrom, dateTo) {
-  await loadGmsEligibility();
-  await loadGmsCampaignTotals(dateFrom, dateTo);
-  gmsPager.offset = 0;
-  await loadGmsItems(dateFrom, dateTo, gmsPager.offset, gmsPager.limit);
-  await loadGmsDeleted();
-}
+/* ===========================
+   GMS (safe)
+=========================== */
 
-async function loadGmsEligibility() {
-  const j = await apiGet("/shops/active/ads/gms/eligibility");
-  const eligible = j?.response?.is_eligible;
-  const reason = j?.response?.reason;
+async function loadGmsAll(dateFrom, dateTo) {
+  // default: desabilita até confirmar eligibility
+  setDisabled("btnGmsCreate", true);
+  setDisabled("btnGmsEdit", true);
+
+  let eligibleResp = null;
+
+  try {
+    eligibleResp = await apiGet("/shops/active/ads/gms/eligibility");
+  } catch (e) {
+    setText("kpiGmsEligible", "Indisponível");
+    setText("kpiGmsReason", "—");
+    setText("kpiGmsExpense", "—");
+    setText("kpiGmsGmv", "—");
+    setText("kpiGmsRoas", "—");
+    setText("kpiGmsAcos", "—");
+    renderGmsTablesEmpty("GMS indisponível para esta loja.");
+    setDisabled("btnGmsCreate", true);
+    setDisabled("btnGmsEdit", true);
+    return;
+  }
+
+  const eligible = eligibleResp?.response?.is_eligible;
+  const reason = eligibleResp?.response?.reason;
+
   setText(
     "kpiGmsEligible",
     eligible === true ? "Sim" : eligible === false ? "Não" : "—"
   );
   setText("kpiGmsReason", reason || "—");
+
+  // Se não for whitelisted, para aqui (evita spam de erros)
+  if (reason === "not_whitelisted") {
+    setText("kpiGmsExpense", "—");
+    setText("kpiGmsGmv", "—");
+    setText("kpiGmsRoas", "—");
+    setText("kpiGmsAcos", "—");
+    renderGmsTablesEmpty("GMS indisponível para esta loja (not_whitelisted).");
+    setDisabled("btnGmsCreate", true);
+    setDisabled("btnGmsEdit", true);
+    return;
+  }
+
+  // Se chegou aqui, permite abrir modais
+  setDisabled("btnGmsCreate", false);
+  setDisabled("btnGmsEdit", false);
+
+  try {
+    await loadGmsCampaignTotals(dateFrom, dateTo);
+    gmsPager.offset = 0;
+    await loadGmsItems(dateFrom, dateTo, gmsPager.offset, gmsPager.limit);
+    await loadGmsDeleted();
+  } catch (e) {
+    setText("kpiGmsExpense", "—");
+    setText("kpiGmsGmv", "—");
+    setText("kpiGmsRoas", "—");
+    setText("kpiGmsAcos", "—");
+    renderGmsTablesEmpty(e.message || "Falha ao carregar GMS.");
+    setDisabled("btnGmsCreate", true);
+    setDisabled("btnGmsEdit", true);
+  }
+}
+
+function renderGmsTablesEmpty(msg) {
+  lastGmsItemRows = [];
+  lastGmsDeletedItemIds = [];
+
+  const tb1 = document.querySelector("#tblGmsItems tbody");
+  const tb2 = document.querySelector("#tblGmsDeleted tbody");
+
+  if (tb1) tb1.innerHTML = `<tr><td colspan="8" class="muted">${msg}</td></tr>`;
+  if (tb2) tb2.innerHTML = `<tr><td class="muted">${msg}</td></tr>`;
+
+  setText("gmsPagerInfo", "—");
+  gmsPager.hasNext = false;
+  gmsPager.total = null;
 }
 
 async function loadGmsCampaignTotals(dateFrom, dateTo) {
@@ -374,11 +655,28 @@ async function loadGmsItems(dateFrom, dateTo, offset, limit) {
     offset,
     limit,
   });
+
   const items = j?.response?.items || [];
   gmsPager.hasNext = Boolean(j?.response?.has_next_page);
   gmsPager.total = j?.response?.total ?? null;
 
+  lastGmsItemRows = items.map((it) => {
+    const r = it.report || {};
+    return {
+      item_id: it.item_id,
+      title: it.title || "",
+      impression: r.impression ?? 0,
+      clicks: r.clicks ?? 0,
+      expense: r.expense ?? 0,
+      broad_gmv: r.broad_gmv ?? 0,
+      broad_roi: r.broad_roi ?? null,
+      broad_cir: r.broad_cir ?? null,
+      broad_order: r.broad_order ?? 0,
+    };
+  });
+
   const tbody = document.querySelector("#tblGmsItems tbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   for (const it of items) {
@@ -432,7 +730,9 @@ async function loadGmsDeleted() {
     limit: 50,
   });
   const itemIds = j?.response?.item_id_list || [];
+  lastGmsDeletedItemIds = itemIds.map((x) => String(x));
   const tbody = document.querySelector("#tblGmsDeleted tbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   for (const id of itemIds) {
@@ -461,8 +761,207 @@ async function gmsPagePrev() {
   await loadGmsItems(dateFrom, dateTo, gmsPager.offset, gmsPager.limit);
 }
 
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest?.(".tab[data-tab='ads']");
-  if (!btn) return;
-  setTimeout(() => loadAdsAll(), 0);
-});
+/* ===========================
+   Modais GMS
+=========================== */
+
+function openGmsCreateModal() {
+  openModal(
+    "Criar campanha GMS",
+    `
+      <div class="field">
+        <label class="muted">Data início (obrigatório)</label>
+        <input id="gmsCreateDateFrom" class="input" type="date">
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Data fim (opcional)</label>
+        <input id="gmsCreateDateTo" class="input" type="date">
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Orçamento diário (obrigatório)</label>
+        <input id="gmsCreateDailyBudget" class="input" type="number" step="0.01" placeholder="Ex: 50.00">
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">ROAS target (opcional)</label>
+        <input id="gmsCreateRoasTarget" class="input" type="number" step="0.1" placeholder="Ex: 6.5">
+        <div class="muted" style="margin-top:6px;">Dica: vazio = GMV Max Auto Bidding (Shop). <b>0</b> também ativa o modo auto.</div>
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Reference ID (opcional)</label>
+        <input id="gmsCreateReferenceId" class="input" type="text" placeholder="UUID (opcional)">
+      </div>
+
+      <div class="actions" style="margin-top:14px;">
+        <button id="btnGmsCreateSubmit" class="btn btn-primary">Criar</button>
+      </div>
+    `
+  );
+
+  const { dateFrom, dateTo } = getDates();
+  const d1 = document.getElementById("gmsCreateDateFrom");
+  const d2 = document.getElementById("gmsCreateDateTo");
+  if (d1) d1.value = dateFrom || "";
+  if (d2) d2.value = dateTo || "";
+
+  const submit = document.getElementById("btnGmsCreateSubmit");
+  if (!submit) return;
+
+  submit.addEventListener("click", async () => {
+    const body = {
+      dateFrom: val("gmsCreateDateFrom"),
+      dateTo: val("gmsCreateDateTo") || null,
+      dailyBudget: val("gmsCreateDailyBudget"),
+      roasTarget: val("gmsCreateRoasTarget") || null,
+      referenceId: val("gmsCreateReferenceId") || null,
+    };
+
+    try {
+      await apiPost("/shops/active/ads/gms/campaign/create", body);
+      alert("Campanha GMS criada.");
+      await loadAdsAll();
+      const overlay = document.getElementById("modal-overlay");
+      if (overlay) overlay.style.display = "none";
+    } catch (e) {
+      alert(e.message || String(e));
+    }
+  });
+}
+
+function openGmsEditModal() {
+  openModal(
+    "Editar campanha GMS",
+    `
+      <div class="field">
+        <label class="muted">Campaign ID (obrigatório)</label>
+        <input id="gmsEditCampaignId" class="input" type="number" placeholder="Ex: 12412421">
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Ação (edit_action)</label>
+        <select id="gmsEditAction" class="select">
+          <option value="change_budget">change_budget</option>
+          <option value="change_duration">change_duration</option>
+          <option value="change_roas_target">change_roas_target</option>
+          <option value="pause">pause</option>
+          <option value="resume">resume</option>
+          <option value="start">start</option>
+        </select>
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Orçamento diário (para change_budget)</label>
+        <input id="gmsEditDailyBudget" class="input" type="number" step="0.01" placeholder="Ex: 80.00">
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Data início (para change_duration)</label>
+        <input id="gmsEditDateFrom" class="input" type="date">
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Data fim (para change_duration)</label>
+        <input id="gmsEditDateTo" class="input" type="date">
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">ROAS target (para change_roas_target)</label>
+        <input id="gmsEditRoasTarget" class="input" type="number" step="0.1">
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Reference ID (recomendado)</label>
+        <input id="gmsEditReferenceId" class="input" type="text" placeholder="UUID para evitar duplicidade">
+      </div>
+
+      <div class="actions" style="margin-top:14px;">
+        <button id="btnGmsEditSubmit" class="btn btn-primary">Aplicar</button>
+      </div>
+    `
+  );
+
+  const { dateFrom, dateTo } = getDates();
+  const d1 = document.getElementById("gmsEditDateFrom");
+  const d2 = document.getElementById("gmsEditDateTo");
+  if (d1) d1.value = dateFrom || "";
+  if (d2) d2.value = dateTo || "";
+
+  const submit = document.getElementById("btnGmsEditSubmit");
+  if (!submit) return;
+
+  submit.addEventListener("click", async () => {
+    const body = {
+      campaignId: val("gmsEditCampaignId"),
+      editAction: val("gmsEditAction"),
+      dailyBudget: val("gmsEditDailyBudget") || null,
+      dateFrom: val("gmsEditDateFrom") || null,
+      dateTo: val("gmsEditDateTo") || null,
+      roasTarget: val("gmsEditRoasTarget") || null,
+      referenceId: val("gmsEditReferenceId") || null,
+    };
+
+    try {
+      await apiPost("/shops/active/ads/gms/campaign/edit", body);
+      alert("Alteração aplicada.");
+      await loadAdsAll();
+      const overlay = document.getElementById("modal-overlay");
+      if (overlay) overlay.style.display = "none";
+    } catch (e) {
+      alert(e.message || String(e));
+    }
+  });
+}
+function exportGmsDeletedCsv() {
+  if (!lastGmsDeletedItemIds.length) {
+    return alert("Nada para exportar. Clique em Atualizar primeiro.");
+  }
+
+  const { dateFrom, dateTo } = getDates();
+  const filename = `gms-deleted-items-first-50-${dateFrom}-to-${dateTo}.csv`;
+
+  const headers = ["item_id"];
+  const rows = lastGmsDeletedItemIds.map((id) => [id]);
+
+  downloadCsv(filename, headers, rows);
+}
+function exportCpcLinkedItemsCsv() {
+  if (!selectedCpcCampaignId) {
+    return alert("Selecione uma campanha primeiro.");
+  }
+
+  const set = cachedCampaignSettings.get(String(selectedCpcCampaignId));
+  if (!set) {
+    return alert(
+      "Sem dados de settings para a campanha selecionada. Clique em Atualizar."
+    );
+  }
+
+  const common = set.common_info || {};
+  const itemIds = Array.isArray(common.item_id_list) ? common.item_id_list : [];
+
+  const autoInfo = Array.isArray(set.auto_product_ads_info)
+    ? set.auto_product_ads_info
+    : [];
+  const autoMap = new Map(
+    autoInfo.filter((x) => x.item_id).map((x) => [String(x.item_id), x])
+  );
+
+  const { dateFrom, dateTo } = getDates();
+  const filename = `cpc-linked-items-campaign-${selectedCpcCampaignId}-${dateFrom}-to-${dateTo}.csv`;
+
+  const headers = ["campaign_id", "item_id", "product_name", "status"];
+  const rows = itemIds.map((itemId) => {
+    const ai = autoMap.get(String(itemId));
+    return [
+      selectedCpcCampaignId,
+      String(itemId),
+      ai?.product_name || "",
+      ai?.status || "",
+    ];
+  });
+
+  downloadCsv(filename, headers, rows);
+}

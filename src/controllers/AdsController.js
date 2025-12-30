@@ -512,10 +512,7 @@ async function gmsItemsPerformance(req, res, next) {
       }))
       .filter((x) => x.item_id);
     // Enrichment: traz title + 1 imagem do seu DB
-    let enrichedItems = items;
-
-if (items.length) {
-  const itemIdsBigInt = items.map((x) => BigInt(x.item_id));
+    const itemIdsBigInt = items.map((x) => BigInt(x.item_id));
 
     const products = await prisma.product.findMany({
       where: {

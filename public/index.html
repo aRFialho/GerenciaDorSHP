@@ -83,13 +83,6 @@
             <span class="ml-nav-item__hint muted">CPC + GMS</span>
           </button>
         </div>
-
-        <div class="ml-sidebar__section">
-          <div class="ml-sidebar__title">Atalhos</div>
-          <div class="ml-sidebar__mini muted">
-            Layout inspirado no Mercado Livre. Mantém rotas, IDs e lógica atual.
-          </div>
-        </div>
       </aside>
 
       <main class="ml-main container">
@@ -290,7 +283,7 @@
         <section id="tab-ads" class="tab-panel">
           <div class="page-title">
             <h2>Ads</h2>
-            <div class="page-subtitle muted">Shopee Ads (CPC) + GMS</div>
+            <div class="page-subtitle muted">Shopee Ads + GMS</div>
           </div>
 
           <div class="section-card">
@@ -333,7 +326,7 @@
             <div class="section-card">
               <div class="section-card__header">
                 <div>
-                  <div class="section-title">Resumo (CPC)</div>
+                  <div class="section-title">Resumo</div>
                   <div class="muted">
                     Saldo e métricas agregadas do período.
                   </div>
@@ -372,7 +365,7 @@
             <div class="section-card">
               <div class="section-card__header">
                 <div>
-                  <div class="section-title">Evolução diária (CPC)</div>
+                  <div class="section-title">Evolução diária</div>
                   <div class="muted">Impressões, cliques, gasto e GMV.</div>
                 </div>
               </div>
@@ -385,10 +378,16 @@
           <div class="section-card">
             <div class="section-card__header">
               <div>
-                <div class="section-title">Campanhas (CPC)</div>
+                <div class="section-title">Campanhas</div>
                 <div class="muted">
                   Clique em uma campanha para ver detalhes.
                 </div>
+              </div>
+
+              <div class="section-actions">
+                <button id="btnExportCpcCampaignsCsv" class="btn btn-ghost">
+                  Exportar CSV
+                </button>
               </div>
             </div>
             <div class="section-card__body">
@@ -445,12 +444,20 @@
                     <canvas id="chartCpcCampaign" height="110"></canvas>
                   </div>
                 </div>
-
                 <div class="section-card" style="margin: 0">
                   <div class="section-card__header">
                     <div>
                       <div class="section-title">Produtos vinculados</div>
                       <div class="muted">Retornado por settings</div>
+                    </div>
+
+                    <div class="section-actions">
+                      <button
+                        id="btnExportCpcLinkedItemsCsv"
+                        class="btn btn-ghost"
+                      >
+                        Exportar CSV
+                      </button>
                     </div>
                   </div>
                   <div class="section-card__body">
@@ -478,6 +485,12 @@
               <div>
                 <div class="section-title">GMS</div>
                 <div class="muted">GMV Max / Product GMS</div>
+              </div>
+
+              <div class="section-actions">
+                <button id="btnExportGmsItemsCsv" class="btn btn-ghost">
+                  Exportar CSV
+                </button>
               </div>
             </div>
             <div class="section-card__body">
@@ -531,11 +544,24 @@
                 <div class="muted" id="gmsPagerInfo">—</div>
                 <button id="btnGmsNext" class="btn btn-ghost">Próximo</button>
               </div>
-
+              <div class="actions">
+                <button id="btnGmsCreate" class="btn btn-primary">
+                  Criar campanha GMS
+                </button>
+                <button id="btnGmsEdit" class="btn btn-ghost">
+                  Editar campanha GMS
+                </button>
+              </div>
               <div class="section-card" style="margin-top: 14px">
                 <div class="section-card__header">
                   <div>
                     <div class="section-title">Itens removidos (GMS)</div>
+                  </div>
+
+                  <div class="section-actions">
+                    <button id="btnExportGmsDeletedCsv" class="btn btn-ghost">
+                      Exportar CSV
+                    </button>
                   </div>
                 </div>
                 <div class="section-card__body">
