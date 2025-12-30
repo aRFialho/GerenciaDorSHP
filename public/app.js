@@ -980,10 +980,11 @@ async function loadAdmin() {
                       <div class="card" style="margin-top:10px;">
                         <div class="card-title">${name}</div>
                         <div class="muted">${email}</div>
-
+                         <button class="btn" data-edit-user="${id}">Editar</button>
                         <div style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                           <div class="muted">Função atual: <strong>${uRole}</strong></div>
                           <button class="btn btn-ghost" data-role-toggle="${id}" data-current-role="${uRole}">
+                          
                             Alternar para ${
                               uRole === "ADMIN" ? "Usuário" : "Admin"
                             }
@@ -1051,7 +1052,7 @@ async function loadAdmin() {
         const nextRole = current === "ADMIN" ? "VIEWER" : "ADMIN";
 
         try {
-          await apiPost(`/admin/users/${userId}/role`, { role: nextRole }); // se você preferir PATCH real, veja nota abaixo
+          await apiPatch(`/admin/users/${userId}/role`, { role: nextRole });
           await loadAdmin();
         } catch (e) {
           openModal(
@@ -1059,6 +1060,83 @@ async function loadAdmin() {
             `<div class="muted">${escapeHtml(e.message)}</div>`
           );
         }
+      });
+    });
+    $all("[data-edit-user]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const userId = Number(btn.getAttribute("data-edit-user"));
+        const u = users.find((x) => Number(x.id) === userId);
+        if (!u) return;
+
+        openModal(
+          "Editar usuário",
+          `
+        <div class="muted">Atualize nome/e-mail e (opcional) defina uma nova senha.</div>
+        <div style="margin-top:12px; display:grid; gap:10px;">
+          <input id="edit-user-name" class="input" placeholder="Nome" value="${escapeHtml(
+            u.name || ""
+          )}" />
+          <input id="edit-user-email" class="input" placeholder="E-mail" value="${escapeHtml(
+            u.email || ""
+          )}" />
+          <input id="edit-user-pass" class="input" placeholder="Nova senha (opcional)" type="password" />
+        </div>
+        <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button id="btn-save-user" class="btn btn-primary">Salvar</button>
+          <button id="btn-del-user" class="btn btn-ghost">Excluir usuário</button>
+        </div>
+        <div id="edit-user-msg" class="muted" style="margin-top:10px;"></div>
+      `
+        );
+
+        document
+          .getElementById("btn-save-user")
+          ?.addEventListener("click", async () => {
+            const name = String(
+              document.getElementById("edit-user-name")?.value || ""
+            ).trim();
+            const email = String(
+              document.getElementById("edit-user-email")?.value || ""
+            ).trim();
+            const password = String(
+              document.getElementById("edit-user-pass")?.value || ""
+            );
+
+            try {
+              const body = {};
+              if (name) body.name = name;
+              if (email) body.email = email;
+              if (password) body.password = password;
+
+              document.getElementById("edit-user-msg").textContent =
+                "Salvando...";
+              await apiPatch(`/admin/users/${userId}`, body);
+              document.getElementById("edit-user-msg").textContent =
+                "Salvo com sucesso.";
+              closeModal();
+              await loadAdmin();
+            } catch (e) {
+              document.getElementById(
+                "edit-user-msg"
+              ).textContent = `Erro: ${e.message}`;
+            }
+          });
+
+        document
+          .getElementById("btn-del-user")
+          ?.addEventListener("click", async () => {
+            try {
+              document.getElementById("edit-user-msg").textContent =
+                "Excluindo...";
+              await apiDelete(`/admin/users/${userId}`);
+              closeModal();
+              await loadAdmin();
+            } catch (e) {
+              document.getElementById(
+                "edit-user-msg"
+              ).textContent = `Erro: ${e.message}`;
+            }
+          });
       });
     });
   } catch (e) {
@@ -1098,6 +1176,13 @@ function initAuthTab() {
       if (preview) preview.textContent = `Erro: ${e.message}`;
     }
   });
+}
+
+async function apiDelete(path) {
+  const r = await fetch(path, { method: "DELETE", credentials: "include" });
+  const text = await r.text();
+  if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
+  return text ? JSON.parse(text) : null;
 }
 
 /* ---------------- Boot ---------------- */
