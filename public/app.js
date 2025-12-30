@@ -767,21 +767,10 @@ function initHeaderButtons() {
       try {
         await loadMe();
         const shops = Array.isArray(ME?.shops) ? ME.shops : [];
-        if (shops.length === 0) {
-          openModal(
-            "Sem lojas",
-            `<div class="muted">Nenhuma loja vinculada. Vá em Autenticação e conecte a Shopee.</div>`
-          );
-          return;
-        }
-        if (shops.length === 1) {
-          openModal(
-            "Apenas 1 loja",
-            `<div class="muted">Esta conta possui apenas uma loja vinculada.</div>`
-          );
-          return;
-        }
-        await promptSelectShop(shops);
+        const role = String(ME?.user?.role || "");
+        const activeShopId = ME?.activeShopId ?? null;
+
+        openShopSwitcherModal({ shops, role, activeShopId });
       } catch (e) {
         openModal("Erro", `<div class="muted">${escapeHtml(e.message)}</div>`);
       }
@@ -794,6 +783,105 @@ function initHeaderButtons() {
         await apiPost("/auth/logout");
       } catch (_) {}
       window.location.href = "/login";
+    });
+  }
+}
+
+function openShopSwitcherModal({ shops, role, activeShopId }) {
+  const canAddShop = role === "ADMIN" || role === "SUPER_ADMIN";
+  const limitReached = shops.length >= 2;
+
+  const shopsHtml = shops.length
+    ? shops
+        .map((s) => {
+          const isActive =
+            activeShopId != null && Number(s.id) === Number(activeShopId);
+
+          const title = s.shopId
+            ? `ShopId Shopee: ${escapeHtml(String(s.shopId))}`
+            : "Loja";
+          const region = s.region ? ` • ${escapeHtml(String(s.region))}` : "";
+          const status = s.status ? ` • ${escapeHtml(String(s.status))}` : "";
+
+          return `
+            <button class="btn btn-primary" data-select-shop="${escapeHtml(
+              String(s.id)
+            )}" style="width:100%; margin-top:10px;">
+              ${title}${region}${status}${isActive ? ` • (ATIVA)` : ""}
+            </button>
+          `;
+        })
+        .join("")
+    : `<div class="muted" style="margin-top:10px;">Nenhuma loja vinculada.</div>`;
+
+  const left = `
+    <div style="flex:1; min-width:280px;">
+      <div class="card-title">Lojas desta conta</div>
+      <div class="muted" style="margin-top:6px;">Selecione qual deseja usar.</div>
+      <div style="margin-top:10px;">${shopsHtml}</div>
+    </div>
+  `;
+
+  const right = canAddShop
+    ? `
+      <div style="flex:1; min-width:280px;">
+        <div class="card-title">Adicionar nova loja</div>
+        <div class="muted" style="margin-top:6px;">
+          ${
+            limitReached
+              ? "Limite de 2 lojas por conta atingido."
+              : "Você pode adicionar mais 1 loja (limite 2)."
+          }
+        </div>
+        <div style="margin-top:10px;">
+          <button id="btn-add-shop" class="btn btn-primary" ${
+            limitReached ? "disabled" : ""
+          }>+ Adicionar nova loja</button>
+        </div>
+      </div>
+    `
+    : `
+      <div style="flex:1; min-width:280px;">
+        <div class="card-title">Adicionar nova loja</div>
+        <div class="muted" style="margin-top:6px;">Somente usuários Admin podem adicionar lojas.</div>
+      </div>
+    `;
+
+  openModal(
+    "Trocar loja",
+    `<div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start;">${left}${right}</div>`
+  );
+
+  // selecionar loja (qualquer usuário pode)
+  $all("[data-select-shop]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const shopId = Number(btn.getAttribute("data-select-shop"));
+      try {
+        await apiPost("/auth/select-shop", { shopId });
+        closeModal();
+        await loadMe();
+      } catch (e) {
+        openModal("Erro", `<div class="muted">${escapeHtml(e.message)}</div>`);
+      }
+    });
+  });
+
+  // adicionar loja (admin)
+  const btnAdd = document.getElementById("btn-add-shop");
+  if (btnAdd && !btnAdd.disabled) {
+    btnAdd.addEventListener("click", async () => {
+      try {
+        const data = await apiGet("/auth/url?mode=add_shop");
+        const url = data?.auth_url || null;
+        if (url) window.location.href = url;
+        else
+          openModal(
+            "Erro",
+            `<div class="muted">Não foi possível gerar o link.</div>`
+          );
+      } catch (e) {
+        openModal("Erro", `<div class="muted">${escapeHtml(e.message)}</div>`);
+      }
     });
   }
 }
@@ -848,59 +936,148 @@ async function loadAdmin() {
       return;
     }
 
-    // 1) Sempre mostra usuários da conta
     const usersData = await apiGet("/admin/users");
     const users = Array.isArray(usersData?.users) ? usersData.users : [];
 
-    let html = `<div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start;">`;
+    const formHtml = `
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-title">Adicionar acesso novo</div>
+        <div class="muted" style="margin-top:6px;">Crie um usuário para acessar esta conta.</div>
 
-    html += `<div class="card" style="flex:1; min-width:320px;">
-      <div class="card-title">Usuários da Conta</div>
-      <div class="muted" style="margin-top:6px;">Crie usuários e gerencie roles (ADMIN/MANAGER/VIEWER).</div>
-      <div style="margin-top:10px;">${
-        users.length
-          ? users
-              .map(
-                (u) =>
-                  `<div class="muted" style="margin-top:6px;">${escapeHtml(
-                    u.email
-                  )} • ${escapeHtml(u.role)}</div>`
-              )
-              .join("")
-          : `<div class="muted" style="margin-top:10px;">Nenhum usuário.</div>`
-      }</div>
-    </div>`;
+        <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <input id="admin-new-name" class="input" placeholder="Nome" />
+          <input id="admin-new-email" class="input" placeholder="E-mail" />
+          <input id="admin-new-pass" class="input" placeholder="Senha" type="password" />
+          <select id="admin-new-role" class="select">
+            <option value="VIEWER" selected>Usuário</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </div>
 
-    // 2) SUPER_ADMIN: mostra contas globais
-    if (role === "SUPER_ADMIN") {
-      const accData = await apiGet("/admin-global/accounts");
-      const accounts = Array.isArray(accData?.accounts) ? accData.accounts : [];
+        <div style="margin-top:12px; display:flex; gap:10px; align-items:center;">
+          <button id="admin-create-user" class="btn btn-primary">Criar acesso</button>
+          <div id="admin-create-msg" class="muted"></div>
+        </div>
+      </div>
+    `;
 
-      html += `<div class="card" style="flex:1; min-width:320px;">
-        <div class="card-title">Admin Global • Accounts</div>
-        <div class="muted" style="margin-top:6px;">Visão geral das contas.</div>
-        <div style="margin-top:10px;">${
-          accounts.length
-            ? accounts
-                .map(
-                  (a) =>
-                    `<div class="muted" style="margin-top:6px;">#${escapeHtml(
-                      String(a.id)
-                    )} • ${escapeHtml(a.name)}</div>`
-                )
-                .join("")
-            : `<div class="muted" style="margin-top:10px;">Nenhuma conta.</div>`
-        }</div>
-      </div>`;
+    const listHtml = `
+      <div class="card">
+        <div class="card-title">Acessos da Conta</div>
+        <div class="muted" style="margin-top:6px;">Troque a função entre Admin e Usuário.</div>
+
+        <div style="margin-top:10px;">
+          ${
+            users.length
+              ? users
+                  .map((u) => {
+                    const id = escapeHtml(String(u.id));
+                    const name = escapeHtml(u.name || "—");
+                    const email = escapeHtml(u.email || "—");
+                    const uRole = escapeHtml(String(u.role || "VIEWER"));
+
+                    return `
+                      <div class="card" style="margin-top:10px;">
+                        <div class="card-title">${name}</div>
+                        <div class="muted">${email}</div>
+
+                        <div style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                          <div class="muted">Função atual: <strong>${uRole}</strong></div>
+                          <button class="btn btn-ghost" data-role-toggle="${id}" data-current-role="${uRole}">
+                            Alternar para ${
+                              uRole === "ADMIN" ? "Usuário" : "Admin"
+                            }
+                          </button>
+                        </div>
+                      </div>
+                    `;
+                  })
+                  .join("")
+              : `<div class="muted" style="margin-top:10px;">Nenhum usuário.</div>`
+          }
+        </div>
+      </div>
+    `;
+
+    root.innerHTML = formHtml + listHtml;
+
+    // Create user
+    const btnCreate = document.getElementById("admin-create-user");
+    const msg = document.getElementById("admin-create-msg");
+
+    if (btnCreate) {
+      btnCreate.addEventListener("click", async () => {
+        const name = String(
+          document.getElementById("admin-new-name")?.value || ""
+        ).trim();
+        const email = String(
+          document.getElementById("admin-new-email")?.value || ""
+        ).trim();
+        const password = String(
+          document.getElementById("admin-new-pass")?.value || ""
+        );
+        const newRole = String(
+          document.getElementById("admin-new-role")?.value || "VIEWER"
+        ).toUpperCase();
+
+        if (!name || !email || !password) {
+          if (msg) msg.textContent = "Informe nome, e-mail e senha.";
+          return;
+        }
+
+        try {
+          if (msg) msg.textContent = "Criando...";
+          await apiPost("/admin/users", {
+            name,
+            email,
+            password,
+            role: newRole,
+          });
+          if (msg) msg.textContent = "Acesso criado com sucesso.";
+          await loadAdmin();
+        } catch (e) {
+          if (msg) msg.textContent = `Erro: ${e.message}`;
+        }
+      });
     }
 
-    html += `</div>`;
-    root.innerHTML = html;
+    // Toggle role ADMIN <-> VIEWER
+    $all("[data-role-toggle]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const userId = Number(btn.getAttribute("data-role-toggle"));
+        const current = String(
+          btn.getAttribute("data-current-role") || "VIEWER"
+        ).toUpperCase();
+        const nextRole = current === "ADMIN" ? "VIEWER" : "ADMIN";
+
+        try {
+          await apiPost(`/admin/users/${userId}/role`, { role: nextRole }); // se você preferir PATCH real, veja nota abaixo
+          await loadAdmin();
+        } catch (e) {
+          openModal(
+            "Erro",
+            `<div class="muted">${escapeHtml(e.message)}</div>`
+          );
+        }
+      });
+    });
   } catch (e) {
     root.innerHTML = `<div class="muted">Erro no Admin: ${escapeHtml(
       e.message
     )}</div>`;
   }
+}
+
+async function apiPatch(path, body) {
+  const r = await fetch(path, {
+    method: "PATCH",
+    credentials: "include",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await r.text();
+  if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
+  return text ? JSON.parse(text) : null;
 }
 
 function initAuthTab() {

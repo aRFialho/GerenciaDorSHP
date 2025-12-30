@@ -15,7 +15,13 @@ router.get(
       const users = await prisma.user.findMany({
         where: { accountId: req.auth.accountId },
         orderBy: { id: "asc" },
-        select: { id: true, email: true, role: true, createdAt: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+        },
       });
       res.json({ users });
     } catch (e) {
@@ -34,17 +40,20 @@ router.post(
         .toLowerCase();
       const role = String(req.body?.role || "VIEWER").toUpperCase();
       const password = String(req.body?.password || "");
-
-      if (!email || !password) {
-        return res
-          .status(400)
-          .json({ error: "bad_request", message: "Informe email e senha." });
+      const name = String(req.body?.name || "").trim();
+      if (!name || !email || !password) {
+        return res.status(400).json({
+          error: "bad_request",
+          message: "Informe nome, email e senha.",
+        });
       }
 
-      const allowed = new Set(["ADMIN", "MANAGER", "VIEWER"]);
-      if (req.auth.role === "SUPER_ADMIN") allowed.add("SUPER_ADMIN"); // opcional
+      const allowed = new Set(["ADMIN", "VIEWER"]);
       if (!allowed.has(role)) {
-        return res.status(400).json({ error: "role_invalid" });
+        return res.status(400).json({
+          error: "role_invalid",
+          message: "Role inválida. Use ADMIN ou VIEWER.",
+        });
       }
 
       const exists = await prisma.user.findUnique({ where: { email } });
@@ -53,8 +62,20 @@ router.post(
       const passwordHash = await bcrypt.hash(password, 10);
 
       const user = await prisma.user.create({
-        data: { email, passwordHash, role, accountId: req.auth.accountId },
-        select: { id: true, email: true, role: true },
+        data: {
+          name,
+          email,
+          passwordHash,
+          role,
+          accountId: req.auth.accountId,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+        },
       });
 
       res.json({ ok: true, user });
@@ -75,6 +96,62 @@ router.get(
         select: { id: true, name: true, createdAt: true },
       });
       res.json({ accounts });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+router.patch(
+  "/admin/users/:id/role",
+  requireRole("ADMIN", "SUPER_ADMIN"),
+  async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      const role = String(req.body?.role || "").toUpperCase();
+
+      if (!Number.isFinite(id)) {
+        return res
+          .status(400)
+          .json({ error: "bad_request", message: "ID inválido." });
+      }
+
+      const allowed = new Set(["ADMIN", "VIEWER"]);
+      if (!allowed.has(role)) {
+        return res
+          .status(400)
+          .json({
+            error: "role_invalid",
+            message: "Role inválida. Use ADMIN ou VIEWER.",
+          });
+      }
+
+      const target = await prisma.user.findFirst({
+        where: { id, accountId: req.auth.accountId },
+        select: { id: true, role: true },
+      });
+
+      if (!target) return res.status(404).json({ error: "not_found" });
+
+      if (String(target.role) === "ADMIN" && role === "VIEWER") {
+        const adminsCount = await prisma.user.count({
+          where: { accountId: req.auth.accountId, role: "ADMIN" },
+        });
+        if (adminsCount <= 1) {
+          return res.status(400).json({
+            error: "last_admin",
+            message: "Não é possível remover o último ADMIN da conta.",
+          });
+        }
+      }
+
+      const updated = await prisma.user.update({
+        where: { id },
+        data: { role },
+        select: { id: true, name: true, email: true, role: true },
+      });
+
+      return res.json({ ok: true, user: updated });
     } catch (e) {
       next(e);
     }

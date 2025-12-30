@@ -465,3 +465,51 @@ body{
 
 .modal-overlay{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .modal-body .muted{line-height:1.35}
+/* ===== Admin ===== */
+.admin-root {
+  display: block;
+}
+
+.admin-root .card {
+  margin-bottom: 12px;
+}
+
+.admin-form-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-actions-row {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+/* ===== Sidebar: texto do menu em branco ===== */
+.ml-sidebar .ml-sidebar__title,
+.ml-sidebar .ml-nav-item__label,
+.ml-sidebar .ml-nav-item__hint,
+.ml-sidebar .ml-sidebar__mini {
+  color: #ffffff !important;
+}
+
+/* Deixa o "hint" um pouco menos forte (opcional, melhora hierarquia visual) */
+.ml-sidebar .ml-nav-item__hint,
+.ml-sidebar .ml-sidebar__mini {
+  opacity: 0.75;
+}
+
+/* Mantém o item ativo bem legível (opcional) */
+.ml-sidebar .ml-nav-item.active .ml-nav-item__label,
+.ml-sidebar .ml-nav-item.active .ml-nav-item__hint {
+  opacity: 1;
+}

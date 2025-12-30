@@ -28,18 +28,16 @@ model Account {
 }
 
 model User {
-  id           Int    @id @default(autoincrement())
-  email        String @unique
+  id           Int     @id @default(autoincrement())
+  name         String?
+  email        String  @unique
   passwordHash String
-  role         Role   @default(VIEWER)
+  role         Role    @default(VIEWER)
 
   accountId Int
   account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  // Sessões normais (login)
-  sessions Session[] @relation("UserSessions")
-
-  // Sessões onde este usuário é o "realUser" (impersonation)
+  sessions       Session[] @relation("UserSessions")
   impersonations Session[] @relation("SessionRealUser")
 
   createdAt DateTime @default(now())
