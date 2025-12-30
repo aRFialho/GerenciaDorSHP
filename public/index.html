@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>DAVANTTI • Shopee API</title>
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/css/ads.css" />
   </head>
   <body>
     <!-- Topbar (fina) -->
@@ -75,6 +76,11 @@
           <button class="tab ml-nav-item" data-tab="orders">
             <span class="ml-nav-item__label">Pedidos</span>
             <span class="ml-nav-item__hint muted">Risco / snapshots</span>
+          </button>
+
+          <button class="tab ml-nav-item" data-tab="ads">
+            <span class="ml-nav-item__label">Ads</span>
+            <span class="ml-nav-item__hint muted">CPC + GMS</span>
           </button>
         </div>
 
@@ -280,6 +286,274 @@
 
           <div id="orders-grid" class="grid"></div>
         </section>
+        <!-- ADS -->
+        <section id="tab-ads" class="tab-panel">
+          <div class="page-title">
+            <h2>Ads</h2>
+            <div class="page-subtitle muted">Shopee Ads (CPC) + GMS</div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-card__header">
+              <div>
+                <div class="section-title">Filtros</div>
+                <div class="muted">Use o mesmo período para CPC e GMS.</div>
+              </div>
+              <div
+                class="section-actions"
+                style="
+                  display: flex;
+                  gap: 10px;
+                  align-items: flex-end;
+                  flex-wrap: wrap;
+                "
+              >
+                <div class="field">
+                  <label class="muted" for="adsDateFrom">De</label>
+                  <input type="date" id="adsDateFrom" class="input" />
+                </div>
+                <div class="field">
+                  <label class="muted" for="adsDateTo">Até</label>
+                  <input type="date" id="adsDateTo" class="input" />
+                </div>
+                <button id="btnAdsReload" class="btn btn-primary">
+                  Atualizar
+                </button>
+              </div>
+            </div>
+            <div class="section-card__body">
+              <div class="muted">
+                Observação: CPC permite no máximo 1 mês. Se o período for maior,
+                o CPC será automaticamente ajustado para os últimos 30 dias.
+              </div>
+            </div>
+          </div>
+
+          <div class="section-grid">
+            <div class="section-card">
+              <div class="section-card__header">
+                <div>
+                  <div class="section-title">Resumo (CPC)</div>
+                  <div class="muted">
+                    Saldo e métricas agregadas do período.
+                  </div>
+                </div>
+              </div>
+              <div class="section-card__body">
+                <div class="kpi-grid">
+                  <div class="kpi">
+                    <div class="kpi-label">Saldo Ads</div>
+                    <div class="kpi-value" id="kpiAdsBalance">—</div>
+                  </div>
+                  <div class="kpi">
+                    <div class="kpi-label">Gasto</div>
+                    <div class="kpi-value" id="kpiCpcExpense">—</div>
+                  </div>
+                  <div class="kpi">
+                    <div class="kpi-label">Impressões</div>
+                    <div class="kpi-value" id="kpiCpcImpressions">—</div>
+                  </div>
+                  <div class="kpi">
+                    <div class="kpi-label">Cliques</div>
+                    <div class="kpi-value" id="kpiCpcClicks">—</div>
+                  </div>
+                  <div class="kpi">
+                    <div class="kpi-label">CTR</div>
+                    <div class="kpi-value" id="kpiCpcCtr">—</div>
+                  </div>
+                  <div class="kpi">
+                    <div class="kpi-label">GMV Direto</div>
+                    <div class="kpi-value" id="kpiCpcDirectGmv">—</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-card">
+              <div class="section-card__header">
+                <div>
+                  <div class="section-title">Evolução diária (CPC)</div>
+                  <div class="muted">Impressões, cliques, gasto e GMV.</div>
+                </div>
+              </div>
+              <div class="section-card__body">
+                <canvas id="chartCpcDaily" height="110"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-card__header">
+              <div>
+                <div class="section-title">Campanhas (CPC)</div>
+                <div class="muted">
+                  Clique em uma campanha para ver detalhes.
+                </div>
+              </div>
+            </div>
+            <div class="section-card__body">
+              <div class="table-wrap">
+                <table class="table" id="tblCpcCampaigns">
+                  <thead>
+                    <tr>
+                      <th>Campanha</th>
+                      <th>Tipo</th>
+                      <th>Status</th>
+                      <th>Placement</th>
+                      <th>Budget</th>
+                      <th>Impressões</th>
+                      <th>Cliques</th>
+                      <th>Gasto</th>
+                      <th>GMV (Direto)</th>
+                      <th>ROAS (Direto)</th>
+                      <th>ACOS (Direto)</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+
+              <div class="split">
+                <div class="section-card" style="margin: 0">
+                  <div class="section-card__header">
+                    <div>
+                      <div class="section-title">Detalhe da campanha</div>
+                      <div class="muted" id="cpcCampaignSelected">
+                        Nenhuma selecionada
+                      </div>
+                    </div>
+                  </div>
+                  <div class="section-card__body">
+                    <div class="kpi-grid kpi-grid-sm">
+                      <div class="kpi">
+                        <div class="kpi-label">Impressões</div>
+                        <div class="kpi-value" id="cpcCampImp">—</div>
+                      </div>
+                      <div class="kpi">
+                        <div class="kpi-label">Cliques</div>
+                        <div class="kpi-value" id="cpcCampClicks">—</div>
+                      </div>
+                      <div class="kpi">
+                        <div class="kpi-label">Gasto</div>
+                        <div class="kpi-value" id="cpcCampExpense">—</div>
+                      </div>
+                      <div class="kpi">
+                        <div class="kpi-label">GMV Dir.</div>
+                        <div class="kpi-value" id="cpcCampDirectGmv">—</div>
+                      </div>
+                    </div>
+                    <canvas id="chartCpcCampaign" height="110"></canvas>
+                  </div>
+                </div>
+
+                <div class="section-card" style="margin: 0">
+                  <div class="section-card__header">
+                    <div>
+                      <div class="section-title">Produtos vinculados</div>
+                      <div class="muted">Retornado por settings</div>
+                    </div>
+                  </div>
+                  <div class="section-card__body">
+                    <div class="table-wrap">
+                      <table class="table" id="tblCpcCampaignItems">
+                        <thead>
+                          <tr>
+                            <th>Item ID</th>
+                            <th>Nome (quando disponível)</th>
+                            <th>Status (auto)</th>
+                          </tr>
+                        </thead>
+                        <tbody></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GMS -->
+          <div class="section-card">
+            <div class="section-card__header">
+              <div>
+                <div class="section-title">GMS</div>
+                <div class="muted">GMV Max / Product GMS</div>
+              </div>
+            </div>
+            <div class="section-card__body">
+              <div class="kpi-grid kpi-grid-sm">
+                <div class="kpi">
+                  <div class="kpi-label">Elegível</div>
+                  <div class="kpi-value" id="kpiGmsEligible">—</div>
+                </div>
+                <div class="kpi">
+                  <div class="kpi-label">Motivo</div>
+                  <div class="kpi-value" id="kpiGmsReason">—</div>
+                </div>
+                <div class="kpi">
+                  <div class="kpi-label">Gasto</div>
+                  <div class="kpi-value" id="kpiGmsExpense">—</div>
+                </div>
+                <div class="kpi">
+                  <div class="kpi-label">GMV</div>
+                  <div class="kpi-value" id="kpiGmsGmv">—</div>
+                </div>
+                <div class="kpi">
+                  <div class="kpi-label">ROAS</div>
+                  <div class="kpi-value" id="kpiGmsRoas">—</div>
+                </div>
+                <div class="kpi">
+                  <div class="kpi-label">ACOS</div>
+                  <div class="kpi-value" id="kpiGmsAcos">—</div>
+                </div>
+              </div>
+
+              <div class="table-wrap">
+                <table class="table" id="tblGmsItems">
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Impressões</th>
+                      <th>Cliques</th>
+                      <th>Gasto</th>
+                      <th>GMV (Broad)</th>
+                      <th>ROAS (Broad)</th>
+                      <th>ACOS (Broad)</th>
+                      <th>Pedidos (Broad)</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+
+              <div class="pager">
+                <button id="btnGmsPrev" class="btn btn-ghost">Anterior</button>
+                <div class="muted" id="gmsPagerInfo">—</div>
+                <button id="btnGmsNext" class="btn btn-ghost">Próximo</button>
+              </div>
+
+              <div class="section-card" style="margin-top: 14px">
+                <div class="section-card__header">
+                  <div>
+                    <div class="section-title">Itens removidos (GMS)</div>
+                  </div>
+                </div>
+                <div class="section-card__body">
+                  <div class="table-wrap">
+                    <table class="table" id="tblGmsDeleted">
+                      <thead>
+                        <tr>
+                          <th>Item ID</th>
+                        </tr>
+                      </thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -294,6 +568,8 @@
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="/js/ads.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>
