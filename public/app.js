@@ -67,7 +67,6 @@ function initTabs() {
       );
 
       // garante loja ativa antes de carregar módulos
-      await ensureShopSelected();
 
       if (tab === "products" || tab === "orders") {
         await ensureShopSelected();
@@ -128,7 +127,23 @@ async function loadMe() {
 
   const viewStatus = document.getElementById("auth-status-view");
   if (viewStatus) viewStatus.textContent = $("#auth-status")?.textContent || "";
+
   const role = String(data?.user?.role || "");
+  const adminBtn = document.getElementById("admin-tab-btn");
+  const adminTitle = document.getElementById("admin-title");
+
+  const canSeeAdmin = role === "ADMIN" || role === "SUPER_ADMIN";
+  if (adminBtn) adminBtn.style.display = canSeeAdmin ? "" : "none";
+
+  if (adminTitle) {
+    adminTitle.textContent = role === "SUPER_ADMIN" ? "Admin Global" : "Admin";
+  }
+
+  const adminBtnLabel = adminBtn?.querySelector(".ml-nav-item__label");
+  if (adminBtnLabel) {
+    adminBtnLabel.textContent =
+      role === "SUPER_ADMIN" ? "Admin Global" : "Admin";
+  }
 }
 
 async function ensureShopSelected() {
@@ -752,7 +767,20 @@ function initHeaderButtons() {
       try {
         await loadMe();
         const shops = Array.isArray(ME?.shops) ? ME.shops : [];
-        if (shops.length <= 1) return;
+        if (shops.length === 0) {
+          openModal(
+            "Sem lojas",
+            `<div class="muted">Nenhuma loja vinculada. Vá em Autenticação e conecte a Shopee.</div>`
+          );
+          return;
+        }
+        if (shops.length === 1) {
+          openModal(
+            "Apenas 1 loja",
+            `<div class="muted">Esta conta possui apenas uma loja vinculada.</div>`
+          );
+          return;
+        }
         await promptSelectShop(shops);
       } catch (e) {
         openModal("Erro", `<div class="muted">${escapeHtml(e.message)}</div>`);
@@ -792,7 +820,7 @@ async function startShopeeOauthFlowIfRequested() {
 
   try {
     const data = await apiGet("/auth/url");
-    const url = data?.url || data?.authUrl || data?.data?.url || null;
+    const url = data?.auth_url || data?.authUrl || data?.url || null;
 
     const preview = document.getElementById("auth-url-preview");
     if (preview)
@@ -885,7 +913,7 @@ function initAuthTab() {
 
     try {
       const data = await apiGet("/auth/url");
-      const url = data?.url || data?.authUrl || data?.data?.url || null;
+      const url = data?.auth_url || data?.authUrl || data?.url || null;
       if (preview)
         preview.textContent = url ? url : "Não foi possível gerar o link.";
       if (url) window.location.href = url;
@@ -907,7 +935,6 @@ async function boot() {
 
   try {
     await loadMe();
-    await ensureShopSelected();
     await startShopeeOauthFlowIfRequested();
   } catch (e) {
     setText("auth-status", "Não autenticado. Recarregue a página.");

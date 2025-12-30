@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8" />
@@ -11,7 +11,11 @@
     <header class="ml-topbar">
       <div class="ml-topbar__left">
         <div class="brand">
-          <img class="logo" src="https://res.cloudinary.com/dhqxp3tuo/image/upload/v1766582391/image_15740736993eche52h2_njlgfu.png" alt="Shopee" />
+          <img
+            class="logo"
+            src="https://res.cloudinary.com/dhqxp3tuo/image/upload/v1766582391/image_15740736993eche52h2_njlgfu.png"
+            alt="Shopee"
+          />
           <div class="brand-text">
             <div class="title">DAVANTTI</div>
             <div class="subtitle">Open Shopee • Integração</div>
@@ -21,10 +25,22 @@
 
       <div class="ml-topbar__right">
         <div class="header-pill">
-         <span class="dot"></span>
-         <span id="auth-status">Carregando...</span>
-         <button id="btn-switch-shop" class="btn btn-ghost" style="margin-left:10px;">Trocar loja</button>
-         <button id="btn-logout" class="btn btn-ghost" style="margin-left:8px;">Sair</button>
+          <span class="dot"></span>
+          <span id="auth-status">Carregando...</span>
+          <button
+            id="btn-switch-shop"
+            class="btn btn-ghost"
+            style="margin-left: 10px"
+          >
+            Trocar loja
+          </button>
+          <button
+            id="btn-logout"
+            class="btn btn-ghost"
+            style="margin-left: 8px"
+          >
+            Sair
+          </button>
         </div>
       </div>
     </header>
@@ -41,9 +57,14 @@
             <span class="ml-nav-item__hint muted">Token / status</span>
           </button>
 
-          <button id="admin-tab-btn" class="tab ml-nav-item" data-tab="admin" style="display:none;">
-           <span class="ml-nav-item__label">Admin</span>
-           <span class="ml-nav-item__hint muted">Usuários / Acessos</span>
+          <button
+            id="admin-tab-btn"
+            class="tab ml-nav-item"
+            data-tab="admin"
+            style="display: none"
+          >
+            <span class="ml-nav-item__label">Admin</span>
+            <span class="ml-nav-item__hint muted">Usuários / Acessos</span>
           </button>
 
           <button class="tab ml-nav-item" data-tab="products">
@@ -70,21 +91,12 @@
         <section id="tab-auth" class="tab-panel active">
           <div class="page-title">
             <h2>Autenticação</h2>
-            <div class="page-subtitle muted">Controle de acesso e status da integração.</div>
+            <div class="page-subtitle muted">
+              Controle de acesso e status da integração.
+            </div>
           </div>
-<!-- ADMIN -->
-      <section id="tab-admin" class="tab-panel">
-       <div class="page-title">
-        <h2 id="admin-title">Admin</h2>
-        <div class="page-subtitle muted">Gerenciamento de usuários e acessos.</div>
-       </div>
+          <!-- ADMIN -->
 
-       <div class="section-card">
-        <div class="section-card__body" id="admin-root">
-         <div class="muted">Carregando...</div>
-        </div>
-       </div>
-      </section>
           <div class="section-card">
             <div class="section-card__header">
               <div>
@@ -95,7 +107,9 @@
             <div class="section-card__body">
               <div class="info-row">
                 <div class="info-label">Status</div>
-                <div class="info-value" id="auth-status-view">Ainda não configurado</div>
+                <div class="info-value" id="auth-status-view">
+                  Ainda não configurado
+                </div>
               </div>
             </div>
           </div>
@@ -107,20 +121,41 @@
                 <div class="muted">Gere o link e finalize a autorização.</div>
               </div>
               <div class="section-actions">
-                <button id="btn-auth-url" class="btn btn-primary">Gerar link de autorização</button>
+                <button id="btn-auth-url" class="btn btn-primary">
+                  Gerar link de autorização
+                </button>
               </div>
             </div>
             <div class="section-card__body">
-              <div id="auth-url-preview" class="muted" style="word-break:break-all;"></div>
+              <div
+                id="auth-url-preview"
+                class="muted"
+                style="word-break: break-all"
+              ></div>
             </div>
           </div>
         </section>
+        <section id="tab-admin" class="tab-panel">
+          <div class="page-title">
+            <h2 id="admin-title">Admin</h2>
+            <div class="page-subtitle muted">
+              Gerenciamento de usuários e acessos.
+            </div>
+          </div>
 
+          <div class="section-card">
+            <div class="section-card__body" id="admin-root">
+              <div class="muted">Carregando...</div>
+            </div>
+          </div>
+        </section>
         <!-- PRODUCTS -->
         <section id="tab-products" class="tab-panel">
           <div class="page-title">
             <h2>Produtos</h2>
-            <div class="page-subtitle muted">Sincronização sob demanda, listagem e detalhes.</div>
+            <div class="page-subtitle muted">
+              Sincronização sob demanda, listagem e detalhes.
+            </div>
           </div>
 
           <div class="section-grid">
@@ -128,10 +163,14 @@
               <div class="section-card__header">
                 <div>
                   <div class="section-title">Sincronização</div>
-                  <div class="muted">Sincroniza apenas quando solicitado (sob demanda).</div>
+                  <div class="muted">
+                    Sincroniza apenas quando solicitado (sob demanda).
+                  </div>
                 </div>
                 <div class="section-actions">
-                  <button id="btn-sync-products" class="btn btn-primary">Sincronizar Produtos</button>
+                  <button id="btn-sync-products" class="btn btn-primary">
+                    Sincronizar Produtos
+                  </button>
                 </div>
               </div>
               <div class="section-card__body">
@@ -164,15 +203,25 @@
                     </select>
 
                     <select id="products-sort-dir" class="select">
-                      <option value="desc" selected>↓ (maior → menor / mais recente)</option>
-                      <option value="asc">↑ (menor → maior / mais antigo)</option>
+                      <option value="desc" selected>
+                        ↓ (maior → menor / mais recente)
+                      </option>
+                      <option value="asc">
+                        ↑ (menor → maior / mais antigo)
+                      </option>
                     </select>
                   </div>
 
                   <div class="toolbar__right">
-                    <input id="products-q" class="input" placeholder="Buscar por ID, SKU ou Nome..." />
+                    <input
+                      id="products-q"
+                      class="input"
+                      placeholder="Buscar por ID, SKU ou Nome..."
+                    />
                     <button id="products-search" class="btn">Buscar</button>
-                    <button id="products-clear" class="btn btn-ghost">Limpar</button>
+                    <button id="products-clear" class="btn btn-ghost">
+                      Limpar
+                    </button>
                   </div>
                 </div>
               </div>
@@ -186,10 +235,18 @@
               <div class="toolbar toolbar--between">
                 <div id="products-page-info" class="muted"></div>
                 <div class="products-pager-actions">
-                  <button id="products-first" class="btn btn-ghost">Primeira</button>
-                  <button id="products-prev" class="btn btn-ghost">Anterior</button>
-                  <button id="products-next" class="btn btn-ghost">Próxima</button>
-                  <button id="products-last" class="btn btn-ghost">Última</button>
+                  <button id="products-first" class="btn btn-ghost">
+                    Primeira
+                  </button>
+                  <button id="products-prev" class="btn btn-ghost">
+                    Anterior
+                  </button>
+                  <button id="products-next" class="btn btn-ghost">
+                    Próxima
+                  </button>
+                  <button id="products-last" class="btn btn-ghost">
+                    Última
+                  </button>
                 </div>
               </div>
             </div>
@@ -200,7 +257,9 @@
         <section id="tab-orders" class="tab-panel">
           <div class="page-title">
             <h2>Pedidos</h2>
-            <div class="page-subtitle muted">Sincronize e consulte pedidos armazenados no banco.</div>
+            <div class="page-subtitle muted">
+              Sincronize e consulte pedidos armazenados no banco.
+            </div>
           </div>
 
           <div class="section-card">
@@ -210,7 +269,9 @@
                 <div class="muted">Troca de endereço e risco de atraso.</div>
               </div>
               <div class="section-actions">
-                <button id="btn-sync-orders" class="btn btn-primary">Sincronizar Pedidos</button>
+                <button id="btn-sync-orders" class="btn btn-primary">
+                  Sincronizar Pedidos
+                </button>
               </div>
             </div>
             <div class="section-card__body">
@@ -224,7 +285,7 @@
     </div>
 
     <!-- Modal (IDs mantidos) -->
-    <div id="modal-overlay" class="modal-overlay" style="display:none;">
+    <div id="modal-overlay" class="modal-overlay" style="display: none">
       <div class="modal">
         <div class="modal-header">
           <div id="modal-title" class="modal-title">Detalhes</div>
