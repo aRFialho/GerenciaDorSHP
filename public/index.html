@@ -52,7 +52,6 @@
         <div class="ml-sidebar__section">
           <div class="ml-sidebar__title">Menu</div>
 
-          <!-- IMPORTANTE: mantive class="tab" e data-tab para seu initTabs() -->
           <button class="tab ml-nav-item active" data-tab="auth">
             <span class="ml-nav-item__label">Autenticação</span>
             <span class="ml-nav-item__hint muted">Token / status</span>
@@ -94,7 +93,6 @@
               Controle de acesso e status da integração.
             </div>
           </div>
-          <!-- ADMIN -->
 
           <div class="section-card">
             <div class="section-card__header">
@@ -134,6 +132,7 @@
             </div>
           </div>
         </section>
+
         <section id="tab-admin" class="tab-panel">
           <div class="page-title">
             <h2 id="admin-title">Admin</h2>
@@ -142,11 +141,11 @@
             </div>
           </div>
 
-          <!-- O app.js renderiza tudo aqui -->
           <div id="admin-root" class="admin-root">
             <div class="muted">Carregando...</div>
           </div>
         </section>
+
         <!-- PRODUCTS -->
         <section id="tab-products" class="tab-panel">
           <div class="page-title">
@@ -279,6 +278,7 @@
 
           <div id="orders-grid" class="grid"></div>
         </section>
+
         <!-- ADS -->
         <section id="tab-ads" class="tab-panel">
           <div class="page-title">
@@ -390,7 +390,65 @@
                 </button>
               </div>
             </div>
+
             <div class="section-card__body">
+              <!-- TOOLBAR + MENSAGENS (ANTES DA TABELA) -->
+              <div
+                class="toolbar"
+                style="
+                  margin-bottom: 10px;
+                  display: flex;
+                  gap: 10px;
+                  justify-content: space-between;
+                  flex-wrap: wrap;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                    align-items: center;
+                  "
+                >
+                  <input
+                    id="cpcCampaignFilter"
+                    class="input"
+                    placeholder="Filtrar por nome ou ID..."
+                    style="min-width: 260px"
+                  />
+                  <select id="cpcCampaignSortBy" class="select">
+                    <option value="expense_desc" selected>Gasto (↓)</option>
+                    <option value="expense_asc">Gasto (↑)</option>
+                    <option value="direct_gmv_desc">GMV Direto (↓)</option>
+                    <option value="direct_gmv_asc">GMV Direto (↑)</option>
+                    <option value="direct_roas_desc">ROAS Direto (↓)</option>
+                    <option value="direct_roas_asc">ROAS Direto (↑)</option>
+                    <option value="clicks_desc">Cliques (↓)</option>
+                    <option value="clicks_asc">Cliques (↑)</option>
+                    <option value="impression_desc">Impressões (↓)</option>
+                    <option value="impression_asc">Impressões (↑)</option>
+                  </select>
+                  <button id="btnCpcCampaignClearFilter" class="btn btn-ghost">
+                    Limpar
+                  </button>
+                </div>
+
+                <div class="muted" id="cpcCampaignCount">—</div>
+              </div>
+
+              <div
+                class="muted"
+                id="cpcCampaignMsg"
+                style="margin: 6px 0 10px"
+              ></div>
+              <div
+                class="muted"
+                id="cpcLoading"
+                style="margin: 6px 0 10px"
+              ></div>
+
+              <!-- TABELA -->
               <div class="table-wrap">
                 <table class="table" id="tblCpcCampaigns">
                   <thead>
@@ -412,7 +470,8 @@
                 </table>
               </div>
 
-              <div class="split">
+              <!-- DETALHE + PRODUTOS VINCULADOS -->
+              <div class="split" style="margin-top: 12px">
                 <div class="section-card" style="margin: 0">
                   <div class="section-card__header">
                     <div>
@@ -444,13 +503,13 @@
                     <canvas id="chartCpcCampaign" height="110"></canvas>
                   </div>
                 </div>
+
                 <div class="section-card" style="margin: 0">
                   <div class="section-card__header">
                     <div>
                       <div class="section-title">Produtos vinculados</div>
                       <div class="muted">Retornado por settings</div>
                     </div>
-
                     <div class="section-actions">
                       <button
                         id="btnExportCpcLinkedItemsCsv"
@@ -493,7 +552,15 @@
                 </button>
               </div>
             </div>
+
             <div class="section-card__body">
+              <div class="muted" id="gmsMsg" style="margin: 6px 0 10px"></div>
+              <div
+                class="muted"
+                id="gmsLoading"
+                style="margin: 6px 0 10px"
+              ></div>
+
               <div class="kpi-grid kpi-grid-sm">
                 <div class="kpi">
                   <div class="kpi-label">Elegível</div>
@@ -544,6 +611,7 @@
                 <div class="muted" id="gmsPagerInfo">—</div>
                 <button id="btnGmsNext" class="btn btn-ghost">Próximo</button>
               </div>
+
               <div class="actions">
                 <button id="btnGmsCreate" class="btn btn-primary">
                   Criar campanha GMS
@@ -552,6 +620,7 @@
                   Editar campanha GMS
                 </button>
               </div>
+
               <div class="section-card" style="margin-top: 14px">
                 <div class="section-card__header">
                   <div>

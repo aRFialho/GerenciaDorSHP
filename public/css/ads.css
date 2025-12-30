@@ -1,38 +1,126 @@
-.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px}
-.filters{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
-.field{display:flex;flex-direction:column;gap:6px}
-.field label{font-size:12px;color:#6b7280}
-.muted{color:#6b7280;font-size:12px}
-.kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:12px 0}
-.kpi-grid-sm{grid-template-columns:repeat(6,minmax(0,1fr))}
-.kpi{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px}
-.kpi-label{font-size:12px;color:#6b7280}
-.kpi-value{font-size:16px;font-weight:700;color:#111827;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin:14px 0}
-.card-header{padding:12px 14px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;gap:10px;align-items:flex-end}
-.card-body{padding:12px 14px}
-.table-wrap{overflow:auto;border:1px solid #e5e7eb;border-radius:10px}
-.table{width:100%;border-collapse:collapse;font-size:13px}
-.table th,.table td{padding:10px;border-bottom:1px solid #f1f5f9;text-align:left;vertical-align:middle}
-.table thead th{background:#f8fafc;font-weight:700}
-.table tbody tr:hover{background:#f8fafc;cursor:pointer}
-.split{display:grid;grid-template-columns:1.2fr 0.8fr;gap:12px;margin-top:12px}
-.card-inner{border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#fff}
-.card-inner-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px}
-.actions{display:flex;gap:10px;margin:10px 0 14px}
-.pager{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:10px}
-.btn-primary,.btn-secondary,.btn-light{border-radius:10px;padding:10px 12px;border:1px solid transparent}
-.btn-primary{background:#111827;color:#fff}
-.btn-secondary{background:#f3f4f6;border-color:#e5e7eb}
-.btn-light{background:#fff;border-color:#e5e7eb}
-.product-cell{display:flex;gap:10px;align-items:center}
-.product-thumb{width:34px;height:34px;border-radius:8px;object-fit:cover;background:#f3f4f6;border:1px solid #e5e7eb}
-@media (max-width: 1100px){
-  .kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .kpi-grid-sm{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .split{grid-template-columns:1fr}
+/* ===========================
+   ADS — Theme-aligned (glass/dark)
+   Scoped to #tab-ads to avoid conflicts
+=========================== */
+
+#tab-ads .muted{color:var(--muted)}
+
+/* KPI grid (Ads) */
+#tab-ads .kpi-grid{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:12px;
+  margin:12px 0;
 }
+
+#tab-ads .kpi-grid-sm{
+  grid-template-columns:repeat(6,minmax(0,1fr));
+}
+
+#tab-ads .kpi{
+  border:1px solid var(--border);
+  background:var(--card);
+  border-radius:var(--radius-sm);
+  padding:10px;
+}
+
+#tab-ads .kpi-label{
+  font-size:12px;
+  color:var(--muted);
+}
+
+#tab-ads .kpi-value{
+  font-size:16px;
+  font-weight:900;
+  color:var(--text);
+  margin-top:4px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Tables in Ads (keep same theme) */
+#tab-ads .table-wrap{
+  overflow:auto;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:rgba(0,0,0,0.12);
+}
+
+#tab-ads .table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+
+#tab-ads .table th,
+#tab-ads .table td{
+  padding:10px;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  text-align:left;
+  vertical-align:middle;
+}
+
+#tab-ads .table thead th{
+  background:rgba(255,255,255,0.06);
+  font-weight:900;
+  color:var(--text);
+}
+
+#tab-ads .table tbody tr:hover{
+  background:rgba(255,255,255,0.05);
+  cursor:pointer;
+}
+
+/* Split area (Campaign detail + linked items) */
+#tab-ads .split{
+  display:grid;
+  grid-template-columns:1.2fr 0.8fr;
+  gap:12px;
+  margin-top:12px;
+}
+
+/* Product cell used in GMS items */
+#tab-ads .product-cell{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+
+#tab-ads .product-thumb{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+  object-fit:cover;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.10);
+}
+
+/* Pager / actions spacing */
+#tab-ads .actions{
+  display:flex;
+  gap:10px;
+  margin:10px 0 14px;
+  flex-wrap:wrap;
+}
+
+#tab-ads .pager{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:flex-end;
+  margin-top:10px;
+  flex-wrap:wrap;
+}
+
+/* Responsive */
+@media (max-width: 1100px){
+  #tab-ads .kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #tab-ads .kpi-grid-sm{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #tab-ads .split{grid-template-columns:1fr}
+}
+
 @media (max-width: 640px){
-  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .kpi-grid-sm{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #tab-ads .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #tab-ads .kpi-grid-sm{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
