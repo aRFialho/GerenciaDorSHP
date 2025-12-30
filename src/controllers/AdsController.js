@@ -1,7 +1,107 @@
 const ShopeeAdsService = require("../services/ShopeeAdsService");
 const { resolveShop } = require("../utils/resolveShop");
 const prisma = require("../config/db");
+const AuthService = require("../services/AuthService"); // ajuste o caminho/nome real
+function getShopeeErrData(e) {
+  return e?.response?.data || e?.shopee || null;
+}
 
+function isInvalidAccessToken(e) {
+  const data = getShopeeErrData(e);
+  const err = String(data?.error || "").toLowerCase();
+  return err === "invalid_acceess_token" || err === "invalid_access_token";
+}
+
+async function getDbTokenRow(dbShopId) {
+  return prisma.oAuthToken.findUnique({
+    where: { shopId: Number(dbShopId) },
+    select: {
+      accessToken: true,
+      accessTokenExpiresAt: true,
+    },
+  });
+}
+
+async function refreshAndReloadAccessToken({ dbShopId, shopeeShopId }) {
+  await AuthService.refreshAccessToken({ shopId: String(shopeeShopId) });
+  const refreshed = await getDbTokenRow(dbShopId);
+  return refreshed?.accessToken || null;
+}
+
+async function callAdsWithAutoRefresh({ shop, call }) {
+  const tokenRow = await getDbTokenRow(shop.id);
+  const token = tokenRow?.accessToken || null;
+
+  if (!token) {
+    const err = new Error("Loja sem access_token. Conecte a loja novamente.");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  try {
+    return await call(token);
+  } catch (e) {
+    if (!isInvalidAccessToken(e)) throw e;
+
+    // refresh + retry 1x
+    const newToken = await refreshAndReloadAccessToken({
+      dbShopId: shop.id,
+      shopeeShopId: shop.shopId,
+    });
+
+    if (!newToken) throw e;
+    return await call(newToken);
+  }
+}
+
+function isHttpStatus(e, code) {
+  const s = e?.response?.status || e?.statusCode || null;
+  return Number(s) === Number(code);
+}
+
+async function withValidAdsToken({ shop, run }) {
+  // shop.id = DB, shop.shopId = Shopee (BigInt)
+  const tokenRow = await prisma.oAuthToken.findUnique({
+    where: { shopId: Number(shop.id) },
+    select: {
+      accessToken: true,
+      accessTokenExpiresAt: true,
+    },
+  });
+
+  const accessToken = tokenRow?.accessToken || null;
+  if (!accessToken) {
+    const err = new Error("Loja sem access_token. Conecte a loja novamente.");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // 1) tenta com token atual
+  try {
+    return await run(accessToken);
+  } catch (e) {
+    // 2) se Shopee disser token inválido: refresh e retry 1x
+    if (
+      isInvalidAccessTokenShopeeAds(e) ||
+      isHttpStatus(e, 401) ||
+      isHttpStatus(e, 403)
+    ) {
+      await AuthService.refreshAccessToken({ shopId: String(shop.shopId) });
+
+      const refreshed = await prisma.oAuthToken.findUnique({
+        where: { shopId: Number(shop.id) },
+        select: { accessToken: true },
+      });
+
+      const newToken = refreshed?.accessToken || null;
+      if (!newToken) throw e;
+
+      return await run(newToken);
+    }
+
+    throw e;
+  }
+}
 function toShopeeDate(iso) {
   const [y, m, d] = String(iso || "").split("-");
   if (!y || !m || !d) return null;
@@ -31,23 +131,36 @@ function chunk(arr, size) {
 async function balance(req, res, next) {
   try {
     const shop = await resolveShop(req, req.params.shopId);
-    const accessToken = await getShopAccessToken(shop.id);
-    if (!accessToken) {
-      return res.status(400).json({
+
+    const raw = await callAdsWithAutoRefresh({
+      shop,
+      call: (accessToken) =>
+        ShopeeAdsService.get_total_balance({
+          accessToken,
+          shopId: shop.shopId,
+        }),
+    });
+
+    return res.json(raw);
+  } catch (e) {
+    const status = e?.response?.status || e?.statusCode || 500;
+    const details = getShopeeErrData(e);
+
+    if (status === 401 || status === 403) {
+      return res.status(status).json({
         error: {
-          message: "Loja sem access_token. Conecte a loja novamente.",
+          message:
+            "Shopee recusou o token de Ads. Refaça a conexão da loja (ou aguarde refresh).",
+          details,
         },
       });
     }
 
-    const raw = await ShopeeAdsService.get_total_balance({
-      accessToken,
-      shopId: shop.shopId,
-    });
+    if (e?.statusCode) {
+      return res.status(e.statusCode).json({ error: { message: e.message } });
+    }
 
-    res.json(raw);
-  } catch (e) {
-    next(e);
+    return next(e);
   }
 }
 
@@ -568,24 +681,36 @@ async function gmsItemsPerformance(req, res, next) {
 async function gmsEligibility(req, res, next) {
   try {
     const shop = await resolveShop(req, req.params.shopId);
-    const accessToken = await getShopAccessToken(shop.id);
-    if (!accessToken) {
-      return res.status(400).json({
+
+    const raw = await callAdsWithAutoRefresh({
+      shop,
+      call: (accessToken) =>
+        ShopeeAdsService.check_create_gms_product_campaign_eligibility({
+          accessToken,
+          shopId: shop.shopId,
+        }),
+    });
+
+    return res.json(raw);
+  } catch (e) {
+    const status = e?.response?.status || e?.statusCode || 500;
+    const details = getShopeeErrData(e);
+
+    if (status === 401 || status === 403) {
+      return res.status(status).json({
         error: {
-          message: "Loja sem access_token. Conecte a loja novamente.",
+          message:
+            "Shopee recusou o token de Ads/GMS. Refaça a conexão da loja.",
+          details,
         },
       });
     }
 
-    const raw =
-      await ShopeeAdsService.check_create_gms_product_campaign_eligibility({
-        accessToken,
-        shopId: shop.shopId,
-      });
+    if (e?.statusCode) {
+      return res.status(e.statusCode).json({ error: { message: e.message } });
+    }
 
-    res.json(raw);
-  } catch (e) {
-    next(e);
+    return next(e);
   }
 }
 
@@ -765,7 +890,41 @@ async function gmsDeletedItems(req, res, next) {
     next(e);
   }
 }
+function isInvalidAccessTokenShopeeAds(e) {
+  const data = e?.response?.data || e?.shopee; // axios vs seu wrapper
+  const err = String(data?.error || "").toLowerCase();
+  return err === "invalid_acceess_token" || err === "invalid_access_token";
+}
 
+async function getValidAccessTokenForShop(dbShopId, shopeeShopId) {
+  const tokenRow = await prisma.oAuthToken.findUnique({
+    where: { shopId: Number(dbShopId) },
+    select: {
+      accessToken: true,
+      accessTokenExpiresAt: true,
+      refreshToken: true,
+      refreshTokenExpiresAt: true,
+    },
+  });
+
+  const accessToken = tokenRow?.accessToken || null;
+  if (!accessToken) return null;
+
+  // refresh preventivo (opcional, mas recomendado)
+  const exp = tokenRow?.accessTokenExpiresAt;
+  const soon = exp ? exp.getTime() - Date.now() < 2 * 60 * 1000 : false; // < 2 min
+
+  if (soon) {
+    await AuthService.refreshAccessToken({ shopId: Number(shopeeShopId) });
+    const refreshed = await prisma.oAuthToken.findUnique({
+      where: { shopId: Number(dbShopId) },
+      select: { accessToken: true },
+    });
+    return refreshed?.accessToken || accessToken;
+  }
+
+  return accessToken;
+}
 module.exports = {
   balance,
   dailyPerformance,
