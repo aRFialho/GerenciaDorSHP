@@ -45,13 +45,26 @@ async function shopeeAdsGet({ path, accessToken, shopId, query }) {
     partner_id: partnerId,
     timestamp,
     access_token: accessToken,
-    shop_id: Number(shopId), // shop_id é int na doc
+    shop_id: Number(shopId),
     sign,
     ...(query || {}),
   };
 
-  const resp = await axios.get(url, { params, timeout: 60_000 });
-  return resp.data;
+  try {
+    const resp = await axios.get(url, { params, timeout: 60_000 });
+    return resp.data;
+  } catch (err) {
+    console.error("[ShopeeAds] GET failed", {
+      url,
+      path,
+      shop_id: params.shop_id,
+      partner_id: params.partner_id,
+      timestamp: params.timestamp,
+      status: err?.response?.status,
+      data: err?.response?.data,
+    });
+    throw err;
+  }
 }
 
 async function get_total_balance({ accessToken, shopId }) {
@@ -158,8 +171,21 @@ async function shopeeAdsPost({ path, accessToken, shopId, query, body }) {
     ...(query || {}),
   };
 
-  const resp = await axios.post(url, body || {}, { params, timeout: 60_000 });
-  return resp.data;
+  try {
+    const resp = await axios.post(url, body || {}, { params, timeout: 60_000 });
+    return resp.data;
+  } catch (err) {
+    console.error("[ShopeeAds] POST failed", {
+      url,
+      path,
+      shop_id: params.shop_id,
+      partner_id: params.partner_id,
+      timestamp: params.timestamp,
+      status: err?.response?.status,
+      data: err?.response?.data,
+    });
+    throw err;
+  }
 }
 
 async function get_gms_item_performance({ accessToken, shopId, payload }) {
