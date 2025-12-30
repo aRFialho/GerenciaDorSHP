@@ -27,5 +27,6 @@ router.use(authRoutes);
 router.use(adminRoutes);
 router.use(ordersRoutes);
 router.use(productsRoutes);
+router.use(adsRoutes);
 
 module.exports = router;
