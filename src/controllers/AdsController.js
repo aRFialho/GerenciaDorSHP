@@ -1,7 +1,7 @@
 const ShopeeAdsService = require("../services/ShopeeAdsService");
 const { resolveShop } = require("../utils/resolveShop");
 const prisma = require("../config/db");
-const AuthService = require("../services/AuthService"); // ajuste o caminho/nome real
+const AuthService = require("../services/ShopeeAuthService"); // ajuste o caminho/nome real
 function getShopeeErrData(e) {
   return e?.response?.data || e?.shopee || null;
 }
