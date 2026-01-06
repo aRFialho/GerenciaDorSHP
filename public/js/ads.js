@@ -528,6 +528,19 @@ function openGmsEditModal() {
 =========================== */
 
 function debounceApplyCpcCampaignView() {
+  // Se veio campanha do backend, mas o filtro salvou “escondeu tudo”, limpa automaticamente
+  if (cpcCampaignsMaster.length > 0 && cpcCampaignsView.length === 0) {
+    const filterEl = document.getElementById("cpcCampaignFilter");
+    if (filterEl && String(filterEl.value || "").trim()) {
+      filterEl.value = "";
+      localStorage.setItem("ads_cpc_filter", "");
+      applyCpcCampaignView();
+      setMsg(
+        "cpcCampaignMsg",
+        "Filtro limpo automaticamente para exibir campanhas."
+      );
+    }
+  }
   if (cpcFilterTimer) clearTimeout(cpcFilterTimer);
   cpcFilterTimer = setTimeout(() => applyCpcCampaignView(), 120);
 }
@@ -1259,7 +1272,7 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
   const perf = await apiGet(
     `/shops/active/ads/campaigns/performance/daily?dateFrom=${encodeURIComponent(
       dateFrom
-    )}&dateTo=${encodeURIComponent(dateTo)}&adType=all`
+    )}&dateTo=${encodeURIComponent(dateTo)}&adType=`
   );
 
   const campaigns = perf?.response?.campaigns || [];

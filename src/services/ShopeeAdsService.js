@@ -95,16 +95,18 @@ async function get_all_cpc_ads_daily_performance({
 async function get_product_level_campaign_id_list({
   accessToken,
   shopId,
-  adType = "all",
+  adType = "",
   offset = 0,
   limit = 5000,
 }) {
+  adType = adType === "all" ? "" : adType;
+
   return shopeeAdsGet({
     path: "/api/v2/ads/get_product_level_campaign_id_list",
     accessToken,
     shopId,
     query: {
-      ad_type: adType, // "", "all", "auto", "manual"
+      ad_type: adType, // "", "auto", "manual"
       offset,
       limit,
     },

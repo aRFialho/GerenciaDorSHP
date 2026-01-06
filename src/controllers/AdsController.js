@@ -214,7 +214,7 @@ async function listCampaignIds(req, res, next) {
       });
     }
 
-    const adType = String(req.query.adType || "all"); // all|auto|manual|""
+    const adType = String(req.query.adType ?? ""); // "" = todos
     const raw = await ShopeeAdsService.get_product_level_campaign_id_list({
       accessToken,
       shopId: shop.shopId,
@@ -250,7 +250,7 @@ async function campaignsDailyPerformance(req, res, next) {
       });
     }
 
-    const adType = String(req.query.adType || "all");
+    const adType = String(req.query.adType ?? ""); // "" = todos
 
     // 1) pega todos os campaign ids
     const idsResp = await ShopeeAdsService.get_product_level_campaign_id_list({
@@ -296,9 +296,16 @@ async function campaignsDailyPerformance(req, res, next) {
     const seriesByCampaignId = {}; // { [campaignId]: [{date,...metrics}] }
 
     for (const raw of rawParts) {
-      const respArr = Array.isArray(raw?.response) ? raw.response : [];
-      for (const shopBlock of respArr) {
-        const cl = shopBlock?.campaign_list || [];
+      const resp = raw?.response;
+
+      // ✅ Aceita response como array OU objeto
+      const blocks = Array.isArray(resp) ? resp : resp ? [resp] : [];
+
+      for (const shopBlock of blocks) {
+        const cl = Array.isArray(shopBlock?.campaign_list)
+          ? shopBlock.campaign_list
+          : [];
+
         for (const c of cl) {
           const campaignId = String(c.campaign_id);
           const adType = c.ad_type || null;
