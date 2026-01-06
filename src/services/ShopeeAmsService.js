@@ -27,6 +27,5 @@ async function getConversionReport({
 }
 
 module.exports = {
-  getProductPerformance,
   getConversionReport,
 };
