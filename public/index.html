@@ -379,7 +379,8 @@
                         line-height: 1.25;
                       "
                     >
-                      Vendas influenciadas pelo anúncio (atribuição indireta).
+                      Vendas influenciadas pelo anúncio (atribuição indireta) /
+                      GMV Total.
                     </div>
                   </div>
                 </div>
@@ -478,6 +479,7 @@
                   ></div>
 
                   <div id="adsGroupSummary" style="margin-top: 10px"></div>
+                  <div id="adsGroupItems" style="margin-top: 10px"></div>
                 </div>
               </div>
               <!-- TOOLBAR + MENSAGENS (ANTES DA TABELA) -->
@@ -506,16 +508,39 @@
                     style="min-width: 260px"
                   />
                   <select id="cpcCampaignSortBy" class="select">
-                    <option value="expense_desc" selected>Gasto (↓)</option>
-                    <option value="expense_asc">Gasto (↑)</option>
-                    <option value="direct_gmv_desc">GMV Direto (↓)</option>
-                    <option value="direct_gmv_asc">GMV Direto (↑)</option>
-                    <option value="direct_roas_desc">ROAS Direto (↓)</option>
-                    <option value="direct_roas_asc">ROAS Direto (↑)</option>
-                    <option value="clicks_desc">Cliques (↓)</option>
-                    <option value="clicks_asc">Cliques (↑)</option>
-                    <option value="impression_desc">Impressões (↓)</option>
-                    <option value="impression_asc">Impressões (↑)</option>
+                    <option value="expense_desc" selected>
+                      Custo (maior → menor)
+                    </option>
+                    <option value="expense_asc">Custo (menor → maior)</option>
+
+                    <option value="direct_gmv_desc">
+                      GMV Direto (maior → menor)
+                    </option>
+                    <option value="direct_gmv_asc">
+                      GMV Direto (menor → maior)
+                    </option>
+
+                    <option value="direct_roas_desc">
+                      ROAS Direto (maior → menor)
+                    </option>
+                    <option value="direct_roas_asc">
+                      ROAS Direto (menor → maior)
+                    </option>
+
+                    <option value="clicks_desc">Cliques (maior → menor)</option>
+                    <option value="clicks_asc">Cliques (menor → maior)</option>
+
+                    <option value="impression_desc">
+                      Impressões (maior → menor)
+                    </option>
+                    <option value="impression_asc">
+                      Impressões (menor → maior)
+                    </option>
+                  </select>
+                  <select id="cpcCampaignStatusFilter" class="select">
+                    <option value="all" selected>Status: Todas</option>
+                    <option value="active">Status: Ativas</option>
+                    <option value="inactive">Status: Inativas</option>
                   </select>
                   <button id="btnCpcCampaignClearFilter" class="btn btn-ghost">
                     Limpar
@@ -596,26 +621,52 @@
                 <div class="section-card" style="margin: 0">
                   <div class="section-card__header">
                     <div>
-                      <div class="section-title">Produtos vinculados</div>
-                      <div class="muted">Retornado por settings</div>
+                      <div class="section-title">Desempenho do produto</div>
+                      <div class="muted">Por item (no período selecionado)</div>
                     </div>
-                    <div class="section-actions">
+                    <div
+                      class="section-actions"
+                      style="display: flex; gap: 8px; flex-wrap: wrap"
+                    >
                       <button
                         id="btnExportCpcLinkedItemsCsv"
                         class="btn btn-ghost"
                       >
-                        Exportar CSV
+                        Exportar CSV (Itens)
+                      </button>
+                      <button
+                        id="btnExportCpcProductPerfCsv"
+                        class="btn btn-ghost"
+                      >
+                        Exportar CSV (Desempenho)
                       </button>
                     </div>
                   </div>
+
                   <div class="section-card__body">
+                    <div
+                      class="muted"
+                      id="cpcItemsMsg"
+                      style="margin: 6px 0 10px"
+                    ></div>
+                    <div
+                      class="muted"
+                      id="cpcItemsLoading"
+                      style="margin: 6px 0 10px"
+                    ></div>
+
                     <div class="table-wrap">
                       <table class="table" id="tblCpcCampaignItems">
                         <thead>
                           <tr>
                             <th>Produto</th>
-                            <th>Nome no Ads</th>
-                            <th>Status no Ads</th>
+                            <th>Impressões</th>
+                            <th>Cliques</th>
+                            <th>Investimento</th>
+                            <th>GMV</th>
+                            <th>Conversões</th>
+                            <th>Itens</th>
+                            <th>Ação</th>
                           </tr>
                         </thead>
                         <tbody></tbody>

@@ -560,6 +560,212 @@ async function campaignSettings(req, res, next) {
   }
 }
 
+async function campaignItemsPerformance(req, res, next) {
+  try {
+    const shop = await resolveShop(req, req.params.shopId);
+
+    const { campaignId, dateFrom, dateTo } = req.body || {};
+    if (!campaignId || String(campaignId).trim() === "") {
+      return res
+        .status(400)
+        .json({ error: { message: "campaignId é obrigatório." } });
+    }
+
+    // Valida datas (mesmo que o endpoint Shopee de item-performance use outro formato)
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({
+        error: { message: "dateFrom/dateTo são obrigatórios (YYYY-MM-DD)." },
+      });
+    }
+    const startDate = toShopeeDate(dateFrom);
+    const endDate = toShopeeDate(dateTo);
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        error: { message: "dateFrom/dateTo inválidos. Use YYYY-MM-DD." },
+      });
+    }
+
+    // 1) Puxa settings para obter item_id_list e status/nome no ads
+    const rawSettings = await callAdsWithAutoRefresh({
+      shop,
+      call: (accessToken) =>
+        ShopeeAdsService.get_product_level_campaign_setting_info({
+          accessToken,
+          shopId: shop.shopId,
+          infoTypeList: [1, 2, 3, 4],
+          campaignIdList: [String(campaignId)],
+        }),
+    });
+
+    const settingsList = Array.isArray(rawSettings?.response?.campaign_list)
+      ? rawSettings.response.campaign_list
+      : [];
+
+    const set0 = settingsList[0] || {};
+    const common0 = set0.common_info || {};
+    const itemIds = Array.isArray(common0.item_id_list)
+      ? common0.item_id_list.map((x) => String(x))
+      : [];
+
+    const autoInfo = Array.isArray(set0.auto_product_ads_info)
+      ? set0.auto_product_ads_info
+      : [];
+    const autoMap = new Map(
+      autoInfo
+        .filter((x) => x?.item_id != null)
+        .map((x) => [String(x.item_id), x])
+    );
+
+    // 2) Enrichment no DB (title + 1 imagem)
+    const itemIdsBigInt = [];
+    for (const id of itemIds) {
+      try {
+        itemIdsBigInt.push(BigInt(id));
+      } catch (_) {}
+    }
+
+    let products = [];
+    if (itemIdsBigInt.length) {
+      products = await prisma.product.findMany({
+        where: { shopId: shop.id, itemId: { in: itemIdsBigInt } },
+        select: {
+          itemId: true,
+          title: true,
+          images: { select: { url: true }, take: 1 },
+        },
+      });
+    }
+
+    const productByItemId = new Map(
+      products.map((p) => [
+        String(p.itemId),
+        { title: p.title || null, image_url: p.images?.[0]?.url || null },
+      ])
+    );
+
+    // 3) Monta items base (settings + DB). Métricas vêm na próxima etapa via Shopee endpoint de item-performance.
+    const itemsBase = itemIds.map((itemId) => {
+      const p = productByItemId.get(String(itemId)) || {};
+      const ai = autoMap.get(String(itemId)) || {};
+      return {
+        item_id: String(itemId),
+        title: p.title || null,
+        image_url: p.image_url || null,
+        product_name: ai.product_name || null,
+        status: ai.status || null,
+
+        // métricas (serão preenchidas quando o ShopeeAdsService tiver o endpoint correto)
+        impression: null,
+        clicks: null,
+        expense: null,
+        gmv: null,
+        conversions: null,
+        items: null,
+      };
+    });
+
+    // 4) PERFORMANCE: tenta buscar métricas por item via endpoint configurável
+    let performanceReady = false;
+
+    try {
+      const perfRaw = await callAdsWithAutoRefresh({
+        shop,
+        call: (accessToken) =>
+          ShopeeAdsService.get_cpc_item_performance({
+            accessToken,
+            shopId: shop.shopId,
+            payload: {
+              start_date: startDate,
+              end_date: endDate,
+              campaign_id: Number(campaignId),
+              // Se o endpoint exigir filtro por item, habilite:
+              // item_id_list: itemIds.map((x) => Number(x)),
+            },
+          }),
+      });
+
+      const resp = perfRaw?.response || {};
+      const list =
+        (Array.isArray(resp.result_list) && resp.result_list) ||
+        (Array.isArray(resp.items) && resp.items) ||
+        (Array.isArray(resp.item_list) && resp.item_list) ||
+        [];
+
+      const perfByItemId = new Map();
+
+      for (const row of list) {
+        const itemId =
+          row?.item_id != null
+            ? String(row.item_id)
+            : row?.itemId != null
+            ? String(row.itemId)
+            : null;
+
+        if (!itemId) continue;
+
+        const r = row?.report || row?.metrics || row || {};
+
+        const impression = r.impression ?? r.impressions ?? null;
+        const clicks = r.clicks ?? null;
+        const expense = r.expense ?? r.cost ?? null;
+
+        const gmv = r.direct_gmv ?? r.gmv ?? r.broad_gmv ?? null;
+
+        const conversions =
+          r.direct_order ?? r.order ?? r.orders ?? r.conversions ?? null;
+
+        const itemsSold =
+          r.direct_item_sold ?? r.item_sold ?? r.items ?? r.item_cnt ?? null;
+
+        perfByItemId.set(itemId, {
+          impression,
+          clicks,
+          expense,
+          gmv,
+          conversions,
+          items: itemsSold,
+        });
+      }
+
+      for (const it of itemsBase) {
+        const perf = perfByItemId.get(String(it.item_id));
+        if (!perf) continue;
+
+        it.impression = perf.impression ?? it.impression;
+        it.clicks = perf.clicks ?? it.clicks;
+        it.expense = perf.expense ?? it.expense;
+        it.gmv = perf.gmv ?? it.gmv;
+        it.conversions = perf.conversions ?? it.conversions;
+        it.items = perf.items ?? it.items;
+      }
+
+      performanceReady = true;
+    } catch (_) {
+      performanceReady = false;
+    }
+
+    return res.json({
+      request_id: rawSettings?.request_id,
+      warning: rawSettings?.warning,
+      error: rawSettings?.error || "",
+      message: rawSettings?.message,
+      response: {
+        campaign_id: String(campaignId),
+        date_from: String(dateFrom),
+        date_to: String(dateTo),
+
+        // o front vai renderizar esta lista
+        items: itemsBase,
+
+        // debug/controle (não obrigatório, mas ajuda na UI enquanto integra métricas)
+        performance_ready: performanceReady,
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+}
+
 async function gmsCampaignPerformance(req, res, next) {
   try {
     const shop = await resolveShop(req, req.params.shopId);
@@ -961,6 +1167,7 @@ module.exports = {
   listCampaignIds,
   campaignsDailyPerformance,
   campaignSettings,
+  campaignItemsPerformance,
   gmsCampaignPerformance,
   gmsItemsPerformance,
   gmsDeletedItems,

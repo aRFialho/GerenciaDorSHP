@@ -16,14 +16,22 @@ router.get(
   "/shops/:shopId/ads/campaigns/settings",
   AdsController.campaignSettings
 );
+
 router.get(
   "/shops/:shopId/ads/campaigns/performance/daily",
   AdsController.campaignsDailyPerformance
 );
+
+router.post(
+  "/shops/:shopId/ads/campaigns/items/performance",
+  AdsController.campaignItemsPerformance
+);
+
 router.post(
   "/shops/:shopId/ads/gms/campaign/performance",
   AdsController.gmsCampaignPerformance
 );
+
 router.post(
   "/shops/:shopId/ads/gms/items/performance",
   AdsController.gmsItemsPerformance

@@ -246,6 +246,27 @@ async function list_gms_user_deleted_item({ accessToken, shopId, payload }) {
   });
 }
 
+async function get_cpc_item_performance({ accessToken, shopId, payload }) {
+  const path =
+    shopeeAds.CPC_ITEM_PERFORMANCE_PATH ||
+    process.env.SHOPEE_ADS_CPC_ITEM_PERFORMANCE_PATH;
+
+  if (!path) {
+    const err = new Error(
+      "CPC item performance path não configurado (CPC_ITEM_PERFORMANCE_PATH / SHOPEE_ADS_CPC_ITEM_PERFORMANCE_PATH)."
+    );
+    err.statusCode = 500;
+    throw err;
+  }
+
+  return shopeeAdsPost({
+    path,
+    accessToken,
+    shopId,
+    body: payload,
+  });
+}
+
 module.exports = {
   get_total_balance,
   get_all_cpc_ads_daily_performance,
@@ -258,4 +279,5 @@ module.exports = {
   create_gms_product_campaign,
   edit_gms_product_campaign,
   list_gms_user_deleted_item,
+  get_cpc_item_performance,
 };

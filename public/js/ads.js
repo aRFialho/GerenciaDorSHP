@@ -21,9 +21,92 @@ let cpcCampaignsView = [];
 
 let cpcFilterTimer = null;
 
+let lastCpcProductPerfRows = [];
+
 /* ===========================
    Helpers
 =========================== */
+
+function getCpcCampaignStatusFilter() {
+  const el = document.getElementById("cpcCampaignStatusFilter");
+  return String(el?.value || "all");
+}
+
+function normStatus(s) {
+  return String(s || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isCampaignActiveStatus(status) {
+  const s = normStatus(status);
+  if (!s) return false;
+
+  if (
+    s.includes("ongoing") ||
+    s.includes("running") ||
+    s.includes("active") ||
+    s.includes("enabled")
+  )
+    return true;
+
+  if (
+    s.includes("paused") ||
+    s.includes("ended") ||
+    s.includes("stopped") ||
+    s.includes("disabled") ||
+    s.includes("deleted")
+  )
+    return false;
+
+  return false;
+}
+
+function badgeHtml(text, tone) {
+  const t = escHtml(text || "—");
+  const cls =
+    tone === "green"
+      ? "badge badge--green"
+      : tone === "yellow"
+      ? "badge badge--yellow"
+      : tone === "red"
+      ? "badge badge--red"
+      : "badge badge--gray";
+
+  return `<span class="${cls}"><span class="badge-dot"></span>${t}</span>`;
+}
+
+function statusTone(status) {
+  const s = normStatus(status);
+  if (!s) return "gray";
+
+  if (
+    s.includes("ongoing") ||
+    s.includes("running") ||
+    s.includes("active") ||
+    s.includes("enabled")
+  )
+    return "green";
+
+  if (s.includes("paused")) return "yellow";
+
+  if (
+    s.includes("ended") ||
+    s.includes("stopped") ||
+    s.includes("disabled") ||
+    s.includes("deleted")
+  )
+    return "gray";
+
+  return "gray";
+}
+
+function adTypeTone(adType) {
+  const s = String(adType || "").toLowerCase();
+  if (s.includes("manual")) return "gray";
+  if (s.includes("auto")) return "gray";
+  return "gray";
+}
 
 function escAttr(s) {
   return String(s ?? "")
@@ -38,6 +121,17 @@ function escHtml(s) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+function markSelectedCampaignRow(campaignId) {
+  const tbody = document.querySelector("#tblCpcCampaigns tbody");
+  if (!tbody) return;
+
+  const id = String(campaignId || "");
+  const rows = tbody.querySelectorAll("tr[data-campaign-id]");
+  rows.forEach((r) =>
+    r.classList.toggle("is-selected", r.dataset.campaignId === id)
+  );
 }
 
 function fmtMoney(v) {
@@ -341,6 +435,52 @@ function exportCpcLinkedItemsCsv() {
   downloadCsv(filename, headers, rows);
 }
 
+function exportCpcProductPerfCsv() {
+  if (!selectedCpcCampaignId) {
+    return setMsg("cpcItemsMsg", "Selecione uma campanha primeiro.");
+  }
+
+  if (!lastCpcProductPerfRows.length) {
+    return setMsg(
+      "cpcItemsMsg",
+      "Nada para exportar. Selecione uma campanha e aguarde carregar o desempenho."
+    );
+  }
+
+  const { dateFrom, dateTo } = getDates();
+  const filename = `cpc-product-performance-campaign-${selectedCpcCampaignId}-${dateFrom}-to-${dateTo}.csv`;
+
+  const headers = [
+    "campaign_id",
+    "item_id",
+    "title",
+    "impression",
+    "clicks",
+    "expense",
+    "gmv",
+    "conversions",
+    "items",
+    "product_name",
+    "status",
+  ];
+
+  const rows = lastCpcProductPerfRows.map((x) => [
+    selectedCpcCampaignId,
+    x.item_id,
+    x.title || "",
+    x.impression ?? "",
+    x.clicks ?? "",
+    x.expense ?? "",
+    x.gmv ?? "",
+    x.conversions ?? "",
+    x.items ?? "",
+    x.product_name || "",
+    x.status || "",
+  ]);
+
+  downloadCsv(filename, headers, rows);
+}
+
 /* ===========================
    Modal
 =========================== */
@@ -529,18 +669,6 @@ function openGmsEditModal() {
 
 function debounceApplyCpcCampaignView() {
   // Se veio campanha do backend, mas o filtro salvou “escondeu tudo”, limpa automaticamente
-  if (cpcCampaignsMaster.length > 0 && cpcCampaignsView.length === 0) {
-    const filterEl = document.getElementById("cpcCampaignFilter");
-    if (filterEl && String(filterEl.value || "").trim()) {
-      filterEl.value = "";
-      localStorage.setItem("ads_cpc_filter", "");
-      applyCpcCampaignView();
-      setMsg(
-        "cpcCampaignMsg",
-        "Filtro limpo automaticamente para exibir campanhas."
-      );
-    }
-  }
   if (cpcFilterTimer) clearTimeout(cpcFilterTimer);
   cpcFilterTimer = setTimeout(() => applyCpcCampaignView(), 120);
 }
@@ -570,7 +698,13 @@ function applyCpcCampaignView() {
       return name.includes(filter) || id.includes(filter);
     });
   }
-
+  const statusFilter = getCpcCampaignStatusFilter();
+  if (statusFilter !== "all") {
+    rows = rows.filter((x) => {
+      const active = isCampaignActiveStatus(x.campaign_status);
+      return statusFilter === "active" ? active : !active;
+    });
+  }
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : -Infinity);
 
   rows.sort((a, b) => {
@@ -623,24 +757,41 @@ function renderCpcCampaignTable(rows) {
     const tr = document.createElement("tr");
     tr.dataset.campaignId = x.campaign_id;
 
+    const name = escHtml(x.ad_name || String(x.campaign_id));
+    const type = badgeHtml(x.ad_type || "—", adTypeTone(x.ad_type));
+    const status = badgeHtml(
+      x.campaign_status || "—",
+      statusTone(x.campaign_status)
+    );
+    const placement = badgeHtml(x.placement || "—", "gray");
+
     tr.innerHTML = `
-  <td>${x.ad_name || x.campaign_id}</td>
-  <td>${x.ad_type || "—"}</td>
-  <td>${x.campaign_status || "—"}</td>
-  <td>${x.placement || "—"}</td>
-  <td>${x.budget != null ? fmtMoney(x.budget) : "—"}</td>
-  <td>${x.credit_estimated != null ? fmtMoney(x.credit_estimated) : "—"}</td>
-  <td>${fmtInt(x.impression)}</td>
-  <td>${fmtInt(x.clicks)}</td>
-  <td>${fmtMoney(x.expense)}</td>
-  <td>${fmtMoney(x.direct_gmv)}</td>
-  <td>${x.direct_roas != null ? Number(x.direct_roas).toFixed(2) : "—"}</td>
-  <td>${
-    x.direct_acos_pct != null ? Number(x.direct_acos_pct).toFixed(2) + "%" : "—"
-  }</td>
-`;
+      <td>${name}</td>
+      <td>${type}</td>
+      <td>${status}</td>
+      <td>${placement}</td>
+      <td>${x.budget != null ? fmtMoney(x.budget) : "—"}</td>
+      <td>${
+        x.credit_estimated != null ? fmtMoney(x.credit_estimated) : "—"
+      }</td>
+      <td>${fmtInt(x.impression)}</td>
+      <td>${fmtInt(x.clicks)}</td>
+      <td>${fmtMoney(x.expense)}</td>
+      <td>${fmtMoney(x.direct_gmv)}</td>
+      <td>${x.direct_roas != null ? Number(x.direct_roas).toFixed(2) : "—"}</td>
+      <td>${
+        x.direct_acos_pct != null
+          ? Number(x.direct_acos_pct).toFixed(2) + "%"
+          : "—"
+      }</td>
+    `;
 
     tr.addEventListener("click", () => selectCampaign(x.campaign_id));
+
+    if (String(x.campaign_id) === String(selectedCpcCampaignId)) {
+      tr.classList.add("is-selected");
+    }
+
     tbody.appendChild(tr);
   }
 
@@ -661,7 +812,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // restore filter/sort
   const filterEl = document.getElementById("cpcCampaignFilter");
   const sortEl = document.getElementById("cpcCampaignSortBy");
-
+  const statusEl = document.getElementById("cpcCampaignStatusFilter");
+  const btnExportCpcPerf = document.getElementById(
+    "btnExportCpcProductPerfCsv"
+  );
+  if (btnExportCpcPerf) {
+    btnExportCpcPerf.addEventListener("click", () => exportCpcProductPerfCsv());
+  }
+  if (statusEl)
+    statusEl.value = localStorage.getItem("ads_cpc_status") || "all";
   if (filterEl) filterEl.value = localStorage.getItem("ads_cpc_filter") || "";
   if (sortEl)
     sortEl.value = localStorage.getItem("ads_cpc_sort") || "expense_desc";
@@ -671,6 +830,13 @@ document.addEventListener("DOMContentLoaded", () => {
     filterEl.addEventListener("input", () => {
       localStorage.setItem("ads_cpc_filter", filterEl.value || "");
       debounceApplyCpcCampaignView();
+    });
+  }
+
+  if (statusEl) {
+    statusEl.addEventListener("change", () => {
+      localStorage.setItem("ads_cpc_status", statusEl.value || "all");
+      applyCpcCampaignView();
     });
   }
 
@@ -691,6 +857,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (sortEl) {
         sortEl.value = "expense_desc";
         localStorage.setItem("ads_cpc_sort", "expense_desc");
+      }
+      if (statusEl) {
+        statusEl.value = "all";
+        localStorage.setItem("ads_cpc_status", "all");
       }
       applyCpcCampaignView();
     });
@@ -737,7 +907,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (selGroup) {
     selGroup.addEventListener("change", () => {
       selectedCampaignGroupId = selGroup.value || null;
-      renderGroupSummary(getGroupById(selectedCampaignGroupId));
+      const g = getGroupById(selectedCampaignGroupId);
+      renderGroupSummary(g);
+      renderGroupItemsInline(g);
     });
   }
 
@@ -1003,7 +1175,7 @@ function openGroupItemsModal(group) {
         <tbody>
           ${
             rows ||
-            `<tr><td colspan="3" class="muted">Nenhum item encontrado.</td></tr>`
+            `<tr><td colspan="8" class="muted">Nenhum item encontrado.</td></tr>`
           }
         </tbody>
       </table>
@@ -1011,6 +1183,53 @@ function openGroupItemsModal(group) {
   `;
 
   openModal(`Itens do grupo`, html);
+}
+
+function renderGroupItemsInline(group) {
+  const box = document.getElementById("adsGroupItems");
+  if (!box) return;
+
+  if (!group) {
+    box.innerHTML = "";
+    return;
+  }
+
+  const { linkedItems } = computeGroupAgg(group);
+
+  const rows = linkedItems
+    .map((it) => {
+      const productHtml = `
+      <div class="product-cell">
+        <img class="product-thumb" src="${
+          it.image_url || ""
+        }" onerror="this.style.display='none'">
+        <div>
+          <div style="font-weight:700">${escHtml(
+            it.title || "Item " + it.item_id
+          )}</div>
+          <div class="muted">ID: ${escHtml(it.item_id)}</div>
+        </div>
+      </div>
+    `;
+
+      return `<tr><td>${productHtml}</td><td>${escHtml(
+        it.product_name || "—"
+      )}</td><td>${escHtml(it.status || "—")}</td></tr>`;
+    })
+    .join("");
+
+  box.innerHTML = `
+    <div class="muted" style="margin:8px 0;">Itens dentro do grupo</div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Produto</th><th>Nome no Ads</th><th>Status no Ads</th></tr></thead>
+        <tbody>${
+          rows ||
+          `<tr><td colspan="3" class="muted">Nenhum item encontrado no grupo.</td></tr>`
+        }</tbody>
+      </table>
+    </div>
+  `;
 }
 
 async function loadCampaignGroups() {
@@ -1036,6 +1255,7 @@ async function loadCampaignGroups() {
     }
 
     renderGroupSummary(getGroupById(selectedCampaignGroupId));
+    renderGroupItemsInline(getGroupById(selectedCampaignGroupId));
   } catch (e) {
     setMsg("adsGroupMsg", e.message || "Falha ao carregar grupos.");
   } finally {
@@ -1049,21 +1269,15 @@ function openAdsGroupCreateModal() {
     `
       <div class="field">
         <label class="muted">Nome (obrigatório)</label>
-        <input id="adsGroupName" class="input" type="text" value="${escAttr(
-          g.name || ""
-        )}">
+        <input id="adsGroupName" class="input" type="text" placeholder="Ex: Linha Premium">
       </div>
       <div class="field" style="margin-top:10px;">
         <label class="muted">Descrição (opcional)</label>
-        <input id="adsGroupDesc" class="input" type="text" value="${escAttr(
-          g.description || ""
-        )}">
+        <input id="adsGroupDesc" class="input" type="text" placeholder="Ex: campanhas de alto ticket">
       </div>
       <div class="field" style="margin-top:10px;">
         <label class="muted">Campaign IDs (CSV)</label>
-        <input id="adsGroupCampaignIds" class="input" type="text" value="${escAttr(
-          (g.campaign_ids || []).join(", ")
-        )}">
+        <input id="adsGroupCampaignIds" class="input" type="text" placeholder="123, 456, 789">
         <div class="muted" style="margin-top:6px;">Unitária = 1 ID • Grupal = vários IDs</div>
       </div>
       <div class="actions" style="margin-top:14px;">
@@ -1115,21 +1329,21 @@ function openAdsGroupEditModal() {
     `
       <div class="field">
         <label class="muted">Nome</label>
-        <input id="adsGroupName" class="input" type="text" value="${(
+        <input id="adsGroupName" class="input" type="text" value="${escAttr(
           g.name || ""
-        ).replace(/"/g, "&quot;")}">
+        )}">
       </div>
       <div class="field" style="margin-top:10px;">
         <label class="muted">Descrição</label>
-        <input id="adsGroupDesc" class="input" type="text" value="${(
+        <input id="adsGroupDesc" class="input" type="text" value="${escAttr(
           g.description || ""
-        ).replace(/"/g, "&quot;")}">
+        )}">
       </div>
       <div class="field" style="margin-top:10px;">
         <label class="muted">Campaign IDs (CSV)</label>
-        <input id="adsGroupCampaignIds" class="input" type="text" value="${(
-          g.campaign_ids || []
-        ).join(", ")}">
+        <input id="adsGroupCampaignIds" class="input" type="text" value="${escAttr(
+          (g.campaign_ids || []).join(", ")
+        )}">
       </div>
       <div class="actions" style="margin-top:14px;">
         <button id="btnAdsGroupEditSubmit" class="btn btn-primary">Salvar</button>
@@ -1186,6 +1400,7 @@ async function deleteAdsGroupSelected() {
     if (sel) sel.value = "";
 
     renderGroupSummary(null);
+    renderGroupItemsInline(null);
     await loadCampaignGroups();
 
     setMsg("adsGroupMsg", "Grupo excluído.");
@@ -1326,7 +1541,30 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
 
   cpcCampaignsMaster = [...lastCpcCampaignRows];
   applyCpcCampaignView();
+  if (cpcCampaignsMaster.length > 0 && cpcCampaignsView.length === 0) {
+    const filterEl = document.getElementById("cpcCampaignFilter");
+    const statusEl = document.getElementById("cpcCampaignStatusFilter");
 
+    const hadFilter = filterEl && String(filterEl.value || "").trim();
+    const hadStatus = statusEl && String(statusEl.value || "all") !== "all";
+
+    if (hadFilter || hadStatus) {
+      if (filterEl) {
+        filterEl.value = "";
+        localStorage.setItem("ads_cpc_filter", "");
+      }
+      if (statusEl) {
+        statusEl.value = "all";
+        localStorage.setItem("ads_cpc_status", "all");
+      }
+
+      applyCpcCampaignView();
+      setMsg(
+        "cpcCampaignMsg",
+        "Filtros limpos automaticamente para exibir campanhas."
+      );
+    }
+  }
   if (cpcCampaignsView.length) {
     selectCampaign(cpcCampaignsView[0].campaign_id);
   } else {
@@ -1335,9 +1573,9 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
   await loadCampaignGroups();
 }
 
-function selectCampaign(campaignId) {
+async function selectCampaign(campaignId) {
   selectedCpcCampaignId = String(campaignId);
-
+  markSelectedCampaignRow(selectedCpcCampaignId);
   const id = String(campaignId);
   const set = cachedCampaignSettings.get(id);
   const common = set?.common_info || {};
@@ -1395,41 +1633,139 @@ function selectCampaign(campaignId) {
   chartCpcCampaign = safeDestroyChart(chartCpcCampaign);
   chartCpcCampaign = renderLineChart("chartCpcCampaign", labels, ds);
 
+  // Desempenho do Produto (tabela de 8 colunas)
+  setMsg("cpcItemsMsg", "");
+  setLoading("cpcItemsLoading", "Carregando desempenho do produto...");
+  lastCpcProductPerfRows = [];
+
+  try {
+    const perf = await loadCpcProductPerformance(selectedCpcCampaignId);
+    const items = perf?.response?.items || [];
+    const ready = Boolean(perf?.response?.performance_ready);
+
+    if (!ready) {
+      setMsg(
+        "cpcItemsMsg",
+        "Desempenho do produto ainda não disponível (endpoint não configurado ou sem dados). Exibindo itens base."
+      );
+    }
+
+    renderCpcProductPerformanceTable(items);
+  } catch (e) {
+    setMsg(
+      "cpcItemsMsg",
+      e.message || "Falha ao carregar desempenho do produto."
+    );
+    renderCpcProductPerformanceTable([]); // mantém tabela consistente
+  } finally {
+    setLoading("cpcItemsLoading", "");
+  }
+  // Desempenho do Produto (igual Shopee) — depende da rota nova do backend
+  try {
+    setMsg("cpcCampaignMsg", "");
+    const perf = await loadCpcProductPerformance(selectedCpcCampaignId);
+    // vamos renderizar quando atualizar o HTML da tabela (próximo arquivo)
+    // por enquanto só deixa pronto o fetch
+  } catch (e) {
+    // não quebra a página se o backend ainda não estiver pronto
+    // você pode comentar esta linha depois que a rota existir
+    // setMsg("cpcCampaignMsg", e.message || "Falha ao carregar desempenho do produto.");
+  }
+}
+
+async function loadCpcProductPerformance(campaignId) {
+  const { dateFrom, dateTo } = getDates();
+
+  // Essa rota vamos criar no backend na próxima etapa
+  return apiPost("/shops/active/ads/campaigns/items/performance", {
+    campaignId: String(campaignId),
+    dateFrom,
+    dateTo,
+  });
+}
+
+function renderCpcProductPerformanceTable(items) {
   const tbody = document.querySelector("#tblCpcCampaignItems tbody");
   if (!tbody) return;
 
   tbody.innerHTML = "";
 
-  const linked = Array.isArray(set?.linked_items) ? set.linked_items : [];
+  const safeItems = Array.isArray(items) ? items : [];
+  lastCpcProductPerfRows = safeItems
+    .map((it) => ({
+      item_id: String(it.item_id || ""),
+      title: it.title || "",
+      image_url: it.image_url || "",
+      product_name: it.product_name || "",
+      status: it.status || "",
+      impression: it.impression ?? null,
+      clicks: it.clicks ?? null,
+      expense: it.expense ?? null,
+      gmv: it.gmv ?? null,
+      conversions: it.conversions ?? null,
+      items: it.items ?? null,
+    }))
+    .filter((x) => x.item_id);
 
-  for (const it of linked) {
+  for (const it of lastCpcProductPerfRows) {
     const tr = document.createElement("tr");
 
     const productHtml = `
-    <div class="product-cell">
-      <img class="product-thumb" src="${
-        it.image_url || ""
-      }" onerror="this.style.display='none'">
-      <div>
-        <div style="font-weight:700">${it.title || "Item " + it.item_id}</div>
-        <div class="muted">${it.item_id}</div>
+      <div class="product-cell">
+        <img class="product-thumb" src="${
+          it.image_url || ""
+        }" onerror="this.style.display='none'">
+        <div>
+          <div style="font-weight:900">${escHtml(
+            it.title || "Item " + it.item_id
+          )}</div>
+          <div class="muted">ID: ${escHtml(it.item_id)}${
+      it.product_name ? " • " + escHtml(it.product_name) : ""
+    }${it.status ? " • " + escHtml(it.status) : ""}</div>
+        </div>
       </div>
-    </div>
-  `;
+    `;
+
+    // Ação simples: copiar item_id
+    const actionHtml = `<button class="btn btn-ghost" data-copy="${escAttr(
+      it.item_id
+    )}">Copiar ID</button>`;
 
     tr.innerHTML = `
-    <td>${productHtml}</td>
-    <td>${it.product_name || "—"}</td>
-    <td>${it.status || "—"}</td>
-  `;
+      <td>${productHtml}</td>
+      <td>${fmtInt(it.impression)}</td>
+      <td>${fmtInt(it.clicks)}</td>
+      <td>${fmtMoney(it.expense)}</td>
+      <td>${fmtMoney(it.gmv)}</td>
+      <td>${fmtInt(it.conversions)}</td>
+      <td>${fmtInt(it.items)}</td>
+      <td>${actionHtml}</td>
+    `;
+
+    // Handler do botão de copiar
+    tr.querySelector("button[data-copy]")?.addEventListener(
+      "click",
+      async (e) => {
+        e.stopPropagation();
+        const v = e.currentTarget.getAttribute("data-copy") || "";
+        try {
+          await navigator.clipboard.writeText(v);
+          setMsg("cpcItemsMsg", "Item ID copiado.");
+        } catch (_) {
+          setMsg(
+            "cpcItemsMsg",
+            "Não foi possível copiar (permissão do navegador)."
+          );
+        }
+      }
+    );
 
     tbody.appendChild(tr);
   }
 
-  if (!linked.length) {
-    const itemIds = common.item_id_list || [];
+  if (!lastCpcProductPerfRows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="3" class="muted">Nenhum item vinculado (ou campanha usa seleção automática sem itens retornados).</td>`;
+    tr.innerHTML = `<td colspan="8" class="muted">Nenhum item retornado para esta campanha no período.</td>`;
     tbody.appendChild(tr);
   }
 }
