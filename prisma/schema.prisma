@@ -90,11 +90,10 @@ model Shop {
   orders   Order[]
   products Product[]
 
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  sessions          Session[]
-  adsCampaignGroups AdsCampaignGroup[]
-  campaignGroups    AdsCampaignGroup[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  sessions       Session[]
+  campaignGroups AdsCampaignGroup[]
 
   @@index([accountId])
 }
