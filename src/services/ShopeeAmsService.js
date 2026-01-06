@@ -1,31 +1,32 @@
 const { requestShopeeAuthed } = require("./ShopeeAuthedHttp");
 
-async function getProductPerformance({
+async function getConversionReport({
   shopId,
-  periodType,
-  startDate,
-  endDate,
   pageNo,
   pageSize,
-  orderType,
-  channel,
-  itemId,
+  orderStatus,
+  orderCompletedTimeStart,
+  orderCompletedTimeEnd,
 }) {
   return requestShopeeAuthed({
     method: "get",
-    path: "/api/v2/ams/get_product_performance",
+    path: "/api/v2/ams/get_conversion_report",
     shopId: String(shopId),
     query: {
-      period_type: periodType,
-      start_date: startDate,
-      end_date: endDate,
       page_no: pageNo,
       page_size: pageSize,
-      order_type: orderType,
-      channel,
-      ...(itemId ? { item_id: String(itemId) } : {}),
+      ...(orderStatus ? { order_status: orderStatus } : {}),
+      ...(orderCompletedTimeStart
+        ? { order_completed_time_start: Number(orderCompletedTimeStart) }
+        : {}),
+      ...(orderCompletedTimeEnd
+        ? { order_completed_time_end: Number(orderCompletedTimeEnd) }
+        : {}),
     },
   });
 }
 
-module.exports = { getProductPerformance };
+module.exports = {
+  getProductPerformance,
+  getConversionReport,
+};

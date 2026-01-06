@@ -10,6 +10,12 @@ router.get(
   "/shops/:shopId/ads/performance/daily",
   AdsController.dailyPerformance
 );
+
+router.get(
+  "/shops/:shopId/ads/performance/daily-real",
+  AdsController.dailyRealPerformance
+);
+
 router.get("/shops/:shopId/ads/campaigns/ids", AdsController.listCampaignIds);
 router.get(
   "/shops/:shopId/ads/campaigns/settings",

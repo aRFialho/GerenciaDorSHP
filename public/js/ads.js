@@ -770,20 +770,39 @@ async function loadCpcBalance() {
 }
 
 async function loadCpcDaily(dateFrom, dateTo) {
-  const j = await apiGet(
-    `/shops/active/ads/performance/daily?dateFrom=${encodeURIComponent(
-      dateFrom
-    )}&dateTo=${encodeURIComponent(dateTo)}`
-  );
+  const [j, jr] = await Promise.all([
+    apiGet(
+      `/shops/active/ads/performance/daily?dateFrom=${encodeURIComponent(
+        dateFrom
+      )}&dateTo=${encodeURIComponent(dateTo)}`
+    ),
+    apiGet(
+      `/shops/active/ads/performance/daily-real?dateFrom=${encodeURIComponent(
+        dateFrom
+      )}&dateTo=${encodeURIComponent(dateTo)}`
+    ),
+  ]);
 
   const series = j?.response?.series || [];
   const totals = j?.response?.totals || {};
-
+  const realTotals = jr?.response?.totals || {};
+  const realSeries = jr?.response?.series || [];
+  const realByDate = new Map(
+    realSeries.map((x) => [x.date, Number(x.gmv_real_delivered) || 0])
+  );
+  if (jr?.response?.meta?.truncated) {
+    setMsg(
+      "cpcCampaignMsg",
+      "Aviso: GMV Real (Entregue) pode estar incompleto (muitos pedidos no período)."
+    );
+  }
   setText("kpiCpcExpense", fmtMoney(totals.expense));
   setText("kpiCpcImpressions", fmtInt(totals.impression));
   setText("kpiCpcClicks", fmtInt(totals.clicks));
   setText("kpiCpcCtr", fmtPctFromClicksImpr(totals.clicks, totals.impression));
   setText("kpiCpcDirectGmv", fmtMoney(totals.direct_gmv));
+  setText("kpiCpcBroadGmv", fmtMoney(totals.broad_gmv));
+  setText("kpiCpcRealDelivered", fmtMoney(realTotals.gmv_real_delivered));
 
   const labels = series.map((x) => x.date);
   const ds = [
@@ -805,10 +824,24 @@ async function loadCpcDaily(dateFrom, dateTo) {
       borderColor: "#dc2626",
       tension: 0.25,
     },
+
     {
       label: "GMV Direto",
       data: series.map((x) => x.direct_gmv),
       borderColor: "#7c3aed",
+      tension: 0.25,
+    },
+    {
+      label: "GMV Broad",
+      data: series.map((x) => x.broad_gmv),
+      borderColor: "#0ea5e9",
+      tension: 0.25,
+    },
+
+    {
+      label: "GMV Real (Entregue)",
+      data: labels.map((d) => realByDate.get(d) || 0),
+      borderColor: "#f59e0b",
       tension: 0.25,
     },
   ];
