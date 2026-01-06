@@ -357,15 +357,30 @@
                   <div class="kpi">
                     <div class="kpi-label">GMV Direto</div>
                     <div class="kpi-value" id="kpiCpcDirectGmv">—</div>
+                    <div
+                      class="muted"
+                      style="
+                        margin-top: 6px;
+                        font-size: 12px;
+                        line-height: 1.25;
+                      "
+                    >
+                      Vendas atribuídas diretamente ao clique no anúncio.
+                    </div>
                   </div>
                   <div class="kpi">
                     <div class="kpi-label">GMV Broad</div>
                     <div class="kpi-value" id="kpiCpcBroadGmv">—</div>
-                  </div>
-
-                  <div class="kpi">
-                    <div class="kpi-label">GMV Real (Entregue)</div>
-                    <div class="kpi-value" id="kpiCpcRealDelivered">—</div>
+                    <div
+                      class="muted"
+                      style="
+                        margin-top: 6px;
+                        font-size: 12px;
+                        line-height: 1.25;
+                      "
+                    >
+                      Vendas influenciadas pelo anúncio (atribuição indireta).
+                    </div>
                   </div>
                 </div>
               </div>
@@ -401,6 +416,70 @@
             </div>
 
             <div class="section-card__body">
+              <!-- ✅ Grupos de campanhas (unitária = 1 id | grupal = N ids) -->
+              <div class="section-card" style="margin: 0 0 12px">
+                <div class="section-card__header">
+                  <div>
+                    <div class="section-title">Grupos</div>
+                    <div class="muted">
+                      Agrupe várias campanhas para ver totais e itens em
+                      conjunto.
+                    </div>
+                  </div>
+                  <div
+                    class="section-actions"
+                    style="display: flex; gap: 8px; flex-wrap: wrap"
+                  >
+                    <button id="btnAdsGroupReload" class="btn btn-ghost">
+                      Atualizar grupos
+                    </button>
+                    <button id="btnAdsGroupCreate" class="btn btn-primary">
+                      Criar grupo
+                    </button>
+                    <button id="btnAdsGroupEdit" class="btn btn-ghost">
+                      Editar
+                    </button>
+                    <button id="btnAdsGroupDelete" class="btn btn-ghost">
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+
+                <div class="section-card__body">
+                  <div
+                    style="
+                      display: flex;
+                      gap: 10px;
+                      align-items: center;
+                      flex-wrap: wrap;
+                    "
+                  >
+                    <select
+                      id="adsGroupSelect"
+                      class="select"
+                      style="min-width: 260px"
+                    >
+                      <option value="">Selecione um grupo…</option>
+                    </select>
+                    <button id="btnAdsGroupViewItems" class="btn btn-ghost">
+                      Ver itens do grupo
+                    </button>
+                  </div>
+
+                  <div
+                    class="muted"
+                    id="adsGroupMsg"
+                    style="margin: 6px 0 0"
+                  ></div>
+                  <div
+                    class="muted"
+                    id="adsGroupLoading"
+                    style="margin: 6px 0 0"
+                  ></div>
+
+                  <div id="adsGroupSummary" style="margin-top: 10px"></div>
+                </div>
+              </div>
               <!-- TOOLBAR + MENSAGENS (ANTES DA TABELA) -->
               <div
                 class="toolbar"
@@ -467,6 +546,7 @@
                       <th>Status</th>
                       <th>Placement</th>
                       <th>Budget</th>
+                      <th>Crédito (est.)</th>
                       <th>Impressões</th>
                       <th>Cliques</th>
                       <th>Gasto</th>
@@ -533,9 +613,9 @@
                       <table class="table" id="tblCpcCampaignItems">
                         <thead>
                           <tr>
-                            <th>Item ID</th>
-                            <th>Nome (quando disponível)</th>
-                            <th>Status (auto)</th>
+                            <th>Produto</th>
+                            <th>Nome no Ads</th>
+                            <th>Status no Ads</th>
                           </tr>
                         </thead>
                         <tbody></tbody>

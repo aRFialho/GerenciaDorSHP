@@ -90,9 +90,11 @@ model Shop {
   orders   Order[]
   products Product[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  sessions  Session[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  sessions          Session[]
+  adsCampaignGroups AdsCampaignGroup[]
+  campaignGroups    AdsCampaignGroup[]
 
   @@index([accountId])
 }
@@ -241,4 +243,33 @@ model ProductModel {
 
   @@unique([productId, modelId])
   @@index([productId])
+}
+
+model AdsCampaignGroup {
+  id     Int  @id @default(autoincrement())
+  shopId Int
+  shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+
+  campaigns AdsCampaignGroupCampaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shopId, name])
+}
+
+model AdsCampaignGroupCampaign {
+  id      Int              @id @default(autoincrement())
+  groupId Int
+  group   AdsCampaignGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  campaignId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([groupId, campaignId])
+  @@index([campaignId])
 }

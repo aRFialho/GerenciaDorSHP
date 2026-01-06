@@ -1,7 +1,7 @@
 const express = require("express");
 const { requireAuth } = require("../middlewares/sessionAuth");
 const AdsController = require("../controllers/AdsController");
-
+const AdsCampaignGroupsController = require("../controllers/AdsCampaignGroupsController");
 const router = express.Router();
 router.use(requireAuth);
 
@@ -9,11 +9,6 @@ router.get("/shops/:shopId/ads/balance", AdsController.balance);
 router.get(
   "/shops/:shopId/ads/performance/daily",
   AdsController.dailyPerformance
-);
-
-router.get(
-  "/shops/:shopId/ads/performance/daily-real",
-  AdsController.dailyRealPerformance
 );
 
 router.get("/shops/:shopId/ads/campaigns/ids", AdsController.listCampaignIds);
@@ -43,6 +38,26 @@ router.post(
 router.post(
   "/shops/:shopId/ads/gms/campaign/edit",
   AdsController.gmsEditCampaign
+);
+
+router.get(
+  "/shops/:shopId/ads/campaign-groups",
+  AdsCampaignGroupsController.list
+);
+
+router.post(
+  "/shops/:shopId/ads/campaign-groups",
+  AdsCampaignGroupsController.create
+);
+
+router.put(
+  "/shops/:shopId/ads/campaign-groups/:groupId",
+  AdsCampaignGroupsController.update
+);
+
+router.delete(
+  "/shops/:shopId/ads/campaign-groups/:groupId",
+  AdsCampaignGroupsController.remove
 );
 
 router.post(

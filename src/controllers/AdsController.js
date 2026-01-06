@@ -2,7 +2,6 @@ const ShopeeAdsService = require("../services/ShopeeAdsService");
 const { resolveShop } = require("../utils/resolveShop");
 const prisma = require("../config/db");
 const AuthService = require("../services/ShopeeAuthService"); // ajuste o caminho/nome real
-const ShopeeOrderService = require("../services/ShopeeOrderService");
 function getShopeeErrData(e) {
   return e?.response?.data || e?.shopee || null;
 }
@@ -461,6 +460,83 @@ async function campaignSettings(req, res, next) {
       };
     });
 
+    // Enrichment: traz title + 1 imagem do seu DB para os item_ids retornados pelo settings
+    const allItemIds = new Set();
+    for (const c of campaigns) {
+      const ids = Array.isArray(c?.common_info?.item_id_list)
+        ? c.common_info.item_id_list
+        : [];
+      for (const id of ids) {
+        if (id != null && String(id).trim() !== "") allItemIds.add(String(id));
+      }
+    }
+
+    let products = [];
+    if (allItemIds.size) {
+      const itemIdsBigInt = [];
+      for (const id of allItemIds) {
+        try {
+          itemIdsBigInt.push(BigInt(id));
+        } catch (_) {
+          // ignora ids inválidos
+        }
+      }
+
+      if (itemIdsBigInt.length) {
+        products = await prisma.product.findMany({
+          where: {
+            shopId: shop.id,
+            itemId: { in: itemIdsBigInt },
+          },
+          select: {
+            itemId: true,
+            title: true,
+            images: {
+              select: { url: true },
+              take: 1,
+            },
+          },
+        });
+      }
+    }
+
+    const productByItemId = new Map(
+      products.map((p) => [
+        String(p.itemId),
+        { title: p.title || null, image_url: p.images?.[0]?.url || null },
+      ])
+    );
+
+    // Agora anexa linked_items em cada campanha
+    const campaignsEnriched = campaigns.map((c) => {
+      const itemIds = Array.isArray(c?.common_info?.item_id_list)
+        ? c.common_info.item_id_list
+        : [];
+
+      // Para campanhas auto, temos auto_product_ads_info com status e nome
+      const autoInfo = Array.isArray(c?.auto_product_ads_info)
+        ? c.auto_product_ads_info
+        : [];
+      const autoMap = new Map(
+        autoInfo.filter((x) => x?.item_id).map((x) => [String(x.item_id), x])
+      );
+
+      const linked_items = itemIds.map((itemId) => {
+        const key = String(itemId);
+        const p = productByItemId.get(key) || {};
+        const ai = autoMap.get(key) || {};
+        return {
+          item_id: key,
+          title: p.title || null,
+          image_url: p.image_url || null,
+          product_name: ai.product_name || null,
+          status: ai.status || null,
+        };
+      });
+
+      return { ...c, linked_items };
+    });
+
     res.json({
       request_id: raw?.request_id,
       warning: raw?.warning,
@@ -469,7 +545,7 @@ async function campaignSettings(req, res, next) {
       response: {
         shop_id: raw?.response?.shop_id,
         region: raw?.response?.region,
-        campaign_list: campaigns,
+        campaign_list: campaignsEnriched,
       },
     });
   } catch (e) {
@@ -872,122 +948,9 @@ function toTsEnd(isoDate) {
   return Math.floor(d.getTime() / 1000);
 }
 
-async function dailyRealPerformance(req, res, next) {
-  try {
-    const shop = await resolveShop(req, req.params.shopId);
-    const { dateFrom, dateTo } = req.query;
-
-    if (!dateFrom || !dateTo) {
-      return res.status(400).json({
-        error: { message: "dateFrom/dateTo obrigatórios (YYYY-MM-DD)." },
-      });
-    }
-
-    const from = new Date(`${dateFrom}T00:00:00.000Z`);
-    const to = new Date(`${dateTo}T00:00:00.000Z`);
-    const diffDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24));
-    if (!Number.isFinite(diffDays) || diffDays < 0) {
-      return res.status(400).json({ error: { message: "Range inválido." } });
-    }
-
-    // 1) Listar order_sn no período (usando UPDATE_TIME para pegar pedidos que viraram COMPLETED no range)
-    const timeFrom = toTsStart(dateFrom);
-    const timeTo = toTsEnd(dateTo);
-
-    const pageSize = 100;
-    let pageNo = 1;
-    let more = true;
-
-    const orderSnSet = new Set();
-    while (more && pageNo <= 100 && pageNo * pageSize <= 10000) {
-      const rawList = await ShopeeOrderService.getOrderList({
-        shopId: shop.shopId,
-        timeFrom,
-        timeTo,
-        pageNo,
-        pageSize,
-        timeRangeField: "update_time",
-      });
-
-      const list = Array.isArray(rawList?.response?.order_list)
-        ? rawList.response.order_list
-        : [];
-
-      for (const x of list) {
-        if (x?.order_sn) orderSnSet.add(String(x.order_sn));
-      }
-
-      more =
-        Boolean(rawList?.response?.more) ||
-        Boolean(rawList?.response?.has_more) ||
-        false;
-
-      pageNo += 1;
-    }
-
-    const orderSns = Array.from(orderSnSet);
-
-    // 2) Pegar detalhes em lotes de 50 e somar apenas COMPLETED
-    const byDay = new Map();
-    let total = 0;
-
-    for (let i = 0; i < orderSns.length; i += 50) {
-      const batch = orderSns.slice(i, i + 50);
-
-      const rawDetail = await ShopeeOrderService.getOrderDetail({
-        shopId: shop.shopId,
-        orderSnList: batch,
-        responseOptionalFields: "total_amount,pay_time",
-      });
-
-      const orders = Array.isArray(rawDetail?.response?.order_list)
-        ? rawDetail.response.order_list
-        : [];
-
-      for (const o of orders) {
-        const status = String(o?.order_status || "").toUpperCase();
-        if (status !== "COMPLETED") continue;
-
-        const upd = Number(o?.update_time || 0);
-        if (!upd) continue;
-
-        const day = new Date(upd * 1000).toISOString().slice(0, 10);
-        if (day < dateFrom || day > dateTo) continue;
-
-        const amount = Number(o?.total_amount) || 0;
-
-        byDay.set(day, (byDay.get(day) || 0) + amount);
-        total += amount;
-      }
-    }
-
-    // 3) Normaliza série com dias vazios
-    const series = [];
-    for (let d = new Date(from); d <= to; d.setUTCDate(d.getUTCDate() + 1)) {
-      const day = d.toISOString().slice(0, 10);
-      series.push({
-        date: day,
-        gmv_real_delivered: byDay.get(day) || 0,
-      });
-    }
-
-    return res.json({
-      error: "",
-      response: {
-        series,
-        totals: { gmv_real_delivered: total },
-        meta: { orders_scanned: orderSns.length, truncated: more === true },
-      },
-    });
-  } catch (e) {
-    return next(e);
-  }
-}
-
 module.exports = {
   balance,
   dailyPerformance,
-  dailyRealPerformance,
   listCampaignIds,
   campaignsDailyPerformance,
   campaignSettings,

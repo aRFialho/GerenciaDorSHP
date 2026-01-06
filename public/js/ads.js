@@ -6,6 +6,9 @@ let selectedCpcCampaignId = null;
 let cachedCampaignSeries = {};
 let cachedCampaignSettings = new Map();
 let cachedSettingsKey = null;
+let cachedCampaignGroups = [];
+let selectedCampaignGroupId = null;
+let lastCpcRange = { dateFrom: null, dateTo: null };
 
 let gmsPager = { offset: 0, limit: 50, hasNext: false, total: null };
 
@@ -21,6 +24,21 @@ let cpcFilterTimer = null;
 /* ===========================
    Helpers
 =========================== */
+
+function escAttr(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 function fmtMoney(v) {
   const n = Number(v);
@@ -55,6 +73,30 @@ async function apiPost(url, body) {
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify(body || {}),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok)
+    throw new Error(j?.error?.message || j?.message || `HTTP ${r.status}`);
+  return j;
+}
+
+async function apiPut(url, body) {
+  const r = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body || {}),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok)
+    throw new Error(j?.error?.message || j?.message || `HTTP ${r.status}`);
+  return j;
+}
+
+async function apiDelete(url) {
+  const r = await fetch(url, {
+    method: "DELETE",
+    credentials: "include",
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok)
@@ -186,6 +228,7 @@ function exportCpcCampaignsCsv() {
     "direct_gmv",
     "direct_roas",
     "direct_acos_pct",
+    "credit_estimated",
   ];
 
   const rows = cpcCampaignsView.map((x) => [
@@ -201,6 +244,7 @@ function exportCpcCampaignsCsv() {
     x.direct_gmv,
     x.direct_roas != null ? Number(x.direct_roas).toFixed(4) : "",
     x.direct_acos_pct != null ? Number(x.direct_acos_pct).toFixed(4) : "",
+    x.credit_estimated,
   ]);
 
   downloadCsv(filename, headers, rows);
@@ -567,22 +611,21 @@ function renderCpcCampaignTable(rows) {
     tr.dataset.campaignId = x.campaign_id;
 
     tr.innerHTML = `
-      <td>${x.ad_name || x.campaign_id}</td>
-      <td>${x.ad_type || "—"}</td>
-      <td>${x.campaign_status || "—"}</td>
-      <td>${x.placement || "—"}</td>
-      <td>${x.budget != null ? fmtMoney(x.budget) : "—"}</td>
-      <td>${fmtInt(x.impression)}</td>
-      <td>${fmtInt(x.clicks)}</td>
-      <td>${fmtMoney(x.expense)}</td>
-      <td>${fmtMoney(x.direct_gmv)}</td>
-      <td>${x.direct_roas != null ? Number(x.direct_roas).toFixed(2) : "—"}</td>
-      <td>${
-        x.direct_acos_pct != null
-          ? Number(x.direct_acos_pct).toFixed(2) + "%"
-          : "—"
-      }</td>
-    `;
+  <td>${x.ad_name || x.campaign_id}</td>
+  <td>${x.ad_type || "—"}</td>
+  <td>${x.campaign_status || "—"}</td>
+  <td>${x.placement || "—"}</td>
+  <td>${x.budget != null ? fmtMoney(x.budget) : "—"}</td>
+  <td>${x.credit_estimated != null ? fmtMoney(x.credit_estimated) : "—"}</td>
+  <td>${fmtInt(x.impression)}</td>
+  <td>${fmtInt(x.clicks)}</td>
+  <td>${fmtMoney(x.expense)}</td>
+  <td>${fmtMoney(x.direct_gmv)}</td>
+  <td>${x.direct_roas != null ? Number(x.direct_roas).toFixed(2) : "—"}</td>
+  <td>${
+    x.direct_acos_pct != null ? Number(x.direct_acos_pct).toFixed(2) + "%" : "—"
+  }</td>
+`;
 
     tr.addEventListener("click", () => selectCampaign(x.campaign_id));
     tbody.appendChild(tr);
@@ -590,7 +633,7 @@ function renderCpcCampaignTable(rows) {
 
   if (!rows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="11" class="muted">Nenhuma campanha encontrada para o filtro/ordem atual.</td>`;
+    tr.innerHTML = `<td colspan="12" class="muted">Nenhuma campanha encontrada para o filtro/ordem atual.</td>`;
     tbody.appendChild(tr);
   }
 }
@@ -676,6 +719,34 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnCreate)
     btnCreate.addEventListener("click", () => openGmsCreateModal());
   if (btnEdit) btnEdit.addEventListener("click", () => openGmsEditModal());
+
+  const selGroup = document.getElementById("adsGroupSelect");
+  if (selGroup) {
+    selGroup.addEventListener("change", () => {
+      selectedCampaignGroupId = selGroup.value || null;
+      renderGroupSummary(getGroupById(selectedCampaignGroupId));
+    });
+  }
+
+  const btnGR = document.getElementById("btnAdsGroupReload");
+  if (btnGR) btnGR.addEventListener("click", () => loadCampaignGroups());
+
+  const btnGC = document.getElementById("btnAdsGroupCreate");
+  if (btnGC) btnGC.addEventListener("click", () => openAdsGroupCreateModal());
+
+  const btnGE = document.getElementById("btnAdsGroupEdit");
+  if (btnGE) btnGE.addEventListener("click", () => openAdsGroupEditModal());
+
+  const btnGD = document.getElementById("btnAdsGroupDelete");
+  if (btnGD) btnGD.addEventListener("click", () => deleteAdsGroupSelected());
+
+  const btnGV = document.getElementById("btnAdsGroupViewItems");
+  if (btnGV)
+    btnGV.addEventListener("click", () => {
+      const g = getGroupById(selectedCampaignGroupId);
+      if (!g) return setMsg("adsGroupMsg", "Selecione um grupo primeiro.");
+      openGroupItemsModal(g);
+    });
 });
 
 // Auto-load ao abrir a aba Ads
@@ -763,6 +834,355 @@ async function loadAdsAll() {
    CPC
 =========================== */
 
+function parseCampaignIdsCsv(s) {
+  const seen = new Set();
+  return String(s || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .filter((x) => (seen.has(x) ? false : (seen.add(x), true)));
+}
+
+function getGroupById(id) {
+  const gid = String(id || "");
+  return cachedCampaignGroups.find((g) => String(g.id) === gid) || null;
+}
+
+function computeGroupAgg(group) {
+  const ids = Array.isArray(group?.campaign_ids) ? group.campaign_ids : [];
+
+  const byCampaign = new Map(
+    cpcCampaignsMaster.map((x) => [String(x.campaign_id), x])
+  );
+
+  let totals = {
+    campaigns: 0,
+    impression: 0,
+    clicks: 0,
+    expense: 0,
+    direct_gmv: 0,
+    budget: 0,
+    credit_estimated: 0, // budget - expense do período
+  };
+
+  // União de itens vinculados (sem duplicar por item_id)
+  const itemMap = new Map(); // item_id -> {item_id,title,image_url,product_name,status}
+
+  for (const cid of ids) {
+    const row = byCampaign.get(String(cid));
+    if (row) {
+      totals.campaigns += 1;
+      totals.impression += Number(row.impression || 0);
+      totals.clicks += Number(row.clicks || 0);
+      totals.expense += Number(row.expense || 0);
+      totals.direct_gmv += Number(row.direct_gmv || 0);
+
+      // budget e crédito estimado já calculado no row
+      if (row.budget != null) totals.budget += Number(row.budget || 0);
+      if (row.credit_estimated != null)
+        totals.credit_estimated += Number(row.credit_estimated || 0);
+    } else {
+      // campanha do grupo não apareceu no período -> conta como “fora do período”
+      totals.campaigns += 1;
+    }
+
+    const set = cachedCampaignSettings.get(String(cid));
+    const linked = Array.isArray(set?.linked_items) ? set.linked_items : [];
+    for (const it of linked) {
+      const key = String(it.item_id || "");
+      if (!key) continue;
+
+      const prev = itemMap.get(key) || {};
+      itemMap.set(key, {
+        item_id: key,
+        title: it.title || prev.title || null,
+        image_url: it.image_url || prev.image_url || null,
+        product_name: it.product_name || prev.product_name || null,
+        status: it.status || prev.status || null,
+      });
+    }
+  }
+
+  return { totals, linkedItems: Array.from(itemMap.values()) };
+}
+
+function renderGroupSummary(group) {
+  const box = document.getElementById("adsGroupSummary");
+  if (!box) return;
+
+  if (!group) {
+    box.innerHTML = "";
+    return;
+  }
+
+  const { totals, linkedItems } = computeGroupAgg(group);
+
+  box.innerHTML = `
+    <div class="kpi-grid kpi-grid-sm">
+      <div class="kpi"><div class="kpi-label">Campanhas</div><div class="kpi-value">${fmtInt(
+        totals.campaigns
+      )}</div></div>
+      <div class="kpi"><div class="kpi-label">Gasto</div><div class="kpi-value">${fmtMoney(
+        totals.expense
+      )}</div></div>
+      <div class="kpi"><div class="kpi-label">GMV Dir.</div><div class="kpi-value">${fmtMoney(
+        totals.direct_gmv
+      )}</div></div>
+      <div class="kpi"><div class="kpi-label">Budget (soma)</div><div class="kpi-value">${fmtMoney(
+        totals.budget
+      )}</div></div>
+      <div class="kpi"><div class="kpi-label">Crédito (est.)</div><div class="kpi-value">${fmtMoney(
+        totals.credit_estimated
+      )}</div></div>
+      <div class="kpi"><div class="kpi-label">Itens (união)</div><div class="kpi-value">${fmtInt(
+        linkedItems.length
+      )}</div></div>
+    </div>
+    <div class="muted" style="margin-top:8px;">
+      Crédito (est.) = soma de (budget − gasto) das campanhas no período ${
+        lastCpcRange.dateFrom || "—"
+      } → ${lastCpcRange.dateTo || "—"}.
+    </div>
+  `;
+}
+
+function openGroupItemsModal(group) {
+  const { linkedItems } = computeGroupAgg(group);
+
+  const rows = linkedItems
+    .map((it) => {
+      const productHtml = `
+        <div class="product-cell">
+          <img class="product-thumb" src="${
+            it.image_url || ""
+          }" onerror="this.style.display='none'">
+          <div>
+            <div style="font-weight:700">${
+              it.title || "Item " + it.item_id
+            }</div>
+            <div class="muted">${it.item_id}</div>
+          </div>
+        </div>
+      `;
+      return `
+        <tr>
+          <td>${productHtml}</td>
+          <td>${it.product_name || "—"}</td>
+          <td>${it.status || "—"}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const html = `
+    <div class="muted" style="margin-bottom:10px;">
+      Itens agregados (união) do grupo <b>${escHtml(group.name)}</b>.
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th>Nome no Ads</th>
+            <th>Status no Ads</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            rows ||
+            `<tr><td colspan="3" class="muted">Nenhum item encontrado.</td></tr>`
+          }
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  openModal(`Itens do grupo`, html);
+}
+
+async function loadCampaignGroups() {
+  setMsg("adsGroupMsg", "");
+  setLoading("adsGroupLoading", "Carregando grupos...");
+
+  try {
+    const j = await apiGet("/shops/active/ads/campaign-groups");
+    const groups = j?.response?.groups || [];
+    cachedCampaignGroups = groups;
+
+    const sel = document.getElementById("adsGroupSelect");
+    if (sel) {
+      sel.innerHTML = `<option value="">Selecione um grupo…</option>`;
+      for (const g of groups) {
+        const opt = document.createElement("option");
+        opt.value = String(g.id);
+        opt.textContent = g.name;
+        sel.appendChild(opt);
+      }
+      // tenta manter seleção
+      if (selectedCampaignGroupId) sel.value = String(selectedCampaignGroupId);
+    }
+
+    renderGroupSummary(getGroupById(selectedCampaignGroupId));
+  } catch (e) {
+    setMsg("adsGroupMsg", e.message || "Falha ao carregar grupos.");
+  } finally {
+    setLoading("adsGroupLoading", "");
+  }
+}
+
+function openAdsGroupCreateModal() {
+  openModal(
+    "Criar grupo de campanhas",
+    `
+      <div class="field">
+        <label class="muted">Nome (obrigatório)</label>
+        <input id="adsGroupName" class="input" type="text" value="${escAttr(
+          g.name || ""
+        )}">
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Descrição (opcional)</label>
+        <input id="adsGroupDesc" class="input" type="text" value="${escAttr(
+          g.description || ""
+        )}">
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Campaign IDs (CSV)</label>
+        <input id="adsGroupCampaignIds" class="input" type="text" value="${escAttr(
+          (g.campaign_ids || []).join(", ")
+        )}">
+        <div class="muted" style="margin-top:6px;">Unitária = 1 ID • Grupal = vários IDs</div>
+      </div>
+      <div class="actions" style="margin-top:14px;">
+        <button id="btnAdsGroupCreateSubmit" class="btn btn-primary">Criar</button>
+      </div>
+    `
+  );
+
+  const submit = document.getElementById("btnAdsGroupCreateSubmit");
+  if (!submit) return;
+
+  submit.addEventListener("click", async () => {
+    setMsg("adsGroupMsg", "");
+    setLoading("adsGroupLoading", "Criando grupo...");
+
+    try {
+      const name = document.getElementById("adsGroupName")?.value || "";
+      const description =
+        document.getElementById("adsGroupDesc")?.value || null;
+      const campaignIdsCsv =
+        document.getElementById("adsGroupCampaignIds")?.value || "";
+      const campaignIds = parseCampaignIdsCsv(campaignIdsCsv);
+
+      await apiPost("/shops/active/ads/campaign-groups", {
+        name,
+        description,
+        campaignIds,
+      });
+
+      const overlay = document.getElementById("modal-overlay");
+      if (overlay) overlay.style.display = "none";
+
+      await loadCampaignGroups();
+      setMsg("adsGroupMsg", "Grupo criado.");
+    } catch (e) {
+      setMsg("adsGroupMsg", e.message || "Falha ao criar grupo.");
+    } finally {
+      setLoading("adsGroupLoading", "");
+    }
+  });
+}
+
+function openAdsGroupEditModal() {
+  const g = getGroupById(selectedCampaignGroupId);
+  if (!g) return setMsg("adsGroupMsg", "Selecione um grupo primeiro.");
+
+  openModal(
+    "Editar grupo de campanhas",
+    `
+      <div class="field">
+        <label class="muted">Nome</label>
+        <input id="adsGroupName" class="input" type="text" value="${(
+          g.name || ""
+        ).replace(/"/g, "&quot;")}">
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Descrição</label>
+        <input id="adsGroupDesc" class="input" type="text" value="${(
+          g.description || ""
+        ).replace(/"/g, "&quot;")}">
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label class="muted">Campaign IDs (CSV)</label>
+        <input id="adsGroupCampaignIds" class="input" type="text" value="${(
+          g.campaign_ids || []
+        ).join(", ")}">
+      </div>
+      <div class="actions" style="margin-top:14px;">
+        <button id="btnAdsGroupEditSubmit" class="btn btn-primary">Salvar</button>
+      </div>
+    `
+  );
+
+  const submit = document.getElementById("btnAdsGroupEditSubmit");
+  if (!submit) return;
+
+  submit.addEventListener("click", async () => {
+    setMsg("adsGroupMsg", "");
+    setLoading("adsGroupLoading", "Salvando grupo...");
+
+    try {
+      const name = document.getElementById("adsGroupName")?.value || "";
+      const description =
+        document.getElementById("adsGroupDesc")?.value || null;
+      const campaignIdsCsv =
+        document.getElementById("adsGroupCampaignIds")?.value || "";
+      const campaignIds = parseCampaignIdsCsv(campaignIdsCsv);
+
+      await apiPut(`/shops/active/ads/campaign-groups/${g.id}`, {
+        name,
+        description,
+        campaignIds,
+      });
+
+      const overlay = document.getElementById("modal-overlay");
+      if (overlay) overlay.style.display = "none";
+
+      await loadCampaignGroups();
+      setMsg("adsGroupMsg", "Grupo atualizado.");
+    } catch (e) {
+      setMsg("adsGroupMsg", e.message || "Falha ao atualizar grupo.");
+    } finally {
+      setLoading("adsGroupLoading", "");
+    }
+  });
+}
+
+async function deleteAdsGroupSelected() {
+  const g = getGroupById(selectedCampaignGroupId);
+  if (!g) return setMsg("adsGroupMsg", "Selecione um grupo primeiro.");
+
+  setMsg("adsGroupMsg", "");
+  setLoading("adsGroupLoading", "Excluindo grupo...");
+
+  try {
+    await apiDelete(`/shops/active/ads/campaign-groups/${g.id}`);
+    selectedCampaignGroupId = null;
+
+    const sel = document.getElementById("adsGroupSelect");
+    if (sel) sel.value = "";
+
+    renderGroupSummary(null);
+    await loadCampaignGroups();
+
+    setMsg("adsGroupMsg", "Grupo excluído.");
+  } catch (e) {
+    setMsg("adsGroupMsg", e.message || "Falha ao excluir grupo.");
+  } finally {
+    setLoading("adsGroupLoading", "");
+  }
+}
+
 async function loadCpcBalance() {
   const j = await apiGet("/shops/active/ads/balance");
   const bal = j?.response?.total_balance;
@@ -770,39 +1190,21 @@ async function loadCpcBalance() {
 }
 
 async function loadCpcDaily(dateFrom, dateTo) {
-  const [j, jr] = await Promise.all([
-    apiGet(
-      `/shops/active/ads/performance/daily?dateFrom=${encodeURIComponent(
-        dateFrom
-      )}&dateTo=${encodeURIComponent(dateTo)}`
-    ),
-    apiGet(
-      `/shops/active/ads/performance/daily-real?dateFrom=${encodeURIComponent(
-        dateFrom
-      )}&dateTo=${encodeURIComponent(dateTo)}`
-    ),
-  ]);
+  const j = await apiGet(
+    `/shops/active/ads/performance/daily?dateFrom=${encodeURIComponent(
+      dateFrom
+    )}&dateTo=${encodeURIComponent(dateTo)}`
+  );
 
   const series = j?.response?.series || [];
   const totals = j?.response?.totals || {};
-  const realTotals = jr?.response?.totals || {};
-  const realSeries = jr?.response?.series || [];
-  const realByDate = new Map(
-    realSeries.map((x) => [x.date, Number(x.gmv_real_delivered) || 0])
-  );
-  if (jr?.response?.meta?.truncated) {
-    setMsg(
-      "cpcCampaignMsg",
-      "Aviso: GMV Real (Entregue) pode estar incompleto (muitos pedidos no período)."
-    );
-  }
+
   setText("kpiCpcExpense", fmtMoney(totals.expense));
   setText("kpiCpcImpressions", fmtInt(totals.impression));
   setText("kpiCpcClicks", fmtInt(totals.clicks));
   setText("kpiCpcCtr", fmtPctFromClicksImpr(totals.clicks, totals.impression));
   setText("kpiCpcDirectGmv", fmtMoney(totals.direct_gmv));
   setText("kpiCpcBroadGmv", fmtMoney(totals.broad_gmv));
-  setText("kpiCpcRealDelivered", fmtMoney(realTotals.gmv_real_delivered));
 
   const labels = series.map((x) => x.date);
   const ds = [
@@ -824,7 +1226,6 @@ async function loadCpcDaily(dateFrom, dateTo) {
       borderColor: "#dc2626",
       tension: 0.25,
     },
-
     {
       label: "GMV Direto",
       data: series.map((x) => x.direct_gmv),
@@ -837,13 +1238,6 @@ async function loadCpcDaily(dateFrom, dateTo) {
       borderColor: "#0ea5e9",
       tension: 0.25,
     },
-
-    {
-      label: "GMV Real (Entregue)",
-      data: labels.map((d) => realByDate.get(d) || 0),
-      borderColor: "#f59e0b",
-      tension: 0.25,
-    },
   ];
 
   chartCpcDaily = safeDestroyChart(chartCpcDaily);
@@ -851,6 +1245,7 @@ async function loadCpcDaily(dateFrom, dateTo) {
 }
 
 async function loadCpcCampaigns(dateFrom, dateTo) {
+  lastCpcRange = { dateFrom, dateTo };
   setMsg("cpcCampaignMsg", "");
   selectedCpcCampaignId = null;
 
@@ -891,7 +1286,10 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
     const set = cachedCampaignSettings.get(String(row.campaign_id));
     const common = set?.common_info || {};
     const m = row.metrics || {};
-
+    const creditEstimated =
+      common.campaign_budget != null
+        ? Number(common.campaign_budget) - Number(m.expense || 0)
+        : null;
     const directRoas =
       m.expense && m.direct_gmv ? m.direct_gmv / m.expense : null;
     const directAcos = m.direct_gmv ? (m.expense / m.direct_gmv) * 100 : null;
@@ -909,6 +1307,7 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
       direct_gmv: m.direct_gmv ?? 0,
       direct_roas: directRoas,
       direct_acos_pct: directAcos,
+      credit_estimated: creditEstimated,
     };
   });
 
@@ -920,6 +1319,7 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
   } else {
     setText("cpcCampaignSelected", "Nenhuma selecionada");
   }
+  await loadCampaignGroups();
 }
 
 function selectCampaign(campaignId) {
@@ -987,24 +1387,34 @@ function selectCampaign(campaignId) {
 
   tbody.innerHTML = "";
 
-  const itemIds = common.item_id_list || [];
-  const autoInfo = set?.auto_product_ads_info || [];
-  const autoMap = new Map(
-    autoInfo.filter((x) => x.item_id).map((x) => [String(x.item_id), x])
-  );
+  const linked = Array.isArray(set?.linked_items) ? set.linked_items : [];
 
-  for (const itemId of itemIds) {
-    const ai = autoMap.get(String(itemId));
+  for (const it of linked) {
     const tr = document.createElement("tr");
+
+    const productHtml = `
+    <div class="product-cell">
+      <img class="product-thumb" src="${
+        it.image_url || ""
+      }" onerror="this.style.display='none'">
+      <div>
+        <div style="font-weight:700">${it.title || "Item " + it.item_id}</div>
+        <div class="muted">${it.item_id}</div>
+      </div>
+    </div>
+  `;
+
     tr.innerHTML = `
-      <td>${itemId}</td>
-      <td>${ai?.product_name || "—"}</td>
-      <td>${ai?.status || "—"}</td>
-    `;
+    <td>${productHtml}</td>
+    <td>${it.product_name || "—"}</td>
+    <td>${it.status || "—"}</td>
+  `;
+
     tbody.appendChild(tr);
   }
 
-  if (!itemIds.length) {
+  if (!linked.length) {
+    const itemIds = common.item_id_list || [];
     const tr = document.createElement("tr");
     tr.innerHTML = `<td colspan="3" class="muted">Nenhum item vinculado (ou campanha usa seleção automática sem itens retornados).</td>`;
     tbody.appendChild(tr);
