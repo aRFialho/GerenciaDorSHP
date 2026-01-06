@@ -1175,7 +1175,7 @@ function openGroupItemsModal(group) {
         <tbody>
           ${
             rows ||
-            `<tr><td colspan="8" class="muted">Nenhum item encontrado.</td></tr>`
+            `<tr><td colspan="3" class="muted">Nenhum item encontrado.</td></tr>`
           }
         </tbody>
       </table>
