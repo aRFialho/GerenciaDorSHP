@@ -46,12 +46,23 @@ function statusBucketFromCampaignStatus(status) {
   const s = normStatus(status);
   if (!s) return "unknown";
 
-  // scheduled
-  if (s.includes("sched") || s.includes("upcom") || s.includes("program"))
+  // scheduled / not started
+  if (
+    s.includes("sched") ||
+    s.includes("upcom") ||
+    s.includes("program") ||
+    s.includes("not_started") ||
+    s.includes("not started") ||
+    s.includes("planned")
+  )
     return "scheduled";
 
   // paused
-  if (s.includes("pause") || s.includes("suspend") || s.includes("hold"))
+  if (
+    s.includes("pause") || // pause / paused
+    s.includes("suspend") ||
+    s.includes("hold")
+  )
     return "paused";
 
   // ended
@@ -60,21 +71,28 @@ function statusBucketFromCampaignStatus(status) {
     s.includes("stop") ||
     s.includes("finish") ||
     s.includes("terminate") ||
-    s.includes("close")
+    s.includes("close") ||
+    s.includes("expired")
   )
     return "ended";
 
   // deleted
   if (s.includes("delete") || s.includes("remove")) return "deleted";
 
-  // active
+  // active (inclui variações bem comuns)
   if (
     s.includes("ongoing") ||
     s.includes("running") ||
     s.includes("active") ||
-    s.includes("enable") ||
+    s.includes("enable") || // enable/enabled
     s.includes("start") ||
-    s.includes("in_progress")
+    s.includes("in_progress") || // underscore
+    s.includes("in progress") || // espaço
+    s.includes("inprogress") || // sem separador
+    s.includes("normal") || // MUITO comum como "ativo"
+    s.includes("andamento") || // pt-br
+    s.includes("em andamento") || // pt-br
+    s.includes("ativo") // pt-br
   )
     return "active";
 
@@ -141,27 +159,9 @@ function badgeHtml(text, tone) {
 }
 
 function statusTone(status) {
-  const s = normStatus(status);
-  if (!s) return "gray";
-
-  if (
-    s.includes("ongoing") ||
-    s.includes("running") ||
-    s.includes("active") ||
-    s.includes("enabled")
-  )
-    return "green";
-
-  if (s.includes("paused")) return "yellow";
-
-  if (
-    s.includes("ended") ||
-    s.includes("stopped") ||
-    s.includes("disabled") ||
-    s.includes("deleted")
-  )
-    return "gray";
-
+  const b = statusBucketFromCampaignStatus(status);
+  if (b === "active") return "green";
+  if (b === "paused") return "yellow";
   return "gray";
 }
 
@@ -1637,7 +1637,6 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
     )
   );
   cpcCampaignsMaster = [...lastCpcCampaignRows];
-  setCpcStatusBucket("all");
   applyCpcCampaignView();
   if (cpcCampaignsMaster.length > 0 && cpcCampaignsView.length === 0) {
     const filterEl = document.getElementById("cpcCampaignFilter");
