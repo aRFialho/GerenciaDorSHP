@@ -44,24 +44,37 @@ function getCpcStatusBucket() {
 
 function statusBucketFromCampaignStatus(status) {
   const s = normStatus(status);
-
   if (!s) return "unknown";
 
-  if (
-    s.includes("scheduled") ||
-    s.includes("upcoming") ||
-    s.includes("program")
-  )
+  // scheduled
+  if (s.includes("sched") || s.includes("upcom") || s.includes("program"))
     return "scheduled";
-  if (s.includes("paused")) return "paused";
-  if (s.includes("ended") || s.includes("stopped")) return "ended";
-  if (s.includes("deleted")) return "deleted";
 
+  // paused
+  if (s.includes("pause") || s.includes("suspend") || s.includes("hold"))
+    return "paused";
+
+  // ended
+  if (
+    s.includes("end") ||
+    s.includes("stop") ||
+    s.includes("finish") ||
+    s.includes("terminate") ||
+    s.includes("close")
+  )
+    return "ended";
+
+  // deleted
+  if (s.includes("delete") || s.includes("remove")) return "deleted";
+
+  // active
   if (
     s.includes("ongoing") ||
     s.includes("running") ||
     s.includes("active") ||
-    s.includes("enabled")
+    s.includes("enable") ||
+    s.includes("start") ||
+    s.includes("in_progress")
   )
     return "active";
 
@@ -991,15 +1004,17 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Auto-load ao abrir a aba Ads
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest?.(".tab[data-tab='ads']");
-  if (!btn) return;
+document.addEventListener(
+  "click",
+  (e) => {
+    const btn = e.target.closest?.(".tab[data-tab='ads']");
+    if (!btn) return;
 
-  // ✅ sempre abre Ads em "Em andamento"
-  setCpcStatusBucket("active");
-
-  setTimeout(() => loadAdsAll(), 0);
-});
+    setCpcStatusBucket("active");
+    setTimeout(() => loadAdsAll(), 0);
+  },
+  true
+);
 
 /* ===========================
    Load All (CPC e GMS independentes, sem alert)
@@ -1533,6 +1548,7 @@ async function loadCpcDaily(dateFrom, dateTo) {
 }
 
 async function loadCpcCampaigns(dateFrom, dateTo) {
+  console.log("loadCpcCampaigns", dateFrom, dateTo);
   lastCpcRange = { dateFrom, dateTo };
   setMsg("cpcCampaignMsg", "");
   selectedCpcCampaignId = null;
@@ -1590,7 +1606,8 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
       campaign_id: row.campaign_id,
       ad_name: common.ad_name || row.ad_name || "",
       ad_type: common.ad_type || row.ad_type || "",
-      campaign_status: common.campaign_status || "",
+      campaign_status:
+        common.campaign_status || row.campaign_status || row.status || "",
       placement: common.campaign_placement || row.campaign_placement || "",
       budget: common.campaign_budget ?? null,
       impression: m.impression ?? 0,
@@ -1603,8 +1620,23 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
       roas_target: roasTarget,
     };
   });
-
+  console.log("CPC rows:", lastCpcCampaignRows.length);
+  console.log(
+    "CPC status sample:",
+    lastCpcCampaignRows.slice(0, 10).map((x) => x.campaign_status)
+  );
+  console.log(
+    "CPC buckets:",
+    Array.from(
+      new Set(
+        lastCpcCampaignRows.map((x) =>
+          statusBucketFromCampaignStatus(x.campaign_status)
+        )
+      )
+    )
+  );
   cpcCampaignsMaster = [...lastCpcCampaignRows];
+  setCpcStatusBucket("all");
   applyCpcCampaignView();
   if (cpcCampaignsMaster.length > 0 && cpcCampaignsView.length === 0) {
     const filterEl = document.getElementById("cpcCampaignFilter");
