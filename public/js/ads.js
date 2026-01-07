@@ -1567,6 +1567,7 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
   );
 
   const campaigns = perf?.response?.campaigns || [];
+  console.log("CPC campaigns len:", campaigns.length, perf);
   cachedCampaignSeries = perf?.response?.seriesByCampaignId || {};
 
   const ids = campaigns
