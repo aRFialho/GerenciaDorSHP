@@ -20,7 +20,7 @@ let cpcCampaignsMaster = [];
 let cpcCampaignsView = [];
 
 let cpcFilterTimer = null;
-
+let cpcStatusBucket = "active"; // padrão Shopee: Em andamento
 let lastCpcProductPerfRows = [];
 
 /* ===========================
@@ -36,6 +36,57 @@ function normStatus(s) {
   return String(s || "")
     .trim()
     .toLowerCase();
+}
+
+function getCpcStatusBucket() {
+  return String(cpcStatusBucket || "active");
+}
+
+function statusBucketFromCampaignStatus(status) {
+  const s = normStatus(status);
+
+  if (!s) return "unknown";
+
+  if (
+    s.includes("scheduled") ||
+    s.includes("upcoming") ||
+    s.includes("program")
+  )
+    return "scheduled";
+  if (s.includes("paused")) return "paused";
+  if (s.includes("ended") || s.includes("stopped")) return "ended";
+  if (s.includes("deleted")) return "deleted";
+
+  if (
+    s.includes("ongoing") ||
+    s.includes("running") ||
+    s.includes("active") ||
+    s.includes("enabled")
+  )
+    return "active";
+
+  return "unknown";
+}
+
+function setCpcStatusBucket(next) {
+  cpcStatusBucket = String(next || "active");
+  localStorage.setItem("ads_cpc_status_bucket", cpcStatusBucket);
+
+  const tabs = document.querySelectorAll("#cpcStatusTabs .status-tab");
+  tabs.forEach((b) =>
+    b.classList.toggle("is-active", b.dataset.status === cpcStatusBucket)
+  );
+
+  // compat: mantém o select antigo coerente
+  const statusEl = document.getElementById("cpcCampaignStatusFilter");
+  if (statusEl) {
+    statusEl.value =
+      cpcStatusBucket === "all"
+        ? "all"
+        : cpcStatusBucket === "active"
+        ? "active"
+        : "inactive";
+  }
 }
 
 function isCampaignActiveStatus(status) {
@@ -698,13 +749,14 @@ function applyCpcCampaignView() {
       return name.includes(filter) || id.includes(filter);
     });
   }
-  const statusFilter = getCpcCampaignStatusFilter();
-  if (statusFilter !== "all") {
-    rows = rows.filter((x) => {
-      const active = isCampaignActiveStatus(x.campaign_status);
-      return statusFilter === "active" ? active : !active;
-    });
+
+  const bucket = getCpcStatusBucket();
+  if (bucket !== "all") {
+    rows = rows.filter(
+      (x) => statusBucketFromCampaignStatus(x.campaign_status) === bucket
+    );
   }
+
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : -Infinity);
 
   rows.sort((a, b) => {
@@ -765,26 +817,30 @@ function renderCpcCampaignTable(rows) {
     );
     const placement = badgeHtml(x.placement || "—", "gray");
 
+    const infoHtml = `
+  <div>
+    <div style="font-weight:900">${escHtml(
+      x.ad_name || "#" + x.campaign_id
+    )}</div>
+    <div class="muted" style="margin-top:2px;">
+      #${escHtml(String(x.campaign_id))}
+      ${badgeHtml(x.ad_type || "—", "gray")}
+      ${badgeHtml(x.campaign_status || "—", statusTone(x.campaign_status))}
+    </div>
+  </div>
+`;
+
     tr.innerHTML = `
-      <td>${name}</td>
-      <td>${type}</td>
-      <td>${status}</td>
-      <td>${placement}</td>
-      <td>${x.budget != null ? fmtMoney(x.budget) : "—"}</td>
-      <td>${
-        x.credit_estimated != null ? fmtMoney(x.credit_estimated) : "—"
-      }</td>
-      <td>${fmtInt(x.impression)}</td>
-      <td>${fmtInt(x.clicks)}</td>
-      <td>${fmtMoney(x.expense)}</td>
-      <td>${fmtMoney(x.direct_gmv)}</td>
-      <td>${x.direct_roas != null ? Number(x.direct_roas).toFixed(2) : "—"}</td>
-      <td>${
-        x.direct_acos_pct != null
-          ? Number(x.direct_acos_pct).toFixed(2) + "%"
-          : "—"
-      }</td>
-    `;
+  <td>${infoHtml}</td>
+  <td>${x.budget != null ? fmtMoney(x.budget) : "—"}</td>
+  <td>${x.roas_target != null ? Number(x.roas_target).toFixed(2) : "—"}</td>
+  <td>—</td>
+  <td>${fmtMoney(x.expense)}</td>
+  <td>${fmtMoney(x.direct_gmv)}</td>
+  <td>${x.direct_roas != null ? Number(x.direct_roas).toFixed(2) : "—"}</td>
+  <td>${fmtInt(x.impression)}</td>
+  <td>${fmtInt(x.clicks)}</td>
+`;
 
     tr.addEventListener("click", () => selectCampaign(x.campaign_id));
 
@@ -797,7 +853,7 @@ function renderCpcCampaignTable(rows) {
 
   if (!rows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="12" class="muted">Nenhuma campanha encontrada para o filtro/ordem atual.</td>`;
+    tr.innerHTML = `<td colspan="9" class="muted">Nenhuma campanha encontrada para o filtro/ordem atual.</td>`;
     tbody.appendChild(tr);
   }
 }
@@ -808,7 +864,18 @@ function renderCpcCampaignTable(rows) {
 
 document.addEventListener("DOMContentLoaded", () => {
   ensureDefaultDates();
+  // ✅ padrão fixo: Em andamento
+  setCpcStatusBucket("active");
 
+  const tabsWrap = document.getElementById("cpcStatusTabs");
+  if (tabsWrap) {
+    tabsWrap.addEventListener("click", (e) => {
+      const btn = e.target.closest?.(".status-tab");
+      if (!btn) return;
+      setCpcStatusBucket(btn.dataset.status || "active");
+      applyCpcCampaignView();
+    });
+  }
   // restore filter/sort
   const filterEl = document.getElementById("cpcCampaignFilter");
   const sortEl = document.getElementById("cpcCampaignSortBy");
@@ -819,8 +886,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnExportCpcPerf) {
     btnExportCpcPerf.addEventListener("click", () => exportCpcProductPerfCsv());
   }
-  if (statusEl)
-    statusEl.value = localStorage.getItem("ads_cpc_status") || "all";
+
   if (filterEl) filterEl.value = localStorage.getItem("ads_cpc_filter") || "";
   if (sortEl)
     sortEl.value = localStorage.getItem("ads_cpc_sort") || "expense_desc";
@@ -830,13 +896,6 @@ document.addEventListener("DOMContentLoaded", () => {
     filterEl.addEventListener("input", () => {
       localStorage.setItem("ads_cpc_filter", filterEl.value || "");
       debounceApplyCpcCampaignView();
-    });
-  }
-
-  if (statusEl) {
-    statusEl.addEventListener("change", () => {
-      localStorage.setItem("ads_cpc_status", statusEl.value || "all");
-      applyCpcCampaignView();
     });
   }
 
@@ -858,10 +917,7 @@ document.addEventListener("DOMContentLoaded", () => {
         sortEl.value = "expense_desc";
         localStorage.setItem("ads_cpc_sort", "expense_desc");
       }
-      if (statusEl) {
-        statusEl.value = "all";
-        localStorage.setItem("ads_cpc_status", "all");
-      }
+      setCpcStatusBucket("active");
       applyCpcCampaignView();
     });
   }
@@ -938,6 +994,10 @@ document.addEventListener("DOMContentLoaded", () => {
 document.addEventListener("click", (e) => {
   const btn = e.target.closest?.(".tab[data-tab='ads']");
   if (!btn) return;
+
+  // ✅ sempre abre Ads em "Em andamento"
+  setCpcStatusBucket("active");
+
   setTimeout(() => loadAdsAll(), 0);
 });
 
@@ -1512,6 +1572,10 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
 
   lastCpcCampaignRows = campaigns.map((row) => {
     const set = cachedCampaignSettings.get(String(row.campaign_id));
+    const roasTarget =
+      set?.auto_bidding_info?.roas_target ??
+      set?.manual_bidding_info?.roas_target ??
+      null;
     const common = set?.common_info || {};
     const m = row.metrics || {};
     const creditEstimated =
@@ -1536,6 +1600,7 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
       direct_roas: directRoas,
       direct_acos_pct: directAcos,
       credit_estimated: creditEstimated,
+      roas_target: roasTarget,
     };
   });
 
@@ -1543,25 +1608,16 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
   applyCpcCampaignView();
   if (cpcCampaignsMaster.length > 0 && cpcCampaignsView.length === 0) {
     const filterEl = document.getElementById("cpcCampaignFilter");
-    const statusEl = document.getElementById("cpcCampaignStatusFilter");
-
     const hadFilter = filterEl && String(filterEl.value || "").trim();
-    const hadStatus = statusEl && String(statusEl.value || "all") !== "all";
 
-    if (hadFilter || hadStatus) {
-      if (filterEl) {
-        filterEl.value = "";
-        localStorage.setItem("ads_cpc_filter", "");
-      }
-      if (statusEl) {
-        statusEl.value = "all";
-        localStorage.setItem("ads_cpc_status", "all");
-      }
+    if (hadFilter) {
+      filterEl.value = "";
+      localStorage.setItem("ads_cpc_filter", "");
 
       applyCpcCampaignView();
       setMsg(
         "cpcCampaignMsg",
-        "Filtros limpos automaticamente para exibir campanhas."
+        "Filtro limpo automaticamente para exibir campanhas."
       );
     }
   }
@@ -1659,17 +1715,6 @@ async function selectCampaign(campaignId) {
     renderCpcProductPerformanceTable([]); // mantém tabela consistente
   } finally {
     setLoading("cpcItemsLoading", "");
-  }
-  // Desempenho do Produto (igual Shopee) — depende da rota nova do backend
-  try {
-    setMsg("cpcCampaignMsg", "");
-    const perf = await loadCpcProductPerformance(selectedCpcCampaignId);
-    // vamos renderizar quando atualizar o HTML da tabela (próximo arquivo)
-    // por enquanto só deixa pronto o fetch
-  } catch (e) {
-    // não quebra a página se o backend ainda não estiver pronto
-    // você pode comentar esta linha depois que a rota existir
-    // setMsg("cpcCampaignMsg", e.message || "Falha ao carregar desempenho do produto.");
   }
 }
 

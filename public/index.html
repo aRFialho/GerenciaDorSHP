@@ -537,10 +537,56 @@
                       Impressões (menor → maior)
                     </option>
                   </select>
-                  <select id="cpcCampaignStatusFilter" class="select">
-                    <option value="all" selected>Status: Todas</option>
-                    <option value="active">Status: Ativas</option>
-                    <option value="inactive">Status: Inativas</option>
+                  <div class="status-tabs" id="cpcStatusTabs">
+                    <button class="status-tab" data-status="all" type="button">
+                      Tudo
+                    </button>
+                    <button
+                      class="status-tab"
+                      data-status="scheduled"
+                      type="button"
+                    >
+                      Programado
+                    </button>
+                    <button
+                      class="status-tab is-active"
+                      data-status="active"
+                      type="button"
+                    >
+                      Em andamento
+                    </button>
+                    <button
+                      class="status-tab"
+                      data-status="paused"
+                      type="button"
+                    >
+                      Pausado
+                    </button>
+                    <button
+                      class="status-tab"
+                      data-status="ended"
+                      type="button"
+                    >
+                      Encerrado
+                    </button>
+                    <button
+                      class="status-tab"
+                      data-status="deleted"
+                      type="button"
+                    >
+                      Excluído
+                    </button>
+                  </div>
+
+                  <!-- opcional: manter o select antigo escondido para não quebrar nada -->
+                  <select
+                    id="cpcCampaignStatusFilter"
+                    class="select"
+                    style="display: none"
+                  >
+                    <option value="all">all</option>
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
                   </select>
                   <button id="btnCpcCampaignClearFilter" class="btn btn-ghost">
                     Limpar
@@ -566,18 +612,15 @@
                 <table class="table" id="tblCpcCampaigns">
                   <thead>
                     <tr>
-                      <th>Campanha</th>
-                      <th>Tipo</th>
-                      <th>Status</th>
-                      <th>Placement</th>
-                      <th>Budget</th>
-                      <th>Crédito (est.)</th>
+                      <th>Info do anúncio</th>
+                      <th>Orçamento</th>
+                      <th>ROAS alvo</th>
+                      <th>Diagnóstico</th>
+                      <th>Investimento</th>
+                      <th>GMV</th>
+                      <th>ROAS</th>
                       <th>Impressões</th>
                       <th>Cliques</th>
-                      <th>Gasto</th>
-                      <th>GMV (Direto)</th>
-                      <th>ROAS (Direto)</th>
-                      <th>ACOS (Direto)</th>
                     </tr>
                   </thead>
                   <tbody></tbody>

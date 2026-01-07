@@ -513,3 +513,7 @@ body{
 .ml-sidebar .ml-nav-item.active .ml-nav-item__hint {
   opacity: 1;
 }
+.status-tabs{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.status-tab{border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.92);padding:8px 12px;border-radius:999px;font-weight:900;cursor:pointer}
+.status-tab:hover{background:rgba(255,255,255,0.10)}
+.status-tab.is-active{border-color:rgba(238,77,45,0.85);background:rgba(238,77,45,0.22);color:#fff}
