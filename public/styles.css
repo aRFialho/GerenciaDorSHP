@@ -517,3 +517,9 @@ body{
 .status-tab{border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.92);padding:8px 12px;border-radius:999px;font-weight:900;cursor:pointer}
 .status-tab:hover{background:rgba(255,255,255,0.10)}
 .status-tab.is-active{border-color:rgba(238,77,45,0.85);background:rgba(238,77,45,0.22);color:#fff}
+.badge--gray{border-color:rgba(255,255,255,0.18);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.88)}
+.badge--green{border-color:rgba(0,255,160,0.35);background:rgba(0,255,160,0.10);color:rgba(230,255,248,0.95)}
+.badge--yellow{border-color:rgba(245,158,11,0.40);background:rgba(245,158,11,0.12);color:rgba(255,244,220,0.95)}
+.badge--red{border-color:rgba(239,68,68,0.45);background:rgba(239,68,68,0.12);color:rgba(255,230,230,0.95)}
+
+.badge-dot{width:7px;height:7px;border-radius:999px;background:currentColor;opacity:0.85;display:inline-block}
