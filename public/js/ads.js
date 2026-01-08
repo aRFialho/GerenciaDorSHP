@@ -46,7 +46,6 @@ function statusBucketFromCampaignStatus(status) {
   const s = normStatus(status);
   if (!s) return "unknown";
 
-  // scheduled / not started
   if (
     s.includes("sched") ||
     s.includes("upcom") ||
@@ -57,16 +56,11 @@ function statusBucketFromCampaignStatus(status) {
   )
     return "scheduled";
 
-  // paused
-  if (
-    s.includes("pause") || // pause / paused
-    s.includes("suspend") ||
-    s.includes("hold")
-  )
+  if (s.includes("pause") || s.includes("suspend") || s.includes("hold"))
     return "paused";
 
-  // ended
   if (
+    s.includes("closed") ||
     s.includes("end") ||
     s.includes("stop") ||
     s.includes("finish") ||
@@ -76,23 +70,21 @@ function statusBucketFromCampaignStatus(status) {
   )
     return "ended";
 
-  // deleted
   if (s.includes("delete") || s.includes("remove")) return "deleted";
 
-  // active (inclui variações bem comuns)
   if (
     s.includes("ongoing") ||
     s.includes("running") ||
     s.includes("active") ||
-    s.includes("enable") || // enable/enabled
+    s.includes("enable") ||
     s.includes("start") ||
-    s.includes("in_progress") || // underscore
-    s.includes("in progress") || // espaço
-    s.includes("inprogress") || // sem separador
-    s.includes("normal") || // MUITO comum como "ativo"
-    s.includes("andamento") || // pt-br
-    s.includes("em andamento") || // pt-br
-    s.includes("ativo") // pt-br
+    s.includes("in_progress") ||
+    s.includes("in progress") ||
+    s.includes("inprogress") ||
+    s.includes("normal") ||
+    s.includes("andamento") ||
+    s.includes("em andamento") ||
+    s.includes("ativo")
   )
     return "active";
 
@@ -1659,6 +1651,114 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
     setText("cpcCampaignSelected", "Nenhuma selecionada");
   }
   await loadCampaignGroups();
+  // ✅ trazer campanhas do grupo mesmo sem performance no período
+  const groupIds = (cachedCampaignGroups || [])
+    .flatMap((g) => (Array.isArray(g.campaign_ids) ? g.campaign_ids : []))
+    .map((x) => String(x));
+
+  await ensureCampaignSettingsLoaded(groupIds);
+
+  const byId = new Map(
+    cpcCampaignsMaster.map((x) => [String(x.campaign_id), x])
+  );
+
+  // ✅ 1) Atualiza campanhas já existentes com dados do SETTINGS (inclui status atual!)
+  for (const [cid, row] of byId.entries()) {
+    const set = cachedCampaignSettings.get(String(cid));
+    const common = set?.common_info || {};
+    if (!set || !common) continue;
+
+    const roasTarget =
+      set?.auto_bidding_info?.roas_target ??
+      set?.manual_bidding_info?.roas_target ??
+      row.roas_target ??
+      null;
+
+    row.ad_name = common.ad_name || row.ad_name || "";
+    row.ad_type = common.ad_type || row.ad_type || "";
+    row.campaign_status = common.campaign_status || row.campaign_status || ""; // ⭐ aqui resolve
+    row.placement = common.campaign_placement || row.placement || "";
+    row.budget = common.campaign_budget ?? row.budget ?? null;
+    row.roas_target = roasTarget;
+  }
+
+  // ✅ 2) Adiciona campanhas do grupo que não estavam na performance
+  for (const cid of groupIds) {
+    if (byId.has(cid)) continue;
+
+    const set = cachedCampaignSettings.get(String(cid));
+    const common = set?.common_info || {};
+    const roasTarget =
+      set?.auto_bidding_info?.roas_target ??
+      set?.manual_bidding_info?.roas_target ??
+      null;
+
+    byId.set(String(cid), {
+      campaign_id: Number(cid),
+      ad_name: common.ad_name || "",
+      ad_type: common.ad_type || "",
+      campaign_status: common.campaign_status || "",
+      placement: common.campaign_placement || "",
+      budget: common.campaign_budget ?? null,
+      impression: 0,
+      clicks: 0,
+      expense: 0,
+      direct_gmv: 0,
+      direct_roas: null,
+      direct_acos_pct: null,
+      credit_estimated: common.campaign_budget ?? null,
+      roas_target: roasTarget,
+    });
+  }
+
+  cpcCampaignsMaster = Array.from(byId.values());
+  applyCpcCampaignView();
+  console.log(
+    "Active count:",
+    cpcCampaignsMaster.filter(
+      (x) => statusBucketFromCampaignStatus(x.campaign_status) === "active"
+    ).length
+  );
+
+  console.log(
+    "Buckets after merge:",
+    Array.from(
+      new Set(
+        cpcCampaignsMaster.map((x) =>
+          statusBucketFromCampaignStatus(x.campaign_status)
+        )
+      )
+    )
+  );
+
+  console.log(
+    "Settings status sample:",
+    groupIds
+      .slice(0, 10)
+      .map(
+        (id) =>
+          cachedCampaignSettings.get(String(id))?.common_info?.campaign_status
+      )
+  );
+}
+
+async function ensureCampaignSettingsLoaded(campaignIds) {
+  const ids = (Array.isArray(campaignIds) ? campaignIds : [])
+    .map((x) => String(x))
+    .filter(Boolean);
+
+  const missing = ids.filter((id) => !cachedCampaignSettings.has(id));
+
+  for (let i = 0; i < missing.length; i += 100) {
+    const batch = missing.slice(i, i + 100);
+    const settings = await apiGet(
+      `/shops/active/ads/campaigns/settings?campaignIds=${encodeURIComponent(
+        batch.join(",")
+      )}&infoTypes=1,2,3,4`
+    );
+    const list = settings?.response?.campaign_list || [];
+    for (const c of list) cachedCampaignSettings.set(String(c.campaign_id), c);
+  }
 }
 
 async function selectCampaign(campaignId) {
