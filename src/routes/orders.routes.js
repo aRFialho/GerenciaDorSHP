@@ -10,6 +10,11 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get(
+  "/shops/active/orders/:orderSn/debug-shopee-detail",
+  requireDebugToken,
+  DebugShopeeController.testShopeeOrderDetailMask
+);
+router.get(
   "/shops/:shopId/orders/:orderSn/debug-shopee-detail",
   requireDebugToken,
   DebugShopeeController.testShopeeOrderDetailMask
