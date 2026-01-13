@@ -239,6 +239,34 @@ function initSwitchShopShortcut() {
 
 /* ---------------- Orders (DB) ---------------- */
 
+let ORDERS_GRID_BOUND = false;
+
+function bindOrdersGridClicks() {
+  if (ORDERS_GRID_BOUND) return;
+  ORDERS_GRID_BOUND = true;
+
+  const grid = $("#orders-grid");
+  if (!grid) return;
+
+  grid.addEventListener("click", async (e) => {
+    // Se clicou no botão do alerta → abre comparação
+    const alertBtn = e.target.closest("[data-order-alert]");
+    if (alertBtn) {
+      e.stopPropagation();
+      const orderSn = alertBtn.getAttribute("data-order-alert");
+      if (orderSn) await openOrderAddressChangeModal(orderSn);
+      return;
+    }
+
+    // Caso contrário → abre detalhe do pedido
+    const card = e.target.closest("[data-order-sn]");
+    if (card) {
+      const orderSn = card.getAttribute("data-order-sn");
+      if (orderSn) await openOrderDetail(orderSn);
+    }
+  });
+}
+
 let ORDERS_OPEN_ADDRESS_ALERTS = []; // cache pro modal-lista
 
 function fmtAddr(snap) {
@@ -277,53 +305,87 @@ async function refreshOrdersAddressAlertsBadge() {
   }
 }
 
-async function openAddressAlertsListModal() {
-  openModal("Alertas de endereço", `<div class="muted">Carregando...</div>`);
+function showOrdersAlertsPopover() {
+  const pop = $("#orders-address-alerts-popover");
+  if (pop) pop.style.display = "block";
+}
 
-  try {
-    await ensureShopSelected();
-    await refreshOrdersAddressAlertsBadge();
+function hideOrdersAlertsPopover() {
+  const pop = $("#orders-address-alerts-popover");
+  if (pop) pop.style.display = "none";
+}
 
-    if (!ORDERS_OPEN_ADDRESS_ALERTS.length) {
-      $(
-        "#modal-body"
-      ).innerHTML = `<div class="muted">Nenhum alerta de endereço em aberto.</div>`;
-      return;
-    }
+function isOrdersAlertsPopoverOpen() {
+  const pop = $("#orders-address-alerts-popover");
+  return pop && pop.style.display !== "none";
+}
 
-    const html =
-      `<div class="muted">Clique em um pedido para ver o endereço antigo vs novo.</div>` +
-      `<div style="margin-top:12px;">` +
-      ORDERS_OPEN_ADDRESS_ALERTS.map((a) => {
-        const orderSn = escapeHtml(a.orderSn || "—");
-        const detected = a.detectedAt
-          ? escapeHtml(new Date(a.detectedAt).toLocaleString("pt-BR"))
-          : "—";
-        const status = escapeHtml(a.orderStatus || "—");
+function renderOrdersAlertsPopover() {
+  const list = $("#orders-address-alerts-list");
+  if (!list) return;
 
-        return `
-          <div class="card clickable" data-open-order-alert="${orderSn}" style="margin-top:10px;">
-            <div class="card-title">Pedido ${orderSn}</div>
-            <div class="muted">Detectado: ${detected}</div>
-            <div class="muted">Status: ${status}</div>
-          </div>
-        `;
-      }).join("") +
-      `</div>`;
-
-    $("#modal-body").innerHTML = html;
-
-    $all("[data-open-order-alert]").forEach((el) => {
-      el.addEventListener("click", async () => {
-        const orderSn = el.getAttribute("data-open-order-alert");
-        await openOrderAddressChangeModal(orderSn);
-      });
-    });
-  } catch (e) {
-    $("#modal-body").innerHTML = `<div class="muted">Erro: ${escapeHtml(
-      e.message
-    )}</div>`;
+  if (!ORDERS_OPEN_ADDRESS_ALERTS.length) {
+    list.innerHTML = `<div class="orders-alerts-empty">Nenhum alerta de endereço em aberto.</div>`;
+    return;
   }
+
+  list.innerHTML = ORDERS_OPEN_ADDRESS_ALERTS.map((a) => {
+    const orderSn = escapeHtml(a.orderSn || "—");
+    const detected = a.detectedAt
+      ? escapeHtml(new Date(a.detectedAt).toLocaleString("pt-BR"))
+      : "—";
+    const status = escapeHtml(a.orderStatus || "—");
+
+    return `
+        <div class="orders-alerts-item" data-open-order-alert="${orderSn}">
+          <div style="font-weight:800;">Pedido ${orderSn}</div>
+          <div class="muted">Detectado: ${detected}</div>
+          <div class="muted">Status: ${status}</div>
+        </div>
+      `;
+  }).join("");
+
+  $all("[data-open-order-alert]").forEach((el) => {
+    el.addEventListener("click", async () => {
+      const orderSn = el.getAttribute("data-open-order-alert");
+      hideOrdersAlertsPopover();
+      await openOrderAddressChangeModal(orderSn);
+    });
+  });
+}
+
+function initOrdersAlertsPopover() {
+  const btn = $("#btn-orders-address-alerts");
+  const closeBtn = $("#orders-address-alerts-close");
+  const wrap = $(".orders-alerts-wrap");
+
+  if (btn) {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+
+      if (isOrdersAlertsPopoverOpen()) {
+        hideOrdersAlertsPopover();
+        return;
+      }
+
+      showOrdersAlertsPopover();
+
+      const list = $("#orders-address-alerts-list");
+      if (list)
+        list.innerHTML = `<div class="orders-alerts-empty">Carregando...</div>`;
+
+      await refreshOrdersAddressAlertsBadge();
+      renderOrdersAlertsPopover();
+    });
+  }
+
+  if (closeBtn) closeBtn.addEventListener("click", hideOrdersAlertsPopover);
+
+  document.addEventListener("click", (e) => {
+    if (!isOrdersAlertsPopoverOpen()) return;
+    if (wrap && wrap.contains(e.target)) return;
+    hideOrdersAlertsPopover();
+  });
 }
 
 async function openOrderAddressChangeModal(orderSn) {
@@ -391,6 +453,7 @@ async function openOrderAddressChangeModal(orderSn) {
 
 async function loadOrders() {
   const grid = $("#orders-grid");
+  bindOrdersGridClicks();
   grid.innerHTML = `<div class="card"><div class="muted">Carregando pedidos...</div></div>`;
 
   try {
@@ -445,14 +508,6 @@ async function loadOrders() {
         `;
       })
       .join("");
-
-    $all("[data-order-alert]").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const orderSn = btn.getAttribute("data-order-alert");
-        await openOrderAddressChangeModal(orderSn);
-      });
-    });
 
     await refreshOrdersAddressAlertsBadge();
   } catch (e) {
@@ -797,15 +852,6 @@ async function openProductDetail(itemId) {
 }
 
 /* ---------------- Sync Buttons ---------------- */
-
-function initOrdersAlertsButton() {
-  const btn = $("#btn-orders-address-alerts");
-  if (!btn) return;
-
-  btn.addEventListener("click", async () => {
-    await openAddressAlertsListModal();
-  });
-}
 
 function initSyncButtons() {
   const btnOrders = $("#btn-sync-orders");
@@ -1376,8 +1422,7 @@ async function boot() {
   initSwitchShopShortcut();
   initHeaderButtons();
   initAuthTab();
-  initOrdersAlertsButton();
-
+  initOrdersAlertsPopover();
   try {
     await loadMe();
     await startShopeeOauthFlowIfRequested();

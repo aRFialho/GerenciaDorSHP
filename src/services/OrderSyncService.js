@@ -14,23 +14,30 @@ function parseRangeDays(v) {
 
 function normalizeStr(v) {
   return String(v || "")
-    .trim()
     .toLowerCase()
-    .replace(/\s+/g, " ");
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[^a-z0-9]+/g, " ") // remove pontuação/símbolos
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
+function normalizeZipcode(v) {
+  const digits = String(v || "").replace(/\D+/g, "");
+  return digits;
+}
 function addressHash(addr) {
   const raw = [
-    normalizeStr(addr?.zipcode),
+    normalizeZipcode(addr?.zipcode),
     normalizeStr(addr?.state),
     normalizeStr(addr?.city),
     normalizeStr(addr?.district),
     normalizeStr(addr?.town),
-    normalizeStr(addr?.full_address),
     normalizeStr(addr?.region),
+    normalizeStr(addr?.full_address),
   ].join("|");
 
-  return crypto.createHash("sha256").update(raw).digest("hex");
+  return crypto.createHash("sha256").update(raw, "utf8").digest("hex");
 }
 
 function calcLateAndRisk(orderStatus, shipByDate) {
@@ -127,10 +134,62 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
     const last = await prisma.orderAddressSnapshot.findFirst({
       where: { orderId: order.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, addressHash: true },
+      select: {
+        id: true,
+        addressHash: true,
+        zipcode: true,
+        state: true,
+        city: true,
+        district: true,
+        town: true,
+        region: true,
+        fullAddress: true,
+      },
     });
 
-    const changedNow = !last || last.addressHash !== currentHash;
+    const currentNorm = {
+      zipcode: normalizeZipcode(addr?.zipcode),
+      state: normalizeStr(addr?.state),
+      city: normalizeStr(addr?.city),
+      district: normalizeStr(addr?.district),
+      town: normalizeStr(addr?.town),
+      region: normalizeStr(addr?.region),
+      fullAddress: normalizeStr(addr?.full_address),
+    };
+
+    const lastNorm = last
+      ? {
+          zipcode: normalizeZipcode(last.zipcode),
+          state: normalizeStr(last.state),
+          city: normalizeStr(last.city),
+          district: normalizeStr(last.district),
+          town: normalizeStr(last.town),
+          region: normalizeStr(last.region),
+          fullAddress: normalizeStr(last.fullAddress),
+        }
+      : null;
+
+    const sameAddress =
+      !!lastNorm &&
+      currentNorm.zipcode === lastNorm.zipcode &&
+      currentNorm.state === lastNorm.state &&
+      currentNorm.city === lastNorm.city &&
+      currentNorm.district === lastNorm.district &&
+      currentNorm.town === lastNorm.town &&
+      currentNorm.region === lastNorm.region &&
+      currentNorm.fullAddress === lastNorm.fullAddress;
+
+    // ✅ agora sim: mudou só se os CAMPOS mudaram
+    const changedNow = !last ? true : !sameAddress;
+
+    // (opcional, mas recomendado) se o endereço é igual porém o hash era antigo/inconsistente,
+    // atualiza o hash do último snapshot pra evitar alertas falsos no futuro.
+    if (last && sameAddress && last.addressHash !== currentHash) {
+      await prisma.orderAddressSnapshot.update({
+        where: { id: last.id },
+        data: { addressHash: currentHash },
+      });
+    }
 
     if (changedNow) {
       const newSnap = await prisma.orderAddressSnapshot.create({
