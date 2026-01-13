@@ -1,108 +1,76 @@
-const { requestShopeeAuthed } = require("../services/ShopeeAuthedHttp");
+const prisma = require("../config/db");
+const ShopeeOrderService = require("../services/ShopeeOrderService");
 
-function nowTs() {
-  return Math.floor(Date.now() / 1000);
-}
-
-async function orderList(req, res) {
-  const shopId = normalizeNumericId(req.params.shopId, "shopId");
-  const rangeDays = req.query.rangeDays ? Number(req.query.rangeDays) : 7;
-
-  const timeTo = nowTs();
-  const timeFrom = timeTo - rangeDays * 24 * 60 * 60;
-
-  const payload = await requestShopeeAuthed({
-    method: "get",
-    path: "/api/v2/order/get_order_list",
-    shopId,
-    query: {
-      time_range_field: "update_time",
-      time_from: timeFrom,
-      time_to: timeTo,
-      page_size: 20,
-      cursor: "",
-    },
-  });
-
-  res.json(payload);
-}
-
-async function orderDetail(req, res) {
-  const shopId = normalizeNumericId(req.params.shopId, "shopId");
-  const orderSn = String(req.query.order_sn || "").trim();
-
-  if (!orderSn) {
-    const err = new Error("Informe order_sn na query (?order_sn=...)");
-    err.statusCode = 400;
-    throw err;
+async function getActiveShopOrFail(req, res) {
+  if (!req.auth) {
+    res.status(401).json({ error: "unauthorized" });
+    return null;
   }
 
-  const payload = await requestShopeeAuthed({
-    method: "get",
-    path: "/api/v2/order/get_order_detail",
-    shopId,
-    query: {
-      order_sn_list: [orderSn],
-      response_optional_fields: [
-        "buyer_user_id",
-        "buyer_username",
-        "buyer_cpf_id",
-        "recipient_address",
-        "order_status",
-        "create_time",
-        "update_time",
-        "pay_time",
-        "payment_method",
-        "payment_info",
-        "invoice_data",
-        "item_list",
-        "total_amount",
-      ],
-    },
-  });
-
-  res.json(payload);
-}
-
-async function orderDetailRaw(req, res) {
-  const shopId = normalizeNumericId(req.params.shopId, "shopId");
-
-  const payload = await requestShopeeAuthed({
-    method: "get",
-    path: "/api/v2/order/get_order_detail",
-    shopId,
-    query: {
-      order_sn_list: [String(orderSn)],
-      response_optional_fields: [
-        "buyer_user_id",
-        "buyer_username",
-        "buyer_cpf_id",
-        "recipient_address",
-        "order_status",
-        "create_time",
-        "update_time",
-        "pay_time",
-        "payment_method",
-        "payment_info",
-        "invoice_data",
-        "item_list",
-        "total_amount",
-      ],
-    },
-  });
-
-  res.json(payload);
-}
-function normalizeNumericId(value, fieldName) {
-  const raw = String(value ?? "").trim();
-
-  // aceita só dígitos
-  if (!/^\d+$/.test(raw)) {
-    const err = new Error(`${fieldName} inválido (deve conter apenas dígitos)`);
-    err.statusCode = 400;
-    throw err;
+  const shopDbId = req.auth.activeShopId || null;
+  if (!shopDbId) {
+    res.status(409).json({
+      error: "select_shop_required",
+      message: "Selecione uma loja para continuar.",
+    });
+    return null;
   }
 
-  return raw;
+  const shop = await prisma.shop.findFirst({
+    where: { id: shopDbId, accountId: req.auth.accountId },
+  });
+
+  if (!shop) {
+    res.status(404).json({ error: "shop_not_found" });
+    return null;
+  }
+
+  return shop;
 }
-module.exports = { orderList, orderDetail, orderDetailRaw };
+
+function responseHasMaskedStars(obj) {
+  // Não loga conteúdo, só detecta padrão "***"
+  try {
+    const s = JSON.stringify(obj);
+    return s.includes('"***"') || s.includes("***");
+  } catch (_) {
+    return false;
+  }
+}
+
+async function testShopeeOrderDetailMask(req, res, next) {
+  try {
+    const shop = await getActiveShopOrFail(req, res);
+    if (!shop) return;
+
+    const orderSn = String(req.params.orderSn || "").trim();
+    if (!orderSn) {
+      return res.status(400).json({ error: "orderSn_required" });
+    }
+
+    // Inclui campos que costumam conter PII (se whitelist estiver OK, devem vir completos)
+    const responseOptionalFields = String(
+      req.query.fields || "recipient_address,total_amount,pay_time"
+    );
+
+    const raw = await ShopeeOrderService.getOrderDetail({
+      shopId: String(shop.shopId), // Shopee shop_id
+      orderSnList: [orderSn],
+      responseOptionalFields,
+    });
+
+    const masked = responseHasMaskedStars(raw);
+
+    return res.json({
+      ok: true,
+      shop_id: String(shop.shopId),
+      order_sn: orderSn,
+      masked,
+      fields: responseOptionalFields,
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = { testShopeeOrderDetailMask };
