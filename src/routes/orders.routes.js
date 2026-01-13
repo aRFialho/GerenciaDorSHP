@@ -21,6 +21,7 @@ router.get("/debug/egress-ip", requireDebugToken, DebugController.egressIp);
 
 router.get("/shops/:shopId/orders", OrdersController.list);
 router.get("/shops/:shopId/orders/:orderSn", OrdersController.detail);
+router.post("/shops/active/orders/sync", OrderSyncController.sync);
 router.post("/shops/:shopId/orders/sync", OrderSyncController.sync);
 
 module.exports = router;
