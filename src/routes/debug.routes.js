@@ -9,7 +9,7 @@ router.get("/debug/ping", (req, res) =>
 );
 
 router.get(
-  "/debug/shops/:shopId/orders/:orderSn/masked-check",
+  "/debug/shops/active/orders/:orderSn/masked-check",
   requireDebugToken,
   DebugShopeeController.testShopeeOrderDetailMask
 );
