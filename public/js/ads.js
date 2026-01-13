@@ -18,6 +18,7 @@ let lastGmsDeletedItemIds = [];
 
 let cpcCampaignsMaster = [];
 let cpcCampaignsView = [];
+let cpcPager = { page: 1, pageSize: 20, totalPages: 1 };
 
 let cpcFilterTimer = null;
 let cpcStatusBucket = "active"; // padrão Shopee: Em andamento
@@ -30,6 +31,37 @@ let lastCpcProductPerfRows = [];
 function getCpcCampaignStatusFilter() {
   const el = document.getElementById("cpcCampaignStatusFilter");
   return String(el?.value || "all");
+}
+function diagnosisHtml(x) {
+  const exp = Number(x?.expense || 0),
+    roas = Number(x?.direct_roas);
+  if (exp <= 0) return badgeHtml("Sem gasto", "gray");
+  if (Number.isFinite(roas) && roas < 1) return badgeHtml("ROAS baixo", "red");
+  if (Number.isFinite(roas) && roas < 2) return badgeHtml("Atenção", "yellow");
+  return badgeHtml("Ok", "green");
+}
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+function resetCpcPager() {
+  cpcPager.page = 1;
+}
+function updateCpcPager(total) {
+  cpcPager.totalPages = Math.max(
+    1,
+    Math.ceil((total || 0) / cpcPager.pageSize)
+  );
+  cpcPager.page = clamp(cpcPager.page, 1, cpcPager.totalPages);
+}
+function renderCpcPager() {
+  setText(
+    "cpcCampaignPageInfo",
+    `Página ${cpcPager.page} de ${cpcPager.totalPages}`
+  );
+  setDisabled("cpcCampaignFirst", cpcPager.page === 1);
+  setDisabled("cpcCampaignPrev", cpcPager.page === 1);
+  setDisabled("cpcCampaignNext", cpcPager.page === cpcPager.totalPages);
+  setDisabled("cpcCampaignLast", cpcPager.page === cpcPager.totalPages);
 }
 
 function normStatus(s) {
@@ -180,14 +212,10 @@ function escHtml(s) {
 }
 
 function markSelectedCampaignRow(campaignId) {
-  const tbody = document.querySelector("#tblCpcCampaigns tbody");
-  if (!tbody) return;
-
   const id = String(campaignId || "");
-  const rows = tbody.querySelectorAll("tr[data-campaign-id]");
-  rows.forEach((r) =>
-    r.classList.toggle("is-selected", r.dataset.campaignId === id)
-  );
+  document.querySelectorAll("[data-campaign-id]").forEach((el) => {
+    el.classList.toggle("is-selected", String(el.dataset.campaignId) === id);
+  });
 }
 
 function fmtMoney(v) {
@@ -797,69 +825,81 @@ function applyCpcCampaignView() {
   });
 
   cpcCampaignsView = rows;
-
-  const countEl = document.getElementById("cpcCampaignCount");
-  if (countEl) countEl.textContent = `${rows.length} campanhas`;
-
-  renderCpcCampaignTable(rows);
+  updateCpcPager(rows.length);
+  const start = (cpcPager.page - 1) * cpcPager.pageSize;
+  const pageRows = rows.slice(start, start + cpcPager.pageSize);
+  renderCpcCampaignCards(pageRows);
+  renderCpcPager();
 }
 
-function renderCpcCampaignTable(rows) {
-  const tbody = document.querySelector("#tblCpcCampaigns tbody");
-  if (!tbody) return;
-
-  tbody.innerHTML = "";
+function renderCpcCampaignCards(rows) {
+  const wrap = document.getElementById("cpcCampaignCards");
+  if (!wrap) return;
+  wrap.innerHTML = "";
 
   for (const x of rows) {
-    const tr = document.createElement("tr");
-    tr.dataset.campaignId = x.campaign_id;
-
-    const name = escHtml(x.ad_name || String(x.campaign_id));
-    const type = badgeHtml(x.ad_type || "—", adTypeTone(x.ad_type));
+    const id = String(x.campaign_id || "");
+    const img = x.thumbnail_url
+      ? `<img class="cpc-card__thumb" src="${escAttr(
+          x.thumbnail_url
+        )}" onerror="this.style.display='none'">`
+      : `<div class="cpc-card__thumb cpc-card__thumb--ph"></div>`;
     const status = badgeHtml(
       x.campaign_status || "—",
       statusTone(x.campaign_status)
     );
-    const placement = badgeHtml(x.placement || "—", "gray");
+    const type = badgeHtml(x.ad_type || "—", "gray");
+    const diag = diagnosisHtml(x);
 
-    const infoHtml = `
-  <div>
-    <div style="font-weight:900">${escHtml(
-      x.ad_name || "#" + x.campaign_id
-    )}</div>
-    <div class="muted" style="margin-top:2px;">
-      #${escHtml(String(x.campaign_id))}
-      ${badgeHtml(x.ad_type || "—", "gray")}
-      ${badgeHtml(x.campaign_status || "—", statusTone(x.campaign_status))}
-    </div>
-  </div>
-`;
+    const el = document.createElement("div");
+    el.className = "cpc-card";
+    el.dataset.campaignId = id;
+    if (id === String(selectedCpcCampaignId || ""))
+      el.classList.add("is-selected");
 
-    tr.innerHTML = `
-  <td>${infoHtml}</td>
-  <td>${x.budget != null ? fmtMoney(x.budget) : "—"}</td>
-  <td>${x.roas_target != null ? Number(x.roas_target).toFixed(2) : "—"}</td>
-  <td>—</td>
-  <td>${fmtMoney(x.expense)}</td>
-  <td>${fmtMoney(x.direct_gmv)}</td>
-  <td>${x.direct_roas != null ? Number(x.direct_roas).toFixed(2) : "—"}</td>
-  <td>${fmtInt(x.impression)}</td>
-  <td>${fmtInt(x.clicks)}</td>
-`;
+    el.innerHTML = `
+      <div class="cpc-card__left">${img}</div>
+      <div class="cpc-card__mid">
+        <div class="cpc-card__title">${escHtml(x.ad_name || "#" + id)}</div>
+        <div class="cpc-card__meta">
+          <span class="muted">#${escHtml(id)}</span>
+          ${type} ${status} ${diag}
+        </div>
+        <div class="cpc-card__grid">
+          <div><div class="muted">Orçamento</div><div class="v">${
+            x.budget != null ? fmtMoney(x.budget) : "—"
+          }</div></div>
+          <div><div class="muted">Gasto</div><div class="v">${fmtMoney(
+            x.expense
+          )}</div></div>
+          <div><div class="muted">GMV Dir.</div><div class="v">${fmtMoney(
+            x.direct_gmv
+          )}</div></div>
+          <div><div class="muted">ROAS Dir.</div><div class="v">${
+            x.direct_roas != null ? Number(x.direct_roas).toFixed(2) : "—"
+          }</div></div>
+          <div><div class="muted">Imp.</div><div class="v">${fmtInt(
+            x.impression
+          )}</div></div>
+          <div><div class="muted">Cliques</div><div class="v">${fmtInt(
+            x.clicks
+          )}</div></div>
+        </div>
+      </div>
+      <div class="cpc-card__right">
+        <div class="muted">ROAS alvo</div>
+        <div class="v">${
+          x.roas_target != null ? Number(x.roas_target).toFixed(2) : "—"
+        }</div>
+      </div>
+    `;
 
-    tr.addEventListener("click", () => selectCampaign(x.campaign_id));
-
-    if (String(x.campaign_id) === String(selectedCpcCampaignId)) {
-      tr.classList.add("is-selected");
-    }
-
-    tbody.appendChild(tr);
+    el.addEventListener("click", () => selectCampaign(x.campaign_id));
+    wrap.appendChild(el);
   }
 
   if (!rows.length) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="9" class="muted">Nenhuma campanha encontrada para o filtro/ordem atual.</td>`;
-    tbody.appendChild(tr);
+    wrap.innerHTML = `<div class="muted" style="padding:10px">Nenhuma campanha encontrada para o filtro/ordem atual.</div>`;
   }
 }
 
@@ -874,11 +914,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const tabsWrap = document.getElementById("cpcStatusTabs");
   if (tabsWrap) {
-    tabsWrap.addEventListener("click", (e) => {
-      const btn = e.target.closest?.(".status-tab");
-      if (!btn) return;
-      setCpcStatusBucket(btn.dataset.status || "active");
-      applyCpcCampaignView();
+    filterEl.addEventListener("input", () => {
+      localStorage.setItem("ads_cpc_filter", filterEl.value || "");
+      resetCpcPager();
+      debounceApplyCpcCampaignView();
     });
   }
   // restore filter/sort
@@ -907,6 +946,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (sortEl) {
     sortEl.addEventListener("change", () => {
       localStorage.setItem("ads_cpc_sort", sortEl.value || "expense_desc");
+      resetCpcPager();
       applyCpcCampaignView();
     });
   }
@@ -923,10 +963,35 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("ads_cpc_sort", "expense_desc");
       }
       setCpcStatusBucket("active");
+      resetCpcPager();
       applyCpcCampaignView();
     });
   }
-
+  const ps = document.getElementById("cpcCampaignPageSize");
+  if (ps) {
+    ps.value = String(cpcPager.pageSize);
+    ps.addEventListener("change", () => {
+      cpcPager.pageSize = Number(ps.value) || 20;
+      resetCpcPager();
+      applyCpcCampaignView();
+    });
+  }
+  document.getElementById("cpcCampaignFirst")?.addEventListener("click", () => {
+    cpcPager.page = 1;
+    applyCpcCampaignView();
+  });
+  document.getElementById("cpcCampaignPrev")?.addEventListener("click", () => {
+    cpcPager.page = Math.max(1, cpcPager.page - 1);
+    applyCpcCampaignView();
+  });
+  document.getElementById("cpcCampaignNext")?.addEventListener("click", () => {
+    cpcPager.page = Math.min(cpcPager.totalPages, cpcPager.page + 1);
+    applyCpcCampaignView();
+  });
+  document.getElementById("cpcCampaignLast")?.addEventListener("click", () => {
+    cpcPager.page = cpcPager.totalPages;
+    applyCpcCampaignView();
+  });
   // Exports
   const btnExportCpc = document.getElementById("btnExportCpcCampaignsCsv");
   if (btnExportCpc)
@@ -1500,7 +1565,9 @@ async function loadCpcDaily(dateFrom, dateTo) {
   setText("kpiCpcCtr", fmtPctFromClicksImpr(totals.clicks, totals.impression));
   setText("kpiCpcDirectGmv", fmtMoney(totals.direct_gmv));
   setText("kpiCpcBroadGmv", fmtMoney(totals.broad_gmv));
-
+  const exp = Number(totals.expense || 0);
+  const gmv = Number(totals.direct_gmv || 0);
+  setText("kpiCpcRoas", exp > 0 ? (gmv / exp).toFixed(2) : "—");
   const labels = series.map((x) => x.date);
   const ds = [
     {
@@ -1581,6 +1648,7 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
 
   lastCpcCampaignRows = campaigns.map((row) => {
     const set = cachedCampaignSettings.get(String(row.campaign_id));
+    const thumb = set?.linked_items?.[0]?.image_url || null;
     const roasTarget =
       set?.auto_bidding_info?.roas_target ??
       set?.manual_bidding_info?.roas_target ??
@@ -1611,6 +1679,7 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
       direct_acos_pct: directAcos,
       credit_estimated: creditEstimated,
       roas_target: roasTarget,
+      thumbnail_url: thumb,
     };
   });
   console.log("CPC rows:", lastCpcCampaignRows.length);
@@ -1629,6 +1698,7 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
     )
   );
   cpcCampaignsMaster = [...lastCpcCampaignRows];
+  resetCpcPager();
   applyCpcCampaignView();
   if (cpcCampaignsMaster.length > 0 && cpcCampaignsView.length === 0) {
     const filterEl = document.getElementById("cpcCampaignFilter");

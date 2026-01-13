@@ -343,6 +343,10 @@
                     <div class="kpi-value" id="kpiCpcExpense">—</div>
                   </div>
                   <div class="kpi">
+                    <div class="kpi-label">ROAS (Direto)</div>
+                    <div class="kpi-value" id="kpiCpcRoas">—</div>
+                  </div>
+                  <div class="kpi">
                     <div class="kpi-label">Impressões</div>
                     <div class="kpi-value" id="kpiCpcImpressions">—</div>
                   </div>
@@ -608,25 +612,49 @@
               ></div>
 
               <!-- TABELA -->
-              <div class="table-wrap">
-                <table class="table" id="tblCpcCampaigns">
-                  <thead>
-                    <tr>
-                      <th>Info do anúncio</th>
-                      <th>Orçamento</th>
-                      <th>ROAS alvo</th>
-                      <th>Diagnóstico</th>
-                      <th>Investimento</th>
-                      <th>GMV</th>
-                      <th>ROAS</th>
-                      <th>Impressões</th>
-                      <th>Cliques</th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
+              <div id="cpcCampaignListWrap">
+                <div id="cpcCampaignCards" class="cpc-cards"></div>
               </div>
-
+              <div
+                id="cpcCampaignPager"
+                class="pager"
+                style="
+                  justify-content: space-between;
+                  gap: 10px;
+                  flex-wrap: wrap;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    gap: 8px;
+                    align-items: center;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <span class="muted">Por página:</span>
+                  <select id="cpcCampaignPageSize" class="select">
+                    <option>20</option>
+                    <option>50</option>
+                    <option>100</option>
+                  </select>
+                  <span class="muted" id="cpcCampaignPageInfo">—</span>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                  <button id="cpcCampaignFirst" class="btn btn-ghost">
+                    Primeira
+                  </button>
+                  <button id="cpcCampaignPrev" class="btn btn-ghost">
+                    Anterior
+                  </button>
+                  <button id="cpcCampaignNext" class="btn btn-ghost">
+                    Próxima
+                  </button>
+                  <button id="cpcCampaignLast" class="btn btn-ghost">
+                    Última
+                  </button>
+                </div>
+              </div>
               <!-- DETALHE + PRODUTOS VINCULADOS -->
               <div class="split" style="margin-top: 12px">
                 <div class="section-card" style="margin: 0">
