@@ -10,11 +10,7 @@ let cachedCampaignGroups = [];
 let selectedCampaignGroupId = null;
 let lastCpcRange = { dateFrom: null, dateTo: null };
 
-let gmsPager = { offset: 0, limit: 50, hasNext: false, total: null };
-
 let lastCpcCampaignRows = [];
-let lastGmsItemRows = [];
-let lastGmsDeletedItemIds = [];
 
 let cpcCampaignsMaster = [];
 let cpcCampaignsView = [];
@@ -438,59 +434,6 @@ function exportCpcCampaignsCsv() {
   downloadCsv(filename, headers, rows);
 }
 
-function exportGmsItemsCsv() {
-  if (!lastGmsItemRows.length)
-    return setMsg(
-      "gmsMsg",
-      "Nada para exportar. Clique em Atualizar primeiro."
-    );
-
-  const { dateFrom, dateTo } = getDates();
-  const filename = `gms-items-${dateFrom}-to-${dateTo}.csv`;
-
-  const headers = [
-    "item_id",
-    "title",
-    "impression",
-    "clicks",
-    "expense",
-    "broad_gmv",
-    "broad_roi",
-    "broad_cir",
-    "broad_order",
-  ];
-
-  const rows = lastGmsItemRows.map((x) => [
-    x.item_id,
-    x.title,
-    x.impression,
-    x.clicks,
-    x.expense,
-    x.broad_gmv,
-    x.broad_roi != null ? Number(x.broad_roi).toFixed(4) : "",
-    x.broad_cir != null ? Number(x.broad_cir).toFixed(4) : "",
-    x.broad_order,
-  ]);
-
-  downloadCsv(filename, headers, rows);
-}
-
-function exportGmsDeletedCsv() {
-  if (!lastGmsDeletedItemIds.length)
-    return setMsg(
-      "gmsMsg",
-      "Nada para exportar. Clique em Atualizar primeiro."
-    );
-
-  const { dateFrom, dateTo } = getDates();
-  const filename = `gms-deleted-items-first-50-${dateFrom}-to-${dateTo}.csv`;
-
-  const headers = ["item_id"];
-  const rows = lastGmsDeletedItemIds.map((id) => [id]);
-
-  downloadCsv(filename, headers, rows);
-}
-
 function exportCpcLinkedItemsCsv() {
   if (!selectedCpcCampaignId)
     return setMsg("cpcCampaignMsg", "Selecione uma campanha primeiro.");
@@ -607,154 +550,6 @@ function openModal(title, html) {
 
 function val(id) {
   return document.getElementById(id)?.value;
-}
-
-function openGmsCreateModal() {
-  openModal(
-    "Criar campanha GMS",
-    `
-      <div class="field">
-        <label class="muted">Data início (obrigatório)</label>
-        <input id="gmsCreateDateFrom" class="input" type="date">
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label class="muted">Data fim (opcional)</label>
-        <input id="gmsCreateDateTo" class="input" type="date">
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label class="muted">Orçamento diário (obrigatório)</label>
-        <input id="gmsCreateDailyBudget" class="input" type="number" step="0.01" placeholder="Ex: 50.00">
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label class="muted">ROAS target (opcional)</label>
-        <input id="gmsCreateRoasTarget" class="input" type="number" step="0.1" placeholder="Ex: 6.5">
-        <div class="muted" style="margin-top:6px;">Dica: vazio = GMV Max Auto Bidding (Shop). <b>0</b> também ativa o modo auto.</div>
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label class="muted">Reference ID (opcional)</label>
-        <input id="gmsCreateReferenceId" class="input" type="text" placeholder="UUID (opcional)">
-      </div>
-      <div class="actions" style="margin-top:14px;">
-        <button id="btnGmsCreateSubmit" class="btn btn-primary">Criar</button>
-      </div>
-    `
-  );
-
-  const { dateFrom, dateTo } = getDates();
-  const d1 = document.getElementById("gmsCreateDateFrom");
-  const d2 = document.getElementById("gmsCreateDateTo");
-  if (d1) d1.value = dateFrom || "";
-  if (d2) d2.value = dateTo || "";
-
-  const submit = document.getElementById("btnGmsCreateSubmit");
-  if (!submit) return;
-
-  submit.addEventListener("click", async () => {
-    setMsg("gmsMsg", "");
-    setLoading("gmsLoading", "Criando campanha...");
-
-    const body = {
-      dateFrom: val("gmsCreateDateFrom"),
-      dateTo: val("gmsCreateDateTo") || null,
-      dailyBudget: val("gmsCreateDailyBudget"),
-      roasTarget: val("gmsCreateRoasTarget") || null,
-      referenceId: val("gmsCreateReferenceId") || null,
-    };
-
-    try {
-      await apiPost("/shops/active/ads/gms/campaign/create", body);
-      setMsg("gmsMsg", "Campanha GMS criada.");
-      await loadAdsAll();
-      const overlay = document.getElementById("modal-overlay");
-      if (overlay) overlay.style.display = "none";
-    } catch (e) {
-      setMsg("gmsMsg", e.message || "Falha ao criar campanha GMS.");
-    } finally {
-      setLoading("gmsLoading", "");
-    }
-  });
-}
-
-function openGmsEditModal() {
-  openModal(
-    "Editar campanha GMS",
-    `
-      <div class="field">
-        <label class="muted">Campaign ID (obrigatório)</label>
-        <input id="gmsEditCampaignId" class="input" type="number" placeholder="Ex: 12412421">
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label class="muted">Ação (edit_action)</label>
-        <select id="gmsEditAction" class="select">
-          <option value="change_budget">change_budget</option>
-          <option value="change_duration">change_duration</option>
-          <option value="change_roas_target">change_roas_target</option>
-          <option value="pause">pause</option>
-          <option value="resume">resume</option>
-          <option value="start">start</option>
-        </select>
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label class="muted">Orçamento diário (para change_budget)</label>
-        <input id="gmsEditDailyBudget" class="input" type="number" step="0.01" placeholder="Ex: 80.00">
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label class="muted">Data início (para change_duration)</label>
-        <input id="gmsEditDateFrom" class="input" type="date">
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label class="muted">Data fim (para change_duration)</label>
-        <input id="gmsEditDateTo" class="input" type="date">
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label class="muted">ROAS target (para change_roas_target)</label>
-        <input id="gmsEditRoasTarget" class="input" type="number" step="0.1">
-      </div>
-      <div class="field" style="margin-top:10px;">
-        <label class="muted">Reference ID (recomendado)</label>
-        <input id="gmsEditReferenceId" class="input" type="text" placeholder="UUID para evitar duplicidade">
-      </div>
-      <div class="actions" style="margin-top:14px;">
-        <button id="btnGmsEditSubmit" class="btn btn-primary">Aplicar</button>
-      </div>
-    `
-  );
-
-  const { dateFrom, dateTo } = getDates();
-  const d1 = document.getElementById("gmsEditDateFrom");
-  const d2 = document.getElementById("gmsEditDateTo");
-  if (d1) d1.value = dateFrom || "";
-  if (d2) d2.value = dateTo || "";
-
-  const submit = document.getElementById("btnGmsEditSubmit");
-  if (!submit) return;
-
-  submit.addEventListener("click", async () => {
-    setMsg("gmsMsg", "");
-    setLoading("gmsLoading", "Aplicando alteração...");
-
-    const body = {
-      campaignId: val("gmsEditCampaignId"),
-      editAction: val("gmsEditAction"),
-      dailyBudget: val("gmsEditDailyBudget") || null,
-      dateFrom: val("gmsEditDateFrom") || null,
-      dateTo: val("gmsEditDateTo") || null,
-      roasTarget: val("gmsEditRoasTarget") || null,
-      referenceId: val("gmsEditReferenceId") || null,
-    };
-
-    try {
-      await apiPost("/shops/active/ads/gms/campaign/edit", body);
-      setMsg("gmsMsg", "Alteração aplicada.");
-      await loadAdsAll();
-      const overlay = document.getElementById("modal-overlay");
-      if (overlay) overlay.style.display = "none";
-    } catch (e) {
-      setMsg("gmsMsg", e.message || "Falha ao editar campanha GMS.");
-    } finally {
-      setLoading("gmsLoading", "");
-    }
-  });
 }
 
 /* ===========================
@@ -1019,14 +814,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnExportCpc)
     btnExportCpc.addEventListener("click", () => exportCpcCampaignsCsv());
 
-  const btnExportGms = document.getElementById("btnExportGmsItemsCsv");
-  if (btnExportGms)
-    btnExportGms.addEventListener("click", () => exportGmsItemsCsv());
-
-  const btnExportGmsDeleted = document.getElementById("btnExportGmsDeletedCsv");
-  if (btnExportGmsDeleted)
-    btnExportGmsDeleted.addEventListener("click", () => exportGmsDeletedCsv());
-
   const btnExportCpcLinked = document.getElementById(
     "btnExportCpcLinkedItemsCsv"
   );
@@ -1038,18 +825,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Reload + pager
   const btnReload = document.getElementById("btnAdsReload");
   if (btnReload) btnReload.addEventListener("click", () => loadAdsAll());
-
-  const prev = document.getElementById("btnGmsPrev");
-  const next = document.getElementById("btnGmsNext");
-  if (prev) prev.addEventListener("click", () => gmsPagePrev());
-  if (next) next.addEventListener("click", () => gmsPageNext());
-
-  // Modals
-  const btnCreate = document.getElementById("btnGmsCreate");
-  const btnEdit = document.getElementById("btnGmsEdit");
-  if (btnCreate)
-    btnCreate.addEventListener("click", () => openGmsCreateModal());
-  if (btnEdit) btnEdit.addEventListener("click", () => openGmsEditModal());
 
   const selGroup = document.getElementById("adsGroupSelect");
   if (selGroup) {
@@ -1096,14 +871,12 @@ document.addEventListener(
 );
 
 /* ===========================
-   Load All (CPC e GMS independentes, sem alert)
+   Load All (CPC independente, sem alert)
 =========================== */
 
 async function loadAdsAll() {
   setMsg("cpcCampaignMsg", "");
-  setMsg("gmsMsg", "");
   setLoading("cpcLoading", "Carregando CPC...");
-  setLoading("gmsLoading", "Carregando GMS...");
 
   const btn = document.getElementById("btnAdsReload");
   if (btn) {
@@ -1146,26 +919,15 @@ async function loadAdsAll() {
           setLoading("cpcLoading", "");
         }
       })(),
-      (async () => {
-        try {
-          await loadGmsAll(dateFrom, dateTo);
-        } catch (e) {
-          setMsg("gmsMsg", e.message || "Falha ao carregar GMS.");
-        } finally {
-          setLoading("gmsLoading", "");
-        }
-      })(),
     ]);
   } catch (e) {
     setMsg("cpcCampaignMsg", e.message || "Falha ao carregar Ads.");
-    setMsg("gmsMsg", e.message || "Falha ao carregar Ads.");
   } finally {
     if (btn) {
       btn.disabled = false;
       btn.textContent = "Atualizar";
     }
     setLoading("cpcLoading", "");
-    setLoading("gmsLoading", "");
   }
 }
 
@@ -2039,223 +1801,4 @@ function renderCpcProductPerformanceTable(items) {
     tr.innerHTML = `<td colspan="8" class="muted">Nenhum item retornado para esta campanha no período.</td>`;
     tbody.appendChild(tr);
   }
-}
-
-/* ===========================
-   GMS
-=========================== */
-
-async function loadGmsAll(dateFrom, dateTo) {
-  setMsg("gmsMsg", "");
-
-  setDisabled("btnGmsCreate", true);
-  setDisabled("btnGmsEdit", true);
-
-  let eligibleResp = null;
-
-  try {
-    eligibleResp = await apiGet("/shops/active/ads/gms/eligibility");
-  } catch (e) {
-    setText("kpiGmsEligible", "Indisponível");
-    setText("kpiGmsReason", "—");
-    setText("kpiGmsExpense", "—");
-    setText("kpiGmsGmv", "—");
-    setText("kpiGmsRoas", "—");
-    setText("kpiGmsAcos", "—");
-    renderGmsTablesEmpty("GMS indisponível para esta loja.");
-    setDisabled("btnGmsCreate", true);
-    setDisabled("btnGmsEdit", true);
-    setMsg("gmsMsg", e.message || "GMS indisponível para esta loja.");
-    return;
-  }
-
-  const eligible = eligibleResp?.response?.is_eligible;
-  const reason = eligibleResp?.response?.reason;
-
-  setText(
-    "kpiGmsEligible",
-    eligible === true ? "Sim" : eligible === false ? "Não" : "—"
-  );
-  setText("kpiGmsReason", reason || "—");
-
-  if (reason === "not_whitelisted") {
-    setText("kpiGmsExpense", "—");
-    setText("kpiGmsGmv", "—");
-    setText("kpiGmsRoas", "—");
-    setText("kpiGmsAcos", "—");
-    renderGmsTablesEmpty("GMS indisponível para esta loja (not_whitelisted).");
-    setDisabled("btnGmsCreate", true);
-    setDisabled("btnGmsEdit", true);
-    setMsg("gmsMsg", "GMS indisponível para esta loja (not_whitelisted).");
-    return;
-  }
-
-  setDisabled("btnGmsCreate", false);
-  setDisabled("btnGmsEdit", false);
-
-  try {
-    await loadGmsCampaignTotals(dateFrom, dateTo);
-    gmsPager.offset = 0;
-    await loadGmsItems(dateFrom, dateTo, gmsPager.offset, gmsPager.limit);
-    await loadGmsDeleted();
-  } catch (e) {
-    setText("kpiGmsExpense", "—");
-    setText("kpiGmsGmv", "—");
-    setText("kpiGmsRoas", "—");
-    setText("kpiGmsAcos", "—");
-    renderGmsTablesEmpty(e.message || "Falha ao carregar GMS.");
-    setDisabled("btnGmsCreate", true);
-    setDisabled("btnGmsEdit", true);
-    setMsg("gmsMsg", e.message || "Falha ao carregar GMS.");
-  }
-}
-
-function renderGmsTablesEmpty(msg) {
-  lastGmsItemRows = [];
-  lastGmsDeletedItemIds = [];
-
-  const tb1 = document.querySelector("#tblGmsItems tbody");
-  const tb2 = document.querySelector("#tblGmsDeleted tbody");
-
-  if (tb1) tb1.innerHTML = `<tr><td colspan="8" class="muted">${msg}</td></tr>`;
-  if (tb2) tb2.innerHTML = `<tr><td class="muted">${msg}</td></tr>`;
-
-  setText("gmsPagerInfo", "—");
-  gmsPager.hasNext = false;
-  gmsPager.total = null;
-}
-
-async function loadGmsCampaignTotals(dateFrom, dateTo) {
-  const j = await apiPost("/shops/active/ads/gms/campaign/performance", {
-    dateFrom,
-    dateTo,
-  });
-  const r = j?.response?.report || {};
-
-  setText("kpiGmsExpense", fmtMoney(r.expense));
-  setText("kpiGmsGmv", fmtMoney(r.broad_gmv));
-  setText(
-    "kpiGmsRoas",
-    r.broad_roi != null ? Number(r.broad_roi).toFixed(2) : "—"
-  );
-  setText(
-    "kpiGmsAcos",
-    r.broad_cir != null ? Number(r.broad_cir).toFixed(2) + "%" : "—"
-  );
-}
-
-async function loadGmsItems(dateFrom, dateTo, offset, limit) {
-  const j = await apiPost("/shops/active/ads/gms/items/performance", {
-    dateFrom,
-    dateTo,
-    offset,
-    limit,
-  });
-
-  const items = j?.response?.items || [];
-  gmsPager.hasNext = Boolean(j?.response?.has_next_page);
-  gmsPager.total = j?.response?.total ?? null;
-
-  lastGmsItemRows = items.map((it) => {
-    const r = it.report || {};
-    return {
-      item_id: it.item_id,
-      title: it.title || "",
-      impression: r.impression ?? 0,
-      clicks: r.clicks ?? 0,
-      expense: r.expense ?? 0,
-      broad_gmv: r.broad_gmv ?? 0,
-      broad_roi: r.broad_roi ?? null,
-      broad_cir: r.broad_cir ?? null,
-      broad_order: r.broad_order ?? 0,
-    };
-  });
-
-  const tbody = document.querySelector("#tblGmsItems tbody");
-  if (!tbody) return;
-
-  tbody.innerHTML = "";
-
-  for (const it of items) {
-    const r = it.report || {};
-    const tr = document.createElement("tr");
-
-    const productHtml = `
-      <div class="product-cell">
-        <img class="product-thumb" src="${
-          it.image_url || ""
-        }" onerror="this.style.display='none'">
-        <div>
-          <div style="font-weight:700">${it.title || "Item " + it.item_id}</div>
-          <div class="muted">${it.item_id}</div>
-        </div>
-      </div>
-    `;
-
-    tr.innerHTML = `
-      <td>${productHtml}</td>
-      <td>${fmtInt(r.impression)}</td>
-      <td>${fmtInt(r.clicks)}</td>
-      <td>${fmtMoney(r.expense)}</td>
-      <td>${fmtMoney(r.broad_gmv)}</td>
-      <td>${r.broad_roi != null ? Number(r.broad_roi).toFixed(2) : "—"}</td>
-      <td>${
-        r.broad_cir != null ? Number(r.broad_cir).toFixed(2) + "%" : "—"
-      }</td>
-      <td>${fmtInt(r.broad_order)}</td>
-    `;
-    tbody.appendChild(tr);
-  }
-
-  if (!items.length) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="8" class="muted">Nenhum item com performance neste período.</td>`;
-    tbody.appendChild(tr);
-  }
-
-  setText(
-    "gmsPagerInfo",
-    `Offset ${offset} • Limit ${limit}${
-      gmsPager.total != null ? " • Total " + gmsPager.total : ""
-    }`
-  );
-}
-
-async function loadGmsDeleted() {
-  const j = await apiPost("/shops/active/ads/gms/items/deleted", {
-    offset: 0,
-    limit: 50,
-  });
-  const itemIds = j?.response?.item_id_list || [];
-  lastGmsDeletedItemIds = itemIds.map((x) => String(x));
-
-  const tbody = document.querySelector("#tblGmsDeleted tbody");
-  if (!tbody) return;
-
-  tbody.innerHTML = "";
-
-  for (const id of itemIds) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${id}</td>`;
-    tbody.appendChild(tr);
-  }
-
-  if (!itemIds.length) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td class="muted">Nenhum item removido retornado.</td>`;
-    tbody.appendChild(tr);
-  }
-}
-
-async function gmsPageNext() {
-  const { dateFrom, dateTo } = getDates();
-  if (!gmsPager.hasNext) return;
-  gmsPager.offset += gmsPager.limit;
-  await loadGmsItems(dateFrom, dateTo, gmsPager.offset, gmsPager.limit);
-}
-
-async function gmsPagePrev() {
-  const { dateFrom, dateTo } = getDates();
-  gmsPager.offset = Math.max(0, gmsPager.offset - gmsPager.limit);
-  await loadGmsItems(dateFrom, dateTo, gmsPager.offset, gmsPager.limit);
 }

@@ -79,7 +79,7 @@
 
           <button class="tab ml-nav-item" data-tab="ads">
             <span class="ml-nav-item__label">Ads</span>
-            <span class="ml-nav-item__hint muted">CPC + GMS</span>
+            <span class="ml-nav-item__hint muted">CPC</span>
           </button>
         </div>
       </aside>
@@ -283,14 +283,14 @@
         <section id="tab-ads" class="tab-panel">
           <div class="page-title">
             <h2>Ads</h2>
-            <div class="page-subtitle muted">Shopee Ads + GMS</div>
+            <div class="page-subtitle muted">Shopee Ads</div>
           </div>
 
           <div class="section-card">
             <div class="section-card__header">
               <div>
                 <div class="section-title">Filtros</div>
-                <div class="muted">Use o mesmo período para CPC e GMS.</div>
+                <div class="muted">Use o mesmo período para CPC.</div>
               </div>
               <div
                 class="section-actions"
@@ -747,117 +747,6 @@
                         <tbody></tbody>
                       </table>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- GMS -->
-          <div class="section-card">
-            <div class="section-card__header">
-              <div>
-                <div class="section-title">GMS</div>
-                <div class="muted">GMV Max / Product GMS</div>
-              </div>
-
-              <div class="section-actions">
-                <button id="btnExportGmsItemsCsv" class="btn btn-ghost">
-                  Exportar CSV
-                </button>
-              </div>
-            </div>
-
-            <div class="section-card__body">
-              <div class="muted" id="gmsMsg" style="margin: 6px 0 10px"></div>
-              <div
-                class="muted"
-                id="gmsLoading"
-                style="margin: 6px 0 10px"
-              ></div>
-
-              <div class="kpi-grid kpi-grid-sm">
-                <div class="kpi">
-                  <div class="kpi-label">Elegível</div>
-                  <div class="kpi-value" id="kpiGmsEligible">—</div>
-                </div>
-                <div class="kpi">
-                  <div class="kpi-label">Motivo</div>
-                  <div class="kpi-value" id="kpiGmsReason">—</div>
-                </div>
-                <div class="kpi">
-                  <div class="kpi-label">Gasto</div>
-                  <div class="kpi-value" id="kpiGmsExpense">—</div>
-                </div>
-                <div class="kpi">
-                  <div class="kpi-label">GMV</div>
-                  <div class="kpi-value" id="kpiGmsGmv">—</div>
-                </div>
-                <div class="kpi">
-                  <div class="kpi-label">ROAS</div>
-                  <div class="kpi-value" id="kpiGmsRoas">—</div>
-                </div>
-                <div class="kpi">
-                  <div class="kpi-label">ACOS</div>
-                  <div class="kpi-value" id="kpiGmsAcos">—</div>
-                </div>
-              </div>
-
-              <div class="table-wrap">
-                <table class="table" id="tblGmsItems">
-                  <thead>
-                    <tr>
-                      <th>Produto</th>
-                      <th>Impressões</th>
-                      <th>Cliques</th>
-                      <th>Gasto</th>
-                      <th>GMV (Broad)</th>
-                      <th>ROAS (Broad)</th>
-                      <th>ACOS (Broad)</th>
-                      <th>Pedidos (Broad)</th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
-              </div>
-
-              <div class="pager">
-                <button id="btnGmsPrev" class="btn btn-ghost">Anterior</button>
-                <div class="muted" id="gmsPagerInfo">—</div>
-                <button id="btnGmsNext" class="btn btn-ghost">Próximo</button>
-              </div>
-
-              <div class="actions">
-                <button id="btnGmsCreate" class="btn btn-primary">
-                  Criar campanha GMS
-                </button>
-                <button id="btnGmsEdit" class="btn btn-ghost">
-                  Editar campanha GMS
-                </button>
-              </div>
-
-              <div class="section-card" style="margin-top: 14px">
-                <div class="section-card__header">
-                  <div>
-                    <div class="section-title">Itens removidos (GMS)</div>
-                  </div>
-
-                  <div class="section-actions">
-                    <button id="btnExportGmsDeletedCsv" class="btn btn-ghost">
-                      Exportar CSV
-                    </button>
-                  </div>
-                </div>
-                <div class="section-card__body">
-                  <div class="table-wrap">
-                    <table class="table" id="tblGmsDeleted">
-                      <thead>
-                        <tr>
-                          <th>Item ID</th>
-                        </tr>
-                      </thead>
-                      <tbody></tbody>
-                    </table>
                   </div>
                 </div>
               </div>

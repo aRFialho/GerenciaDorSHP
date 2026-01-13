@@ -27,27 +27,6 @@ router.post(
   AdsController.campaignItemsPerformance
 );
 
-router.post(
-  "/shops/:shopId/ads/gms/campaign/performance",
-  AdsController.gmsCampaignPerformance
-);
-
-router.post(
-  "/shops/:shopId/ads/gms/items/performance",
-  AdsController.gmsItemsPerformance
-);
-
-router.get("/shops/:shopId/ads/gms/eligibility", AdsController.gmsEligibility);
-
-router.post(
-  "/shops/:shopId/ads/gms/campaign/create",
-  AdsController.gmsCreateCampaign
-);
-router.post(
-  "/shops/:shopId/ads/gms/campaign/edit",
-  AdsController.gmsEditCampaign
-);
-
 router.get(
   "/shops/:shopId/ads/campaign-groups",
   AdsCampaignGroupsController.list
@@ -66,11 +45,6 @@ router.put(
 router.delete(
   "/shops/:shopId/ads/campaign-groups/:groupId",
   AdsCampaignGroupsController.remove
-);
-
-router.post(
-  "/shops/:shopId/ads/gms/items/deleted",
-  AdsController.gmsDeletedItems
 );
 
 module.exports = router;

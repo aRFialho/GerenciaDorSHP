@@ -190,62 +190,6 @@ async function shopeeAdsPost({ path, accessToken, shopId, query, body }) {
   }
 }
 
-async function get_gms_item_performance({ accessToken, shopId, payload }) {
-  return shopeeAdsPost({
-    path: "/api/v2/ads/get_gms_item_performance",
-    accessToken,
-    shopId,
-    body: payload,
-  });
-}
-
-async function get_gms_campaign_performance({ accessToken, shopId, payload }) {
-  return shopeeAdsPost({
-    path: "/api/v2/ads/get_gms_campaign_performance",
-    accessToken,
-    shopId,
-    body: payload,
-  });
-}
-
-async function check_create_gms_product_campaign_eligibility({
-  accessToken,
-  shopId,
-}) {
-  return shopeeAdsGet({
-    path: "/api/v2/ads/check_create_gms_product_campaign_eligibility",
-    accessToken,
-    shopId,
-  });
-}
-
-async function create_gms_product_campaign({ accessToken, shopId, payload }) {
-  return shopeeAdsPost({
-    path: "/api/v2/ads/create_gms_product_campaign",
-    accessToken,
-    shopId,
-    body: payload,
-  });
-}
-
-async function edit_gms_product_campaign({ accessToken, shopId, payload }) {
-  return shopeeAdsPost({
-    path: "/api/v2/ads/edit_gms_product_campaign",
-    accessToken,
-    shopId,
-    body: payload,
-  });
-}
-
-async function list_gms_user_deleted_item({ accessToken, shopId, payload }) {
-  return shopeeAdsPost({
-    path: "/api/v2/ads/list_gms_user_deleted_item",
-    accessToken,
-    shopId,
-    body: payload,
-  });
-}
-
 async function get_cpc_item_performance({ accessToken, shopId, payload }) {
   const path =
     shopeeAds.CPC_ITEM_PERFORMANCE_PATH ||
@@ -273,11 +217,5 @@ module.exports = {
   get_product_level_campaign_id_list,
   get_product_campaign_daily_performance,
   get_product_level_campaign_setting_info,
-  get_gms_item_performance,
-  get_gms_campaign_performance,
-  check_create_gms_product_campaign_eligibility,
-  create_gms_product_campaign,
-  edit_gms_product_campaign,
-  list_gms_user_deleted_item,
   get_cpc_item_performance,
 };
