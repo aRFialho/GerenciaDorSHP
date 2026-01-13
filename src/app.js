@@ -3,7 +3,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const path = require("path");
 const cookieParser = require("cookie-parser");
-
+const debugRoutes = require("./routes/debug.routes");
 const requestLogger = require("./middlewares/requestLogger");
 const errorHandler = require("./middlewares/errorHandler");
 const routes = require("./routes");
@@ -18,7 +18,7 @@ function createApp() {
   const app = express();
 
   app.disable("x-powered-by");
-
+  app.use(debugRoutes);
   app.use(
     helmet({
       contentSecurityPolicy: {

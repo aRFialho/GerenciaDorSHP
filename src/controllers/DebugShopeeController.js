@@ -40,21 +40,18 @@ function responseHasMaskedStars(obj) {
 
 async function testShopeeOrderDetailMask(req, res, next) {
   try {
-    const shop = await getActiveShopOrFail(req, res);
-    if (!shop) return;
-
+    const shopeeShopId = String(req.params.shopId || "").trim();
     const orderSn = String(req.params.orderSn || "").trim();
-    if (!orderSn) {
-      return res.status(400).json({ error: "orderSn_required" });
-    }
+    if (!shopeeShopId)
+      return res.status(400).json({ error: "shopId_required" });
+    if (!orderSn) return res.status(400).json({ error: "orderSn_required" });
 
-    // Inclui campos que costumam conter PII (se whitelist estiver OK, devem vir completos)
     const responseOptionalFields = String(
       req.query.fields || "recipient_address,total_amount,pay_time"
     );
 
     const raw = await ShopeeOrderService.getOrderDetail({
-      shopId: String(shop.shopId), // Shopee shop_id
+      shopId: shopeeShopId,
       orderSnList: [orderSn],
       responseOptionalFields,
     });
@@ -63,7 +60,7 @@ async function testShopeeOrderDetailMask(req, res, next) {
 
     return res.json({
       ok: true,
-      shop_id: String(shop.shopId),
+      shop_id: shopeeShopId,
       order_sn: orderSn,
       masked,
       fields: responseOptionalFields,
