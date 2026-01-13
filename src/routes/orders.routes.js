@@ -16,7 +16,6 @@ router.get(
 );
 
 const DebugController = require("../controllers/DebugController");
-const { requireDebugToken } = require("../middlewares/debugToken");
 
 router.get("/debug/egress-ip", requireDebugToken, DebugController.egressIp);
 
