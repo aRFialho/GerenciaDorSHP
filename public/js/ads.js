@@ -229,7 +229,17 @@ function fmtInt(v) {
   if (!Number.isFinite(n)) return "—";
   return n.toLocaleString("pt-BR");
 }
-
+function fmtPct(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(2) + "%" : "—";
+}
+function acosTone(acosPct) {
+  const n = Number(acosPct);
+  if (!Number.isFinite(n)) return "gray";
+  if (n >= 50) return "red";
+  if (n >= 30) return "yellow";
+  return "green";
+}
 function fmtPctFromClicksImpr(clicks, impr) {
   const c = Number(clicks) || 0;
   const i = Number(impr) || 0;
@@ -825,6 +835,8 @@ function applyCpcCampaignView() {
   });
 
   cpcCampaignsView = rows;
+  const countEl = document.getElementById("cpcCampaignCount");
+  if (countEl) countEl.textContent = `${rows.length} campanhas`;
   updateCpcPager(rows.length);
   const start = (cpcPager.page - 1) * cpcPager.pageSize;
   const pageRows = rows.slice(start, start + cpcPager.pageSize);
@@ -850,7 +862,12 @@ function renderCpcCampaignCards(rows) {
     );
     const type = badgeHtml(x.ad_type || "—", "gray");
     const diag = diagnosisHtml(x);
-
+    const placement = badgeHtml(x.placement || "—", "gray");
+    const acosTxt = x.direct_acos_pct != null ? fmtPct(x.direct_acos_pct) : "—";
+    const acosBadge =
+      x.direct_acos_pct != null
+        ? badgeHtml("ACOS " + acosTxt, acosTone(x.direct_acos_pct))
+        : badgeHtml("ACOS —", "gray");
     const el = document.createElement("div");
     el.className = "cpc-card";
     el.dataset.campaignId = id;
@@ -863,7 +880,7 @@ function renderCpcCampaignCards(rows) {
         <div class="cpc-card__title">${escHtml(x.ad_name || "#" + id)}</div>
         <div class="cpc-card__meta">
           <span class="muted">#${escHtml(id)}</span>
-          ${type} ${status} ${diag}
+          ${type} ${status} ${placement} ${diag} ${acosBadge}
         </div>
         <div class="cpc-card__grid">
           <div><div class="muted">Orçamento</div><div class="v">${
@@ -884,6 +901,8 @@ function renderCpcCampaignCards(rows) {
           <div><div class="muted">Cliques</div><div class="v">${fmtInt(
             x.clicks
           )}</div></div>
+          <div><div class="muted">ACOS Dir.</div><div class="v">${acosTxt}
+          </div></div>
         </div>
       </div>
       <div class="cpc-card__right">
@@ -914,10 +933,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const tabsWrap = document.getElementById("cpcStatusTabs");
   if (tabsWrap) {
-    filterEl.addEventListener("input", () => {
-      localStorage.setItem("ads_cpc_filter", filterEl.value || "");
+    tabsWrap.addEventListener("click", (e) => {
+      const btn = e.target.closest?.(".status-tab");
+      if (!btn) return;
+      setCpcStatusBucket(btn.dataset.status || "active");
       resetCpcPager();
-      debounceApplyCpcCampaignView();
+      applyCpcCampaignView();
     });
   }
   // restore filter/sort
@@ -939,6 +960,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (filterEl) {
     filterEl.addEventListener("input", () => {
       localStorage.setItem("ads_cpc_filter", filterEl.value || "");
+      resetCpcPager();
       debounceApplyCpcCampaignView();
     });
   }
@@ -1566,8 +1588,10 @@ async function loadCpcDaily(dateFrom, dateTo) {
   setText("kpiCpcDirectGmv", fmtMoney(totals.direct_gmv));
   setText("kpiCpcBroadGmv", fmtMoney(totals.broad_gmv));
   const exp = Number(totals.expense || 0);
-  const gmv = Number(totals.direct_gmv || 0);
-  setText("kpiCpcRoas", exp > 0 ? (gmv / exp).toFixed(2) : "—");
+  const gmvD = Number(totals.direct_gmv || 0);
+  const gmvB = Number(totals.broad_gmv || 0);
+  setText("kpiCpcRoas", exp > 0 ? (gmvD / exp).toFixed(2) : "—");
+  setText("kpiCpcRoasBroad", exp > 0 ? (gmvB / exp).toFixed(2) : "—");
   const labels = series.map((x) => x.date);
   const ds = [
     {
