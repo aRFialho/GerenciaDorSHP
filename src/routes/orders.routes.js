@@ -7,6 +7,11 @@ const router = express.Router();
 
 router.use(requireAuth);
 
+const DebugController = require("../controllers/DebugController");
+const { requireDebugToken } = require("../middlewares/debugToken");
+
+router.get("/debug/egress-ip", requireDebugToken, DebugController.egressIp);
+
 router.get("/shops/:shopId/orders", OrdersController.list);
 router.get("/shops/:shopId/orders/:orderSn", OrdersController.detail);
 router.post("/shops/:shopId/orders/sync", OrderSyncController.sync);
