@@ -24,23 +24,11 @@ async function getActiveShopOrFail(req, res) {
 async function list(req, res) {
   const shop = await getActiveShopOrFail(req, res);
   if (!shop) return;
+
   const limit = Math.min(Number(req.query.limit || 60), 200);
-  const q = String(req.query.q || "").trim();
-  const qDigitsOnly = /^\d+$/.test(q);
-  const where = {
-    shopId: shop.id,
-    ...(q
-      ? {
-          OR: [
-            ...(qDigitsOnly ? [{ itemId: BigInt(q) }] : []),
-            { title: { contains: q, mode: "insensitive" } },
-            { models: { some: { sku: { contains: q, mode: "insensitive" } } } },
-          ],
-        }
-      : {}),
-  };
+
   const items = await prisma.order.findMany({
-    where,
+    where: { shopId: shop.id },
     orderBy: { shopeeUpdateTime: "desc" },
     take: limit,
     select: {
@@ -55,25 +43,32 @@ async function list(req, res) {
       currency: true,
     },
   });
-  if (items.length === 0) {
+
+  if (!items.length) {
     res.json({ items: [] });
     return;
   }
-  const orderIds = items.map((item) => item.id);
+
+  const orderIds = items.map((o) => o.id);
 
   const grouped = await prisma.orderAddressChangeAlert.groupBy({
     by: ["orderId"],
-    where: { orderId: { in: orderIds }, resolvedAt: null },
+    where: { resolvedAt: null, orderId: { in: orderIds } },
     _count: { _all: true },
   });
 
   const countMap = new Map(grouped.map((g) => [g.orderId, g._count._all]));
 
-  const enrichedItems = items.map((item) => {
-    const c = countMap.get(item.id) || 0;
-    return { ...item, hasAddressAlert: c > 0, addressAlertCount: c };
+  const enrichedItems = items.map((o) => {
+    const c = countMap.get(o.id) || 0;
+    return {
+      ...o,
+      hasAddressAlert: c > 0,
+      addressAlertCount: c,
+    };
   });
-  res.json({ items: enriched });
+
+  res.json({ items: enrichedItems });
 }
 async function detail(req, res) {
   const { orderSn } = req.params;
