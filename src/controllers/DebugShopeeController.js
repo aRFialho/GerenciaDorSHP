@@ -73,4 +73,6 @@ async function testShopeeOrderDetailMask(req, res, next) {
   }
 }
 
-module.exports = { testShopeeOrderDetailMask };
+module.exports = {
+  testShopeeOrderDetailMask,
+};
