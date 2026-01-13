@@ -4,6 +4,7 @@ const OrderSyncController = require("../controllers/OrderSyncController");
 const { requireAuth } = require("../middlewares/sessionAuth");
 const DebugShopeeController = require("../controllers/DebugShopeeController");
 const { requireDebugToken } = require("../middlewares/debugToken");
+const OrderAddressAlertsController = require("../controllers/OrderAddressAlertsController");
 
 const router = express.Router();
 
@@ -21,8 +22,21 @@ router.get(
 );
 
 const DebugController = require("../controllers/DebugController");
-
 router.get("/debug/egress-ip", requireDebugToken, DebugController.egressIp);
+
+// ✅ Alertas (popup + modal + resolver)
+router.get(
+  "/shops/active/orders/address-alerts",
+  OrderAddressAlertsController.listOpen
+);
+router.get(
+  "/shops/active/orders/:orderSn/address-alerts",
+  OrderAddressAlertsController.getOpenByOrderSn
+);
+router.patch(
+  "/shops/active/orders/address-alerts/:id/resolve",
+  OrderAddressAlertsController.resolve
+);
 
 router.get("/shops/:shopId/orders", OrdersController.list);
 router.get("/shops/:shopId/orders/:orderSn", OrdersController.detail);

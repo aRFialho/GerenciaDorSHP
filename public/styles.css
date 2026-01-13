@@ -523,3 +523,148 @@ body{
 .badge--red{border-color:rgba(239,68,68,0.45);background:rgba(239,68,68,0.12);color:rgba(255,230,230,0.95)}
 
 .badge-dot{width:7px;height:7px;border-radius:999px;background:currentColor;opacity:0.85;display:inline-block}
+/* Card de pedido precisa ser relativo para o ícone ficar no canto */
+.order-card { position: relative; }
+
+/* Ícone vermelho no canto superior direito do card */
+.order-card .order-addr-alert-btn{
+  position:absolute; top:10px; right:10px;
+  width:28px; height:28px; border-radius:50%;
+  border:none; background:#e11d48; color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+}
+
+.order-card .order-addr-alert-badge{
+  position:absolute; top:-6px; right:-6px;
+  min-width:18px; height:18px; border-radius:999px;
+  background:#111; color:#fff; font-size:12px;
+  display:flex; align-items:center; justify-content:center;
+  padding:0 5px;
+}
+
+/* Badge do botão “Alertas de Endereço” */
+.badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:18px; height:18px; padding:0 6px;
+  border-radius:999px; background:#e11d48; color:#fff;
+  font-size:12px; margin-left:6px;
+}
+
+/* Popover */
+.orders-alerts-popover{
+  position:absolute;
+  right: 24px; /* ajusta conforme seu layout */
+  margin-top: 10px;
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.18);
+  z-index: 1000;
+}
+
+.orders-alerts-popover__header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 12px 12px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+}
+
+.orders-alerts-popover__list{
+  max-height: 340px;
+  overflow:auto;
+  padding: 8px 0;
+}
+
+.orders-alerts-item{
+  padding: 10px 12px;
+  cursor:pointer;
+}
+
+.orders-alerts-item:hover{
+  background: rgba(0,0,0,.04);
+}
+/* Card do pedido com ícone no canto */
+.order-card{position:relative;}
+.order-addr-alert-btn{
+  position:absolute;top:10px;right:10px;
+  width:28px;height:28px;border-radius:50%;
+  border:none;background:#e11d48;color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-weight:800;
+}
+.order-addr-alert-btn:hover{filter:brightness(0.95);}
+.order-addr-alert-badge{
+  position:absolute;top:-6px;right:-6px;
+  min-width:18px;height:18px;border-radius:999px;
+  background:#111;color:#fff;font-size:12px;
+  display:flex;align-items:center;justify-content:center;
+  padding:0 5px;
+}
+
+/* Badge do botão no header (caso você não tenha um .badge genérico) */
+.badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;height:18px;padding:0 6px;border-radius:999px;
+  background:#e11d48;color:#fff;font-size:12px;margin-left:6px;
+}
+.badge.gray{background:#64748b;}
+/* Wrapper do popover (ancora no botão) */
+.orders-alerts-wrap{position:relative;display:inline-block;}
+
+/* Popover */
+.orders-alerts-popover{
+  position:absolute;
+  right:0;
+  top:calc(100% + 10px);
+  width:420px;
+  max-width:calc(100vw - 40px);
+  background:#fff;
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:12px;
+  box-shadow:0 18px 40px rgba(0,0,0,.18);
+  z-index:1000;
+}
+
+.orders-alerts-popover__header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px;
+  border-bottom:1px solid rgba(0,0,0,.08);
+}
+
+.orders-alerts-popover__title{font-weight:800;}
+
+.orders-alerts-popover__list{
+  max-height:340px;
+  overflow:auto;
+  padding:8px 0;
+}
+
+.orders-alerts-item{
+  padding:10px 12px;
+  cursor:pointer;
+}
+
+.orders-alerts-item:hover{background:rgba(0,0,0,.04);}
+
+.orders-alerts-empty{padding:12px;color:#64748b;}
+
+/* Ícone no card de pedido */
+.order-card{position:relative;}
+.order-addr-alert-btn{
+  position:absolute;top:10px;right:10px;
+  width:28px;height:28px;border-radius:50%;
+  border:none;background:#e11d48;color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-weight:800;
+}
+.order-addr-alert-badge{
+  position:absolute;top:-6px;right:-6px;
+  min-width:18px;height:18px;border-radius:999px;
+  background:#111;color:#fff;font-size:12px;
+  display:flex;align-items:center;justify-content:center;
+  padding:0 5px;
+}

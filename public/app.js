@@ -238,6 +238,157 @@ function initSwitchShopShortcut() {
 }
 
 /* ---------------- Orders (DB) ---------------- */
+
+let ORDERS_OPEN_ADDRESS_ALERTS = []; // cache pro modal-lista
+
+function fmtAddr(snap) {
+  if (!snap) return "—";
+  const parts = [
+    snap.fullAddress || "",
+    [snap.city, snap.state].filter(Boolean).join(" / "),
+    snap.zipcode ? `CEP: ${snap.zipcode}` : "",
+  ].filter(Boolean);
+  return escapeHtml(parts.join(" • "));
+}
+
+async function refreshOrdersAddressAlertsBadge() {
+  const badge = $("#orders-address-alerts-badge");
+  if (!badge) return;
+
+  try {
+    const data = await apiGet(
+      `/shops/${SHOP_PATH_PLACEHOLDER}/orders/address-alerts?limit=500`
+    );
+
+    const items = Array.isArray(data?.items) ? data.items : [];
+    ORDERS_OPEN_ADDRESS_ALERTS = items;
+
+    if (items.length > 0) {
+      badge.style.display = "inline-flex";
+      badge.textContent = String(items.length);
+    } else {
+      badge.style.display = "none";
+      badge.textContent = "0";
+    }
+  } catch (_) {
+    // se falhar, não quebra a tela
+    badge.style.display = "none";
+    badge.textContent = "0";
+  }
+}
+
+async function openAddressAlertsListModal() {
+  openModal("Alertas de endereço", `<div class="muted">Carregando...</div>`);
+
+  try {
+    await ensureShopSelected();
+    await refreshOrdersAddressAlertsBadge();
+
+    if (!ORDERS_OPEN_ADDRESS_ALERTS.length) {
+      $(
+        "#modal-body"
+      ).innerHTML = `<div class="muted">Nenhum alerta de endereço em aberto.</div>`;
+      return;
+    }
+
+    const html =
+      `<div class="muted">Clique em um pedido para ver o endereço antigo vs novo.</div>` +
+      `<div style="margin-top:12px;">` +
+      ORDERS_OPEN_ADDRESS_ALERTS.map((a) => {
+        const orderSn = escapeHtml(a.orderSn || "—");
+        const detected = a.detectedAt
+          ? escapeHtml(new Date(a.detectedAt).toLocaleString("pt-BR"))
+          : "—";
+        const status = escapeHtml(a.orderStatus || "—");
+
+        return `
+          <div class="card clickable" data-open-order-alert="${orderSn}" style="margin-top:10px;">
+            <div class="card-title">Pedido ${orderSn}</div>
+            <div class="muted">Detectado: ${detected}</div>
+            <div class="muted">Status: ${status}</div>
+          </div>
+        `;
+      }).join("") +
+      `</div>`;
+
+    $("#modal-body").innerHTML = html;
+
+    $all("[data-open-order-alert]").forEach((el) => {
+      el.addEventListener("click", async () => {
+        const orderSn = el.getAttribute("data-open-order-alert");
+        await openOrderAddressChangeModal(orderSn);
+      });
+    });
+  } catch (e) {
+    $("#modal-body").innerHTML = `<div class="muted">Erro: ${escapeHtml(
+      e.message
+    )}</div>`;
+  }
+}
+
+async function openOrderAddressChangeModal(orderSn) {
+  openModal(
+    `Endereço alterado • Pedido ${escapeHtml(orderSn)}`,
+    `<div class="muted">Carregando comparação...</div>`
+  );
+
+  try {
+    await ensureShopSelected();
+
+    const data = await apiGet(
+      `/shops/${SHOP_PATH_PLACEHOLDER}/orders/${encodeURIComponent(
+        orderSn
+      )}/address-alerts`
+    );
+
+    const items = Array.isArray(data?.items) ? data.items : [];
+    if (!items.length) {
+      $(
+        "#modal-body"
+      ).innerHTML = `<div class="muted">Não há alertas abertos para este pedido.</div>`;
+      return;
+    }
+
+    const a = items[0]; // mais recente
+    const detected = a.detectedAt
+      ? escapeHtml(new Date(a.detectedAt).toLocaleString("pt-BR"))
+      : "—";
+
+    const oldSnap = a.oldSnapshot || null;
+    const newSnap = a.newSnapshot || null;
+
+    const html = `
+      <div class="muted">Detectado: ${detected}</div>
+
+      <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="card">
+          <div class="card-title">Endereço anterior</div>
+          <div class="muted" style="margin-top:8px;">${fmtAddr(oldSnap)}</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Endereço novo</div>
+          <div class="muted" style="margin-top:8px;">${fmtAddr(newSnap)}</div>
+        </div>
+      </div>
+
+      ${
+        items.length > 1
+          ? `<div class="muted" style="margin-top:12px;">Há mais ${
+              items.length - 1
+            } alteração(ões) em aberto para este pedido.</div>`
+          : ""
+      }
+    `;
+
+    $("#modal-body").innerHTML = html;
+  } catch (e) {
+    $("#modal-body").innerHTML = `<div class="muted">Erro: ${escapeHtml(
+      e.message
+    )}</div>`;
+  }
+}
+
 async function loadOrders() {
   const grid = $("#orders-grid");
   grid.innerHTML = `<div class="card"><div class="muted">Carregando pedidos...</div></div>`;
@@ -266,8 +417,26 @@ async function loadOrders() {
           ? new Date(o.shopeeUpdateTime).toLocaleString("pt-BR")
           : "—";
 
+        const hasAlert = Boolean(o.hasAddressAlert);
+        const alertCount = Number(o.addressAlertCount || 0);
+
         return `
-          <div class="card clickable" data-order-sn="${orderSn}">
+          <div class="card clickable order-card" data-order-sn="${orderSn}">
+            ${
+              hasAlert
+                ? `<button class="order-addr-alert-btn" type="button" data-order-alert="${orderSn}" title="Endereço alterado">
+                     !
+                     ${
+                       alertCount > 1
+                         ? `<span class="order-addr-alert-badge">${escapeHtml(
+                             String(alertCount)
+                           )}</span>`
+                         : ""
+                     }
+                   </button>`
+                : ""
+            }
+
             <div class="card-title">Pedido ${orderSn}</div>
             <div class="muted">Status: ${status}</div>
             <div class="muted">Ship by: ${escapeHtml(shipBy)}</div>
@@ -277,12 +446,15 @@ async function loadOrders() {
       })
       .join("");
 
-    $all("[data-order-sn]").forEach((el) => {
-      el.addEventListener("click", async () => {
-        const orderSn = el.getAttribute("data-order-sn");
-        await openOrderDetail(orderSn);
+    $all("[data-order-alert]").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const orderSn = btn.getAttribute("data-order-alert");
+        await openOrderAddressChangeModal(orderSn);
       });
     });
+
+    await refreshOrdersAddressAlertsBadge();
   } catch (e) {
     grid.innerHTML = `<div class="card"><div class="muted">Erro ao carregar pedidos: ${escapeHtml(
       e.message
@@ -625,6 +797,16 @@ async function openProductDetail(itemId) {
 }
 
 /* ---------------- Sync Buttons ---------------- */
+
+function initOrdersAlertsButton() {
+  const btn = $("#btn-orders-address-alerts");
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    await openAddressAlertsListModal();
+  });
+}
+
 function initSyncButtons() {
   const btnOrders = $("#btn-sync-orders");
   const btnProducts = $("#btn-sync-products");
@@ -1194,6 +1376,7 @@ async function boot() {
   initSwitchShopShortcut();
   initHeaderButtons();
   initAuthTab();
+  initOrdersAlertsButton();
 
   try {
     await loadMe();

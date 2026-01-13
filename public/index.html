@@ -269,6 +269,45 @@
                 <button id="btn-sync-orders" class="btn btn-primary">
                   Sincronizar Pedidos
                 </button>
+
+                <div class="orders-alerts-wrap">
+                  <button
+                    id="btn-orders-address-alerts"
+                    class="btn btn-ghost"
+                    type="button"
+                  >
+                    Alertas de endereço
+                    <span
+                      id="orders-address-alerts-badge"
+                      class="badge"
+                      style="display: none"
+                      >0</span
+                    >
+                  </button>
+
+                  <div
+                    id="orders-address-alerts-popover"
+                    class="orders-alerts-popover"
+                    style="display: none"
+                  >
+                    <div class="orders-alerts-popover__header">
+                      <div class="orders-alerts-popover__title">
+                        Alertas de endereço
+                      </div>
+                      <button
+                        id="orders-address-alerts-close"
+                        class="btn btn-ghost"
+                        type="button"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                    <div
+                      id="orders-address-alerts-list"
+                      class="orders-alerts-popover__list"
+                    ></div>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="section-card__body">

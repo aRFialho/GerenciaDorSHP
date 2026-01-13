@@ -27,8 +27,7 @@ function addressHash(addr) {
     normalizeStr(addr?.district),
     normalizeStr(addr?.town),
     normalizeStr(addr?.full_address),
-    normalizeStr(addr?.name),
-    normalizeStr(addr?.phone),
+    normalizeStr(addr?.region),
   ].join("|");
 
   return crypto.createHash("sha256").update(raw).digest("hex");
@@ -51,6 +50,11 @@ function chunk(arr, size) {
   const out = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
+}
+
+function isOrderClosed(orderStatus) {
+  const s = String(orderStatus || "").toUpperCase();
+  return ["COMPLETED", "CANCELLED", "RETURNED"].includes(s);
 }
 
 async function upsertOrderAndSnapshot(shopInternalId, detail) {
@@ -107,20 +111,29 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
   });
 
   const addr = detail.recipient_address || null;
-  let addressChanged = false;
+  let addressChanged = false; // "mudou de verdade" (comparado com snapshot anterior)
+  let snapshotCreated = false;
 
-  if (addr) {
+  // Se o pedido fechou, resolve alertas abertos e não cria novos
+  if (isOrderClosed(order.orderStatus)) {
+    await prisma.orderAddressChangeAlert.updateMany({
+      where: { orderId: order.id, resolvedAt: null },
+      data: { resolvedAt: new Date() },
+    });
+    // Ainda podemos criar snapshot? (opcional). Por segurança, aqui eu não crio.
+  } else if (addr) {
     const currentHash = addressHash(addr);
 
     const last = await prisma.orderAddressSnapshot.findFirst({
       where: { orderId: order.id },
       orderBy: { createdAt: "desc" },
+      select: { id: true, addressHash: true },
     });
 
-    addressChanged = !last || last.addressHash !== currentHash;
+    const changedNow = !last || last.addressHash !== currentHash;
 
-    if (addressChanged) {
-      await prisma.orderAddressSnapshot.create({
+    if (changedNow) {
+      const newSnap = await prisma.orderAddressSnapshot.create({
         data: {
           orderId: order.id,
           name: addr.name || null,
@@ -134,7 +147,38 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
           fullAddress: addr.full_address || null,
           addressHash: currentHash,
         },
+        select: { id: true },
       });
+
+      snapshotCreated = true;
+
+      // Só vira "alerta" se já existia snapshot anterior (senão é o primeiro endereço salvo)
+      if (last) {
+        addressChanged = true;
+
+        await prisma.orderAddressChangeAlert.upsert({
+          where: {
+            orderId_newHash: {
+              orderId: order.id,
+              newHash: currentHash,
+            },
+          },
+          update: {
+            resolvedAt: null, // reabre se tinha sido resolvido manualmente
+            detectedAt: new Date(),
+            oldSnapshotId: last.id,
+            newSnapshotId: newSnap.id,
+            oldHash: last.addressHash,
+          },
+          create: {
+            orderId: order.id,
+            oldSnapshotId: last.id,
+            newSnapshotId: newSnap.id,
+            oldHash: last.addressHash,
+            newHash: currentHash,
+          },
+        });
+      }
     }
   }
 
@@ -246,4 +290,4 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
   };
 }
 
-module.exports = { parseRangeDays, syncOrdersForShop };
+module.exports = { parseRangeDays, syncOrdersForShop, isOrderClosed };

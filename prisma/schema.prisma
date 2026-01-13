@@ -49,15 +49,12 @@ model User {
 model Session {
   id String @id @default(cuid())
 
-  // Usuário logado (ou usuário "atuando", caso impersonation esteja ativo)
   userId Int
   user   User @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
 
-  // Loja ativa (Shop.id) para resolver as rotas /shops/:shopId/... ignorando :shopId
   activeShopId Int?
   activeShop   Shop? @relation(fields: [activeShopId], references: [id], onDelete: SetNull)
 
-  // Impersonation (para SUPER_ADMIN)
   realUserId    Int?
   realUser      User?   @relation("SessionRealUser", fields: [realUserId], references: [id], onDelete: SetNull)
   impersonating Boolean @default(false)
@@ -70,15 +67,9 @@ model Session {
   @@index([expiresAt])
 }
 
-/**
- * ===== Seus models atuais (com ajustes mínimos) =====
- * Observação: accountId está nullable (Int?) para preservar dados no Render na primeira migration.
- * Depois do backfill, você torna obrigatório (Int).
- */
 model Shop {
   id Int @id @default(autoincrement())
 
-  // Vínculo multi-tenant (Migration 1: nullable / Migration 2: obrigatório)
   accountId Int?
   account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -140,6 +131,7 @@ model Order {
   reverseShippingFee Int?
 
   addressSnapshots OrderAddressSnapshot[]
+  addressAlerts    OrderAddressChangeAlert[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -166,8 +158,11 @@ model OrderAddressSnapshot {
   fullAddress String? @db.Text
 
   addressHash String
+  createdAt   DateTime @default(now())
 
-  createdAt DateTime @default(now())
+  oldAlerts                OrderAddressChangeAlert[] @relation("OldAddressSnapshot")
+  newAlerts                OrderAddressChangeAlert[] @relation("NewAddressSnapshot")
+  orderAddressChangeAlerts OrderAddressChangeAlert[]
 
   @@index([orderId, createdAt])
   @@index([addressHash])
@@ -271,4 +266,29 @@ model AdsCampaignGroupCampaign {
 
   @@unique([groupId, campaignId])
   @@index([campaignId])
+}
+
+model OrderAddressChangeAlert {
+  id Int @id @default(autoincrement())
+
+  orderId Int
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  oldSnapshotId Int?
+  oldSnapshot   OrderAddressSnapshot? @relation("OldAddressSnapshot", fields: [oldSnapshotId], references: [id], onDelete: SetNull)
+
+  newSnapshotId Int
+  newSnapshot   OrderAddressSnapshot @relation("NewAddressSnapshot", fields: [newSnapshotId], references: [id], onDelete: Cascade)
+
+  oldHash String?
+  newHash String
+
+  detectedAt             DateTime              @default(now())
+  resolvedAt             DateTime?
+  orderAddressSnapshot   OrderAddressSnapshot? @relation(fields: [orderAddressSnapshotId], references: [id])
+  orderAddressSnapshotId Int?
+
+  @@unique([orderId, newHash])
+  @@index([orderId, detectedAt])
+  @@index([resolvedAt])
 }
