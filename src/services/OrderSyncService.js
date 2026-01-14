@@ -94,10 +94,13 @@ async function persistOrderGeoAddressOnce({ shopInternalId, order, addr }) {
   if (!existing) {
     try {
       await prisma.orderGeoAddress.create({ data: payload });
-    } catch (_) {}
-    return;
+      return; // ✅ essencial
+    } catch (e) {
+      if (e?.code === "P2002") return;
+      console.error("persistOrderGeoAddressOnce failed:", e);
+      return;
+    }
   }
-
   const shouldUpdate =
     (!existing.city && payload.city) ||
     (!existing.fullAddress && payload.fullAddress);

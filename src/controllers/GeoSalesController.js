@@ -61,50 +61,6 @@ function toUF(stateNormOrRaw) {
   return STATE_NORM_TO_UF.get(s) || null;
 }
 
-function toUF(v) {
-  const s = String(v || "")
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z]/g, "")
-    .trim();
-
-  const map = {
-    acre: "AC",
-    alagoas: "AL",
-    amapa: "AP",
-    amazonas: "AM",
-    bahia: "BA",
-    ceara: "CE",
-    distritofederal: "DF",
-    espiritosanto: "ES",
-    goias: "GO",
-    maranhao: "MA",
-    matogrosso: "MT",
-    matogrossodosul: "MS",
-    minasgerais: "MG",
-    para: "PA",
-    paraiba: "PB",
-    parana: "PR",
-    pernambuco: "PE",
-    piaui: "PI",
-    riodejaneiro: "RJ",
-    riograndedonorte: "RN",
-    riograndedosul: "RS",
-    rondonia: "RO",
-    roraima: "RR",
-    santacatarina: "SC",
-    saopaulo: "SP",
-    sergipe: "SE",
-    tocantins: "TO",
-  };
-
-  // já veio UF?
-  if (s.length === 2) return s.toUpperCase();
-
-  return map[s] || null;
-}
-
 function normsForUF(uf) {
   const key = String(uf || "").toUpperCase();
   return UF_TO_STATE_NORMS[key] || [];

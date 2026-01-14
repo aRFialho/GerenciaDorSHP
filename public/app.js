@@ -877,7 +877,8 @@ function setMapLegend({ max, title }) {
 
     const items = ranges
       .map((r) => {
-        const ratio = max > 0 ? r.to / max : 0; // usa o topo do range para amostrar a cor
+        const mid = (r.from + r.to) / 2;
+        const ratio = max > 0 ? mid / max : 0;
         const swatch = colorForRatio(ratio);
         const label = r.to >= max ? `${r.from}+` : `${r.from}–${r.to}`;
         return `<div class="geo-map-legend__item"><span class="geo-map-legend__swatch" style="background:${swatch};"></span><span class="geo-map-legend__label">${escapeHtml(
@@ -925,7 +926,7 @@ async function renderGeoBrazil() {
     items.map((x) => [String(x.uf).toUpperCase(), Number(x.count || 0)])
   );
   const max = Math.max(0, ...Array.from(countMap.values()));
-
+  setMapLegend({ max, title: "Vendas (UF)" });
   // index (lado direito)
   renderGeoIndex(items, { mode: "BR", activeKey: GEO_UF });
 
@@ -942,7 +943,6 @@ async function renderGeoBrazil() {
     const uf = getUfFromFeature(feature);
     const c = uf ? countMap.get(uf) || 0 : 0;
     const r = max > 0 ? c / max : 0;
-    setMapLegend({ max, title: "Vendas (UF)" });
     return {
       weight: 1,
       color: borderForRatio(r),
