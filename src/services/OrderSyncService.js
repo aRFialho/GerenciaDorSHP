@@ -12,6 +12,24 @@ function parseRangeDays(v) {
   return 7;
 }
 
+function addressKeyFromShopee(addr) {
+  return [
+    normalizeZipcode(addr?.zipcode),
+    normalizeStr(addr?.state),
+    normalizeStr(addr?.city),
+    normalizeStr(addr?.full_address),
+  ].join("|");
+}
+
+function addressKeyFromSnapshot(snap) {
+  return [
+    normalizeZipcode(snap?.zipcode),
+    normalizeStr(snap?.state),
+    normalizeStr(snap?.city),
+    normalizeStr(snap?.fullAddress),
+  ].join("|");
+}
+
 function normalizeStr(v) {
   return String(v || "")
     .toLowerCase()
@@ -26,18 +44,58 @@ function normalizeZipcode(v) {
   const digits = String(v || "").replace(/\D+/g, "");
   return digits;
 }
-function addressHash(addr) {
-  const raw = [
-    normalizeZipcode(addr?.zipcode),
-    normalizeStr(addr?.state),
-    normalizeStr(addr?.city),
-    normalizeStr(addr?.district),
-    normalizeStr(addr?.town),
-    normalizeStr(addr?.region),
-    normalizeStr(addr?.full_address),
-  ].join("|");
 
-  return crypto.createHash("sha256").update(raw, "utf8").digest("hex");
+function looksMasked(v) {
+  const s = String(v || "").trim();
+  if (!s) return true;
+  return s.includes("*") || s.toLowerCase().includes("xxx");
+}
+
+async function persistOrderGeoAddressOnce({ shopInternalId, order, addr }) {
+  // Precisamos no mínimo de cidade/estado para o mapa
+  const stateRaw = String(addr?.state || "").trim();
+  const cityRaw = String(addr?.city || "").trim();
+
+  if (!stateRaw || !cityRaw) return;
+  if (looksMasked(stateRaw) || looksMasked(cityRaw)) return;
+
+  // "salvar 1x": se já existe, não atualiza
+  const exists = await prisma.orderGeoAddress.findUnique({
+    where: { orderId: order.id },
+    select: { id: true },
+  });
+  if (exists) return;
+
+  try {
+    await prisma.orderGeoAddress.create({
+      data: {
+        shopId: shopInternalId,
+        orderId: order.id,
+        orderSn: order.orderSn,
+
+        state: stateRaw,
+        stateNorm: normalizeStr(stateRaw),
+        city: cityRaw,
+        cityNorm: normalizeStr(cityRaw),
+
+        zipcode: addr?.zipcode ? String(addr.zipcode) : null,
+        fullAddress: addr?.full_address ? String(addr.full_address) : null,
+
+        shopeeCreateTime: order.shopeeCreateTime || null,
+        shopeeUpdateTime: order.shopeeUpdateTime || null,
+      },
+    });
+  } catch (e) {
+    // Se dois workers tentarem criar ao mesmo tempo, o @unique(orderId) pode disparar.
+    // Como a regra é "não atualizar", a gente só ignora conflito de duplicidade.
+    // (Se quiser, eu deixo esse catch mais específico por código de erro do Prisma.)
+    return;
+  }
+}
+
+function addressHash(addr) {
+  const key = addressKeyFromShopee(addr);
+  return crypto.createHash("sha256").update(key, "utf8").digest("hex");
 }
 
 function calcLateAndRisk(orderStatus, shipByDate) {
@@ -118,6 +176,9 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
   });
 
   const addr = detail.recipient_address || null;
+  if (addr) {
+    await persistOrderGeoAddressOnce({ shopInternalId, order, addr });
+  }
   let addressChanged = false; // "mudou de verdade" (comparado com snapshot anterior)
   let snapshotCreated = false;
 
@@ -129,6 +190,7 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
     });
     // Ainda podemos criar snapshot? (opcional). Por segurança, aqui eu não crio.
   } else if (addr) {
+    const currentKey = addressKeyFromShopee(addr);
     const currentHash = addressHash(addr);
 
     const last = await prisma.orderAddressSnapshot.findFirst({
@@ -140,51 +202,18 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
         zipcode: true,
         state: true,
         city: true,
-        district: true,
-        town: true,
-        region: true,
         fullAddress: true,
       },
     });
 
-    const currentNorm = {
-      zipcode: normalizeZipcode(addr?.zipcode),
-      state: normalizeStr(addr?.state),
-      city: normalizeStr(addr?.city),
-      district: normalizeStr(addr?.district),
-      town: normalizeStr(addr?.town),
-      region: normalizeStr(addr?.region),
-      fullAddress: normalizeStr(addr?.full_address),
-    };
+    const lastKey = last ? addressKeyFromSnapshot(last) : null;
 
-    const lastNorm = last
-      ? {
-          zipcode: normalizeZipcode(last.zipcode),
-          state: normalizeStr(last.state),
-          city: normalizeStr(last.city),
-          district: normalizeStr(last.district),
-          town: normalizeStr(last.town),
-          region: normalizeStr(last.region),
-          fullAddress: normalizeStr(last.fullAddress),
-        }
-      : null;
+    // ✅ changedNow depende SOMENTE do endereço do cliente (não do hash)
+    const changedNow = !last ? true : currentKey !== lastKey;
 
-    const sameAddress =
-      !!lastNorm &&
-      currentNorm.zipcode === lastNorm.zipcode &&
-      currentNorm.state === lastNorm.state &&
-      currentNorm.city === lastNorm.city &&
-      currentNorm.district === lastNorm.district &&
-      currentNorm.town === lastNorm.town &&
-      currentNorm.region === lastNorm.region &&
-      currentNorm.fullAddress === lastNorm.fullAddress;
-
-    // ✅ agora sim: mudou só se os CAMPOS mudaram
-    const changedNow = !last ? true : !sameAddress;
-
-    // (opcional, mas recomendado) se o endereço é igual porém o hash era antigo/inconsistente,
-    // atualiza o hash do último snapshot pra evitar alertas falsos no futuro.
-    if (last && sameAddress && last.addressHash !== currentHash) {
+    // se o endereço é igual mas o hash antigo difere (mudança de algoritmo/normalização),
+    // só corrige o hash do último snapshot (não cria snapshot/alerta)
+    if (last && !changedNow && last.addressHash !== currentHash) {
       await prisma.orderAddressSnapshot.update({
         where: { id: last.id },
         data: { addressHash: currentHash },
@@ -211,19 +240,15 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
 
       snapshotCreated = true;
 
-      // Só vira "alerta" se já existia snapshot anterior (senão é o primeiro endereço salvo)
       if (last) {
         addressChanged = true;
 
         await prisma.orderAddressChangeAlert.upsert({
           where: {
-            orderId_newHash: {
-              orderId: order.id,
-              newHash: currentHash,
-            },
+            orderId_newHash: { orderId: order.id, newHash: currentHash },
           },
           update: {
-            resolvedAt: null, // reabre se tinha sido resolvido manualmente
+            resolvedAt: null,
             detectedAt: new Date(),
             oldSnapshotId: last.id,
             newSnapshotId: newSnap.id,

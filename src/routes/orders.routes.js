@@ -5,10 +5,15 @@ const { requireAuth } = require("../middlewares/sessionAuth");
 const DebugShopeeController = require("../controllers/DebugShopeeController");
 const { requireDebugToken } = require("../middlewares/debugToken");
 const OrderAddressAlertsController = require("../controllers/OrderAddressAlertsController");
+const GeoSalesController = require("../controllers/GeoSalesController");
 
 const router = express.Router();
 
 router.use(requireAuth);
+
+// 🌎 Geografia de vendas (mapa)
+router.get("/shops/active/geo/sales", GeoSalesController.byState);
+router.get("/shops/active/geo/sales/:uf", GeoSalesController.byCityInState);
 
 router.get(
   "/shops/active/orders/:orderSn/debug-shopee-detail",

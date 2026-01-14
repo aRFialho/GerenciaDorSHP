@@ -25,9 +25,13 @@ function createApp() {
         useDefaults: true,
         directives: {
           ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-          "script-src": ["'self'", "https://cdn.jsdelivr.net"],
+          "script-src": [
+            "'self'",
+            "https://cdn.jsdelivr.net",
+            "https://unpkg.com",
+          ],
+          "style-src": ["'self'", "'unsafe-inline'", "https://unpkg.com"],
           "img-src": ["'self'", "data:", "https:"],
-          "style-src": ["'self'", "'unsafe-inline'"],
         },
       },
     })
