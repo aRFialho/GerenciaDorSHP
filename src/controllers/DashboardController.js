@@ -37,7 +37,7 @@ async function monthlySales(req, res) {
       select: { shopeeCreateTime: true, createdAt: true, gmvCents: true },
     });
 
-    const daily = Array.from({ length: daysInMonth }, (_, i) => ({
+    const dailyBars = Array.from({ length: daysInMonth }, (_, i) => ({
       day: i + 1,
       gmvCents: 0,
     }));
@@ -47,7 +47,7 @@ async function monthlySales(req, res) {
       const dt = o.shopeeCreateTime || o.createdAt;
       const cents = Number(o.gmvCents || 0);
       gmvMtdCents += cents;
-      daily[dt.getDate() - 1].gmvCents += cents;
+      dailyBars[dt.getDate() - 1].gmvCents += cents;
     }
 
     const avgPerDayCents = Math.round(gmvMtdCents / Math.max(1, dayOfMonth));
@@ -77,11 +77,16 @@ async function monthlySales(req, res) {
         adsStatus: "not_configured",
         organicEstimatedCents: gmvMtdCents,
       },
-      dailyBars: daily,
+      dailyBars,
     });
   } catch (e) {
-    console.error("monthlySales failed:", e);
-    res.status(500).json({ error: "dashboard_monthly_sales_failed" });
+    console.error("dashboard.monthlySales failed:", e);
+    res
+      .status(500)
+      .json({
+        error: "dashboard_monthly_sales_failed",
+        message: String(e?.message || e),
+      });
   }
 }
 
