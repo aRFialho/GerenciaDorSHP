@@ -21,6 +21,22 @@ async function getActiveShopOrFail(req, res) {
   }
   return shop;
 }
+
+function normalizeStatus(s) {
+  return String(s || "")
+    .toUpperCase()
+    .trim();
+}
+
+const HIDDEN_STATUSES = [
+  "COMPLETED", // finalizado
+  "CANCELLED", // cancelado
+  "RETURNED", // devolvido
+  "TO_CONFIRM_RECEIVE", // entregue/aguardando confirmação (geralmente “já entregue”)
+  "IN_CANCEL", // em cancelamento
+  "TO_RETURN", // em devolução
+];
+
 async function list(req, res) {
   const shop = await getActiveShopOrFail(req, res);
   if (!shop) return;
@@ -28,7 +44,10 @@ async function list(req, res) {
   const limit = Math.min(Number(req.query.limit || 60), 200);
 
   const items = await prisma.order.findMany({
-    where: { shopId: shop.id },
+    where: {
+      shopId: shop.id,
+      NOT: { orderStatus: { in: HIDDEN_STATUSES } },
+    },
     orderBy: { shopeeUpdateTime: "desc" },
     take: limit,
     select: {
