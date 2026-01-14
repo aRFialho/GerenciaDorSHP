@@ -115,9 +115,9 @@ model Order {
   region      String?
   currency    String?
 
-  daysToShip Int?
-  shipByDate DateTime?
-
+  daysToShip       Int?
+  shipByDate       DateTime?
+  gmvCents         Int       @default(0)
   shopeeCreateTime DateTime?
   shopeeUpdateTime DateTime?
 

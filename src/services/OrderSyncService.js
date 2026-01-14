@@ -151,9 +151,29 @@ function isOrderClosed(orderStatus) {
   return ["COMPLETED", "CANCELLED", "RETURNED"].includes(s);
 }
 
+function extractGmvCents(detail) {
+  const keys = [
+    "total_amount",
+    "totalAmount",
+    "order_total",
+    "orderTotal",
+    "gmv",
+    "total",
+  ];
+  for (const k of keys) {
+    let v = detail?.[k];
+    if (v == null) continue;
+    if (typeof v === "string") v = Number(v.replace(",", "."));
+    if (!Number.isFinite(v)) continue;
+    if (Number.isInteger(v) && v >= 1000) return v; // assume já em centavos
+    return Math.round(v * 100); // assume em reais
+  }
+  return null;
+}
+
 async function upsertOrderAndSnapshot(shopInternalId, detail) {
   const orderSn = String(detail.order_sn);
-
+  const gmvCandidate = extractGmvCents(detail);
   const shipByDate = detail.ship_by_date
     ? new Date(Number(detail.ship_by_date) * 1000)
     : null;
@@ -161,6 +181,7 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
   const order = await prisma.order.upsert({
     where: { shopId_orderSn: { shopId: shopInternalId, orderSn } },
     create: {
+      gmvCents: gmvCandidate ?? 0,
       shopId: shopInternalId,
       orderSn,
       orderStatus: detail.order_status || null,
@@ -183,6 +204,7 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
       reverseShippingFee: detail.reverse_shipping_fee ?? null,
     },
     update: {
+      gmvCents: gmvCandidate ?? 0,
       orderStatus: detail.order_status || null,
       region: detail.region || null,
       currency: detail.currency || null,

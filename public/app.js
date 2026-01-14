@@ -5,7 +5,7 @@ let PRODUCTS_Q = "";
 let PRODUCTS_SORT_BY = "updatedAt";
 let PRODUCTS_SORT_DIR = "desc";
 let GEO_STATIC = null;
-
+let DASH_CHART = null;
 let ME = null; // cache do /me
 let ACTIVE_SHOP_ID = null; // Shop.id (DB) vindo da sessão
 
@@ -20,6 +20,11 @@ function formatBRLFixed90(value) {
     style: "currency",
     currency: "BRL",
   });
+}
+
+function formatBRLCents(cents) {
+  const n = Number(cents || 0) / 100;
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function $(sel) {
@@ -69,7 +74,12 @@ function initTabs() {
 
       // garante loja ativa antes de carregar módulos
 
-      if (tab === "products" || tab === "orders" || tab === "geo-sales") {
+      if (
+        tab === "products" ||
+        tab === "orders" ||
+        tab === "geo-sales" ||
+        tab === "dashboard"
+      ) {
         await ensureShopSelected();
       }
 
@@ -77,6 +87,7 @@ function initTabs() {
       if (tab === "orders") loadOrders();
       if (tab === "admin") loadAdmin();
       if (tab === "geo-sales") loadGeoSales();
+      if (tab === "dashboard") loadDashboard();
     });
   });
 }
@@ -156,7 +167,6 @@ async function ensureShopSelected() {
   const shops = Array.isArray(ME?.shops) ? ME.shops : [];
   const active = ME?.activeShopId ?? null;
 
-  // 0 lojas: ainda não vinculou Shopee
   if (shops.length === 0) {
     openModal(
       "Conectar Shopee",
@@ -166,21 +176,74 @@ async function ensureShopSelected() {
     return;
   }
 
-  // 1 loja: se não estiver ativa, seleciona automaticamente
   if (shops.length === 1 && !active) {
     await apiPost("/auth/select-shop", { shopId: shops[0].id });
     await loadMe();
     return;
   }
 
-  // 2 lojas: se não tiver ativa, pede seleção via popup
   if (shops.length > 1 && !active) {
     await promptSelectShop(shops);
     await loadMe();
     return;
   }
 }
+async function loadDashboard() {
+  await ensureShopSelected();
+  const msg = document.getElementById("dashMsg");
+  if (msg) msg.textContent = "Carregando...";
 
+  try {
+    const data = await apiGet(
+      `/shops/${SHOP_PATH_PLACEHOLDER}/dashboard/monthly-sales`
+    );
+
+    setText("dashPeriodLabel", data.period.label);
+    setText(
+      "dashDayLabel",
+      `${data.period.dayOfMonth}/${data.period.daysInMonth}`
+    );
+    setText("dashProgressLabel", `${data.period.progressPct}%`);
+
+    setText("dashGmvMtd", formatBRLCents(data.metrics.gmvMtdCents));
+    setText("dashAvgPerDay", formatBRLCents(data.metrics.avgPerDayCents));
+    setText("dashProjection", formatBRLCents(data.metrics.projectionCents));
+    setText("dashAdsStatus", "Ads não configurado");
+    setText(
+      "dashOrganicEstimated",
+      formatBRLCents(data.metrics.organicEstimatedCents)
+    );
+    setText("dashOrdersCount", String(data.metrics.ordersCountMtd));
+    setText("dashTicketAvg", formatBRLCents(data.metrics.ticketAvgCents));
+    setText("dashFormula", "(total do mês ÷ dia atual) × dias do mês");
+
+    const labels = data.dailyBars.map((d) => d.day);
+    const values = data.dailyBars.map((d) => (d.gmvCents || 0) / 100);
+
+    const today = data.period.dayOfMonth;
+    const colors = labels.map((day) =>
+      day < today
+        ? "rgba(59,130,246,0.55)"
+        : day === today
+        ? "rgba(34,197,94,0.75)"
+        : "rgba(148,163,184,0.25)"
+    );
+
+    const ctx = document.getElementById("dashSalesChart")?.getContext("2d");
+    if (DASH_CHART) DASH_CHART.destroy();
+    if (ctx) {
+      DASH_CHART = new Chart(ctx, {
+        type: "bar",
+        data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
+        options: { responsive: true, plugins: { legend: { display: false } } },
+      });
+    }
+
+    if (msg) msg.textContent = "";
+  } catch (e) {
+    if (msg) msg.textContent = `Erro: ${e.message}`;
+  }
+}
 async function promptSelectShop(shops) {
   const optionsHtml = shops
     .map((s) => {
@@ -1935,9 +1998,17 @@ async function boot() {
   initHeaderButtons();
   initAuthTab();
   initOrdersAlertsPopover();
+  document
+    .getElementById("btnDashReload")
+    ?.addEventListener("click", loadDashboard);
   try {
     await loadMe();
     await startShopeeOauthFlowIfRequested();
+    const dashPanel = document.getElementById("tab-dashboard");
+    if (dashPanel && dashPanel.classList.contains("active")) {
+      await ensureShopSelected();
+      await loadDashboard();
+    }
   } catch (e) {
     setText("auth-status", "Não autenticado. Recarregue a página.");
   }

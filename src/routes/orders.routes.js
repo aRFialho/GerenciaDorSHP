@@ -6,7 +6,7 @@ const DebugShopeeController = require("../controllers/DebugShopeeController");
 const { requireDebugToken } = require("../middlewares/debugToken");
 const OrderAddressAlertsController = require("../controllers/OrderAddressAlertsController");
 const GeoSalesController = require("../controllers/GeoSalesController");
-
+const DashboardController = require("../controllers/DashboardController");
 const router = express.Router();
 
 router.use(requireAuth);
@@ -25,7 +25,10 @@ router.get(
   requireDebugToken,
   DebugShopeeController.testShopeeOrderDetailMask
 );
-
+router.get(
+  "/shops/active/dashboard/monthly-sales",
+  DashboardController.monthlySales
+);
 const DebugController = require("../controllers/DebugController");
 router.get("/debug/egress-ip", requireDebugToken, DebugController.egressIp);
 
