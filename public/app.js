@@ -205,6 +205,10 @@ async function loadDashboard() {
     setText("dashProjection", formatBRLCents(data.metrics.projectionCents));
     setText("dashAdsStatus", "Ads: Ads não configurado");
     setText(
+      "dashAdsAttributed",
+      formatBRLCents(data.metrics.adsAttributedCents || 0)
+    );
+    setText(
       "dashOrganicEstimated",
       formatBRLCents(data.metrics.organicEstimatedCents)
     );
