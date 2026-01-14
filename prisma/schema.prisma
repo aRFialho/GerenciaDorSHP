@@ -154,8 +154,8 @@ model OrderGeoAddress {
 
   state     String
   stateNorm String
-  city      String
-  cityNorm  String
+  city      String?
+  cityNorm  String?
 
   zipcode     String?
   fullAddress String? @db.Text

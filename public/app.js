@@ -597,7 +597,7 @@ async function openOrderDetail(orderSn) {
 let GEO_READY = false;
 let GEO_VIEW = "BR"; // "BR" | "UF"
 let GEO_UF = null;
-
+let GEO_LEGEND_CTRL = null;
 let GEO_MONTHS = 6;
 
 let GEO_MAP = null;
@@ -828,6 +828,71 @@ async function geoZoomToCity(cityNorm) {
   GEO_MAP.setView([lat, lng], 9, { animate: true });
 }
 
+function buildLegendRanges(max) {
+  // você pode ajustar esses “degraus” como preferir
+  if (max <= 0) return [];
+
+  // Exemplo com ranges fixos que incluem "10–20"
+  // e se max for maior, cria o último como "21+"
+  const ranges = [
+    { from: 1, to: 5 },
+    { from: 6, to: 10 },
+    { from: 11, to: 20 },
+  ];
+
+  if (max > 20) ranges.push({ from: 21, to: max });
+
+  // remove ranges que não fazem sentido dado o max
+  return ranges
+    .filter((r) => r.from <= max)
+    .map((r) => ({
+      from: r.from,
+      to: Math.min(r.to, max),
+    }));
+}
+
+function setMapLegend({ max, title }) {
+  if (!GEO_MAP) return;
+
+  // remove a legenda anterior
+  if (GEO_LEGEND_CTRL) {
+    GEO_LEGEND_CTRL.remove();
+    GEO_LEGEND_CTRL = null;
+  }
+
+  const ranges = buildLegendRanges(max);
+
+  GEO_LEGEND_CTRL = L.control({ position: "bottomright" });
+  GEO_LEGEND_CTRL.onAdd = function () {
+    const div = L.DomUtil.create("div", "geo-map-legend");
+
+    const head = `<div class="geo-map-legend__title">${escapeHtml(
+      title
+    )}</div>`;
+    if (!ranges.length) {
+      div.innerHTML =
+        head + `<div class="geo-map-legend__item muted">Sem dados</div>`;
+      return div;
+    }
+
+    const items = ranges
+      .map((r) => {
+        const ratio = max > 0 ? r.to / max : 0; // usa o topo do range para amostrar a cor
+        const swatch = colorForRatio(ratio);
+        const label = r.to >= max ? `${r.from}+` : `${r.from}–${r.to}`;
+        return `<div class="geo-map-legend__item"><span class="geo-map-legend__swatch" style="background:${swatch};"></span><span class="geo-map-legend__label">${escapeHtml(
+          label
+        )} vendas</span></div>`;
+      })
+      .join("");
+
+    div.innerHTML = head + items;
+    return div;
+  };
+
+  GEO_LEGEND_CTRL.addTo(GEO_MAP);
+}
+
 async function renderGeoBrazil() {
   ensureGeoDomBound();
   ensureGeoMap();
@@ -877,7 +942,7 @@ async function renderGeoBrazil() {
     const uf = getUfFromFeature(feature);
     const c = uf ? countMap.get(uf) || 0 : 0;
     const r = max > 0 ? c / max : 0;
-
+    setMapLegend({ max, title: "Vendas (UF)" });
     return {
       weight: 1,
       color: borderForRatio(r),

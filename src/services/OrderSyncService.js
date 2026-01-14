@@ -8,8 +8,9 @@ function nowTs() {
 
 function parseRangeDays(v) {
   const n = Number(v);
-  if ([7, 15, 30, 60].includes(n)) return n;
-  return 7;
+  if (!Number.isFinite(n)) return 7;
+  const x = Math.floor(n);
+  return Math.min(Math.max(x, 1), 180);
 }
 
 function addressKeyFromShopee(addr) {
@@ -47,49 +48,74 @@ function normalizeZipcode(v) {
 
 function looksMasked(v) {
   const s = String(v || "").trim();
-  if (!s) return true;
-  return s.includes("*") || s.toLowerCase().includes("xxx");
+  if (!s) return false;
+  const low = s.toLowerCase();
+  return s.includes("*") || low.includes("xxx") || low.includes("masked");
 }
 
 async function persistOrderGeoAddressOnce({ shopInternalId, order, addr }) {
-  // Precisamos no mínimo de cidade/estado para o mapa
   const stateRaw = String(addr?.state || "").trim();
   const cityRaw = String(addr?.city || "").trim();
 
-  if (!stateRaw || !cityRaw) return;
-  if (looksMasked(stateRaw) || looksMasked(cityRaw)) return;
+  if (!stateRaw || looksMasked(stateRaw)) return; // UF é o mínimo mesmo
 
-  // "salvar 1x": se já existe, não atualiza
-  const exists = await prisma.orderGeoAddress.findUnique({
+  const payload = {
+    shopId: shopInternalId,
+    orderId: order.id,
+    orderSn: order.orderSn,
+
+    state: stateRaw,
+    stateNorm: normalizeStr(stateRaw),
+
+    // cidade opcional (para permitir “UF-only”)
+    city: cityRaw && !looksMasked(cityRaw) ? cityRaw : null,
+    cityNorm: cityRaw && !looksMasked(cityRaw) ? normalizeStr(cityRaw) : null,
+
+    zipcode: addr?.zipcode ? String(addr.zipcode) : null,
+
+    // se mascarado, não salva endereço completo
+    fullAddress:
+      addr?.full_address && !looksMasked(addr.full_address)
+        ? String(addr.full_address)
+        : null,
+
+    // datas: evite null pra ajudar filtros do mapa
+    shopeeCreateTime:
+      order.shopeeCreateTime || order.shopeeUpdateTime || new Date(),
+    shopeeUpdateTime: order.shopeeUpdateTime || null,
+  };
+
+  // Se já existe: não “regride”, só melhora dados (ex.: antes sem city, agora com city)
+  const existing = await prisma.orderGeoAddress.findUnique({
     where: { orderId: order.id },
-    select: { id: true },
+    select: { id: true, city: true, fullAddress: true },
   });
-  if (exists) return;
 
-  try {
-    await prisma.orderGeoAddress.create({
+  if (!existing) {
+    try {
+      await prisma.orderGeoAddress.create({ data: payload });
+    } catch (_) {}
+    return;
+  }
+
+  const shouldUpdate =
+    (!existing.city && payload.city) ||
+    (!existing.fullAddress && payload.fullAddress);
+
+  if (shouldUpdate) {
+    await prisma.orderGeoAddress.update({
+      where: { orderId: order.id },
       data: {
-        shopId: shopInternalId,
-        orderId: order.id,
-        orderSn: order.orderSn,
-
-        state: stateRaw,
-        stateNorm: normalizeStr(stateRaw),
-        city: cityRaw,
-        cityNorm: normalizeStr(cityRaw),
-
-        zipcode: addr?.zipcode ? String(addr.zipcode) : null,
-        fullAddress: addr?.full_address ? String(addr.full_address) : null,
-
-        shopeeCreateTime: order.shopeeCreateTime || null,
-        shopeeUpdateTime: order.shopeeUpdateTime || null,
+        city: payload.city ?? undefined,
+        cityNorm: payload.cityNorm ?? undefined,
+        fullAddress: payload.fullAddress ?? undefined,
+        zipcode: payload.zipcode ?? undefined,
+        shopeeCreateTime: payload.shopeeCreateTime,
+        shopeeUpdateTime: payload.shopeeUpdateTime,
+        state: payload.state,
+        stateNorm: payload.stateNorm,
       },
     });
-  } catch (e) {
-    // Se dois workers tentarem criar ao mesmo tempo, o @unique(orderId) pode disparar.
-    // Como a regra é "não atualizar", a gente só ignora conflito de duplicidade.
-    // (Se quiser, eu deixo esse catch mais específico por código de erro do Prisma.)
-    return;
   }
 }
 

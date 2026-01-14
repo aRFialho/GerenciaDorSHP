@@ -147,6 +147,7 @@ async function byCityInState(req, res) {
       shopId: shop.id,
       shopeeCreateTime: { gte: from },
       stateNorm: { in: stateNorms },
+      cityNorm: { not: null }, // ✅ importante
     },
     _count: { _all: true },
   });
