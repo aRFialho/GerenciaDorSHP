@@ -73,13 +73,13 @@ model Shop {
   accountId Int?
   account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  shopId BigInt  @unique
-  region String?
-  status String  @default("UNKNOWN")
-
-  tokens   OAuthToken?
-  orders   Order[]
-  products Product[]
+  shopId       BigInt            @unique
+  region       String?
+  status       String            @default("UNKNOWN")
+  geoAddresses OrderGeoAddress[]
+  tokens       OAuthToken?
+  orders       Order[]
+  products     Product[]
 
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
@@ -126,9 +126,9 @@ model Order {
   advancePackage        Boolean?
   hotListingOrder       Boolean?
   isBuyerShopCollection Boolean?
-  messageToSeller       String?  @db.Text
-
-  reverseShippingFee Int?
+  messageToSeller       String?          @db.Text
+  geoAddress            OrderGeoAddress?
+  reverseShippingFee    Int?
 
   addressSnapshots OrderAddressSnapshot[]
   addressAlerts    OrderAddressChangeAlert[]
@@ -139,6 +139,36 @@ model Order {
   @@unique([shopId, orderSn])
   @@index([shopId, orderStatus])
   @@index([shopId, shipByDate])
+}
+
+model OrderGeoAddress {
+  id Int @id @default(autoincrement())
+
+  shopId Int
+  shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  orderId Int   @unique
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  orderSn String
+
+  state     String
+  stateNorm String
+  city      String
+  cityNorm  String
+
+  zipcode     String?
+  fullAddress String? @db.Text
+
+  shopeeCreateTime DateTime?
+  shopeeUpdateTime DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([shopId, orderSn])
+  @@index([shopId, stateNorm])
+  @@index([shopId, stateNorm, cityNorm])
+  @@index([shopId, shopeeCreateTime])
 }
 
 model OrderAddressSnapshot {

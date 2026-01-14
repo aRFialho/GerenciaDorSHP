@@ -4,6 +4,7 @@ let PRODUCTS_TOTAL_PAGES = 1;
 let PRODUCTS_Q = "";
 let PRODUCTS_SORT_BY = "updatedAt";
 let PRODUCTS_SORT_DIR = "desc";
+let GEO_STATIC = null;
 
 let ME = null; // cache do /me
 let ACTIVE_SHOP_ID = null; // Shop.id (DB) vindo da sessão
@@ -68,13 +69,14 @@ function initTabs() {
 
       // garante loja ativa antes de carregar módulos
 
-      if (tab === "products" || tab === "orders") {
+      if (tab === "products" || tab === "orders" || tab === "geo-sales") {
         await ensureShopSelected();
       }
 
       if (tab === "products") loadProducts();
       if (tab === "orders") loadOrders();
       if (tab === "admin") loadAdmin();
+      if (tab === "geo-sales") loadGeoSales();
     });
   });
 }
@@ -590,6 +592,451 @@ async function openOrderDetail(orderSn) {
   }
 }
 
+/* ---------------- Geo Sales (Mapa) ---------------- */
+
+let GEO_READY = false;
+let GEO_VIEW = "BR"; // "BR" | "UF"
+let GEO_UF = null;
+
+let GEO_MONTHS = 6;
+
+let GEO_MAP = null;
+let GEO_BASE = null;
+let GEO_STATES_LAYER = null;
+let GEO_HEAT = null;
+
+let GEO_BR_GEOJSON = null; // cache do geojson Brasil
+let GEO_STATE_POINTS_CACHE = new Map(); // uf -> points[]
+
+function normTextGeo(v) {
+  return String(v || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getUfFromFeature(feature) {
+  const p = feature?.properties || {};
+  const cand =
+    p.sigla ||
+    p.SIGLA ||
+    p.uf ||
+    p.UF ||
+    p.abbrev ||
+    p.ABBREV ||
+    p.SIGLA_UF ||
+    feature?.id ||
+    null;
+
+  if (!cand) return null;
+
+  const s = String(cand).toUpperCase().trim();
+  if (/^[A-Z]{2}$/.test(s)) return s;
+
+  const m = s.match(/([A-Z]{2})$/);
+  return m ? m[1] : null;
+}
+
+function clamp(n, a, b) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return a;
+  return Math.max(a, Math.min(b, x));
+}
+
+function colorForRatio(r) {
+  // r: 0..1
+  const x = clamp(r, 0, 1);
+
+  // escala “quente” (laranja -> rosa)
+  // retorna rgba para ficar elegante no tema escuro
+  const a = 0.12 + 0.55 * x;
+  if (x < 0.5) {
+    // laranja
+    return `rgba(255, 106, 0, ${a.toFixed(3)})`;
+  }
+  // rosa
+  return `rgba(255, 46, 147, ${a.toFixed(3)})`;
+}
+
+function borderForRatio(r) {
+  const x = clamp(r, 0, 1);
+  const a = 0.1 + 0.55 * x;
+  return `rgba(255,255,255,${a.toFixed(3)})`;
+}
+
+function fmtInt(n) {
+  const x = Number(n || 0);
+  return Number.isFinite(x) ? x.toLocaleString("pt-BR") : "0";
+}
+
+async function loadGeoStatic() {
+  if (GEO_STATIC) return GEO_STATIC;
+  GEO_STATIC = await apiGet("/json/Geo.json");
+  return GEO_STATIC;
+}
+
+async function loadBrStatesGeoJson() {
+  const data = await loadGeoStatic();
+  return data?.brStatesGeoJson || null;
+}
+
+async function loadUfPoints(uf) {
+  const data = await loadGeoStatic();
+  const key = String(uf || "").toUpperCase();
+  const arr = data?.cityPointsByUf?.[key];
+  return Array.isArray(arr) ? arr : [];
+}
+
+function ensureGeoDomBound() {
+  if (GEO_READY) return;
+  GEO_READY = true;
+
+  const sel = $("#geoSalesMonths");
+  const btnReload = $("#geoSalesReload");
+  const btnBack = $("#geoSalesBack");
+
+  if (sel) {
+    GEO_MONTHS = Number(sel.value || 6);
+    setText("geoSalesMonthsLabel", String(GEO_MONTHS));
+
+    sel.addEventListener("change", async () => {
+      GEO_MONTHS = Number(sel.value || 6);
+      setText("geoSalesMonthsLabel", String(GEO_MONTHS));
+      await loadGeoSales(); // recarrega mantendo a view atual
+    });
+  }
+
+  if (btnReload) {
+    btnReload.addEventListener("click", async () => {
+      await loadGeoSales();
+    });
+  }
+
+  if (btnBack) {
+    btnBack.addEventListener("click", async () => {
+      GEO_VIEW = "BR";
+      GEO_UF = null;
+      await renderGeoBrazil();
+    });
+  }
+}
+
+function ensureGeoMap() {
+  if (GEO_MAP) return;
+
+  const el = $("#geoSalesMap");
+  if (!el) return;
+
+  GEO_MAP = L.map(el, {
+    zoomControl: true,
+    scrollWheelZoom: true,
+  }).setView([-14.2, -51.9], 4);
+
+  GEO_BASE = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: "&copy; OpenStreetMap",
+  }).addTo(GEO_MAP);
+}
+
+function setGeoHeader({ title, subtitle, indexSubtitle, showBack }) {
+  setText("geoSalesTitle", title);
+  setText("geoSalesSubtitle", subtitle);
+  setText("geoSalesIndexSubtitle", indexSubtitle);
+
+  const back = $("#geoSalesBack");
+  if (back) back.style.display = showBack ? "" : "none";
+}
+
+function renderGeoIndex(items, { mode, activeKey }) {
+  const root = $("#geoSalesIndex");
+  if (!root) return;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    root.innerHTML = `<div class="muted">Sem dados para o período selecionado.</div>`;
+    return;
+  }
+
+  const max = Math.max(...items.map((x) => Number(x.count || 0)));
+  const html =
+    `<div class="geo-index">` +
+    items
+      .map((x) => {
+        const name = mode === "BR" ? String(x.uf) : String(x.city || "—");
+        const key =
+          mode === "BR"
+            ? String(x.uf)
+            : String(x.cityNorm || normTextGeo(x.city));
+        const pct = max > 0 ? (Number(x.count || 0) / max) * 100 : 0;
+        const active = activeKey && String(activeKey) === String(key);
+
+        return `
+          <div class="geo-index-item ${
+            active ? "is-active" : ""
+          }" data-geo-item="${escapeHtml(key)}" data-geo-mode="${escapeHtml(
+          mode
+        )}">
+            <div class="geo-index-top">
+              <div class="geo-index-name">${escapeHtml(name)}</div>
+              <div class="geo-index-count">${escapeHtml(
+                fmtInt(x.count || 0)
+              )}</div>
+            </div>
+            <div class="geo-index-bar"><div style="width:${pct.toFixed(
+              2
+            )}%"></div></div>
+          </div>
+        `;
+      })
+      .join("") +
+    `</div>`;
+
+  root.innerHTML = html;
+
+  $all("[data-geo-item]").forEach((el) => {
+    el.addEventListener("click", async () => {
+      const mode = el.getAttribute("data-geo-mode");
+      const key = el.getAttribute("data-geo-item");
+
+      if (mode === "BR") {
+        const uf = String(key || "").toUpperCase();
+        GEO_VIEW = "UF";
+        GEO_UF = uf;
+        await renderGeoState(uf);
+      } else {
+        // Em UF: clicar no item dá zoom em um ponto (se existir)
+        const cityNorm = String(key || "");
+        await geoZoomToCity(cityNorm);
+      }
+    });
+  });
+}
+
+async function geoZoomToCity(cityNorm) {
+  if (!GEO_MAP || !GEO_UF) return;
+
+  const pts = await loadUfPoints(GEO_UF);
+  const match = pts.find((p) => normTextGeo(p.city || p.name) === cityNorm);
+  if (!match) return;
+
+  const lat = Number(match.lat);
+  const lng = Number(match.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+  GEO_MAP.setView([lat, lng], 9, { animate: true });
+}
+
+async function renderGeoBrazil() {
+  ensureGeoDomBound();
+  ensureGeoMap();
+
+  setGeoHeader({
+    title: "Brasil",
+    subtitle: "Vendas por estado",
+    indexSubtitle: "Vendas por estado",
+    showBack: false,
+  });
+
+  // limpa heat layer (se estiver em UF)
+  if (GEO_HEAT) {
+    GEO_MAP.removeLayer(GEO_HEAT);
+    GEO_HEAT = null;
+  }
+
+  const months = GEO_MONTHS || 6;
+  setText("geoSalesLegend", "Carregando…");
+
+  const data = await apiGet(
+    `/shops/${SHOP_PATH_PLACEHOLDER}/geo/sales?months=${encodeURIComponent(
+      String(months)
+    )}`
+  );
+  const items = Array.isArray(data?.items) ? data.items : [];
+
+  // mapa uf -> count
+  const countMap = new Map(
+    items.map((x) => [String(x.uf).toUpperCase(), Number(x.count || 0)])
+  );
+  const max = Math.max(0, ...Array.from(countMap.values()));
+
+  // index (lado direito)
+  renderGeoIndex(items, { mode: "BR", activeKey: GEO_UF });
+
+  // geojson do Brasil
+  const geo = await loadBrStatesGeoJson();
+
+  // remove layer antigo
+  if (GEO_STATES_LAYER) {
+    GEO_MAP.removeLayer(GEO_STATES_LAYER);
+    GEO_STATES_LAYER = null;
+  }
+
+  function styleFeature(feature) {
+    const uf = getUfFromFeature(feature);
+    const c = uf ? countMap.get(uf) || 0 : 0;
+    const r = max > 0 ? c / max : 0;
+
+    return {
+      weight: 1,
+      color: borderForRatio(r),
+      fillColor: colorForRatio(r),
+      fillOpacity: 0.85,
+    };
+  }
+
+  function onEachFeature(feature, layer) {
+    const uf = getUfFromFeature(feature) || "—";
+    const c = countMap.get(uf) || 0;
+
+    layer.on("click", async () => {
+      GEO_VIEW = "UF";
+      GEO_UF = uf;
+      await renderGeoState(uf);
+    });
+
+    layer.on("mouseover", () => {
+      layer.setStyle({ weight: 2, color: "rgba(238,77,45,0.85)" });
+      layer
+        .bindTooltip(`${uf} • ${fmtInt(c)} venda(s)`, { sticky: true })
+        .openTooltip();
+    });
+
+    layer.on("mouseout", () => {
+      GEO_STATES_LAYER.resetStyle(layer);
+      layer.closeTooltip();
+    });
+  }
+
+  GEO_STATES_LAYER = L.geoJSON(geo, {
+    style: styleFeature,
+    onEachFeature: onEachFeature,
+  }).addTo(GEO_MAP);
+
+  // zoom para Brasil
+  try {
+    GEO_MAP.fitBounds(GEO_STATES_LAYER.getBounds(), { padding: [18, 18] });
+  } catch (_) {}
+
+  setText(
+    "geoSalesLegend",
+    `Período: últimos ${months} meses • Total (com geo): ${fmtInt(
+      data?.total || 0
+    )}`
+  );
+}
+
+async function renderGeoState(uf) {
+  ensureGeoDomBound();
+  ensureGeoMap();
+
+  const months = GEO_MONTHS || 6;
+  const UF = String(uf || "").toUpperCase();
+
+  setGeoHeader({
+    title: `Estado: ${UF}`,
+    subtitle: "Vendas por cidade (heatmap)",
+    indexSubtitle: "Vendas por cidade",
+    showBack: true,
+  });
+
+  setText("geoSalesLegend", "Carregando…");
+
+  // carrega agregação por cidade
+  const data = await apiGet(
+    `/shops/${SHOP_PATH_PLACEHOLDER}/geo/sales/${encodeURIComponent(
+      UF
+    )}?months=${encodeURIComponent(String(months))}`
+  );
+
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const cityCount = new Map(
+    items.map((x) => [
+      String(x.cityNorm || normTextGeo(x.city)),
+      Number(x.count || 0),
+    ])
+  );
+
+  // index (lado direito)
+  renderGeoIndex(items, { mode: "UF", activeKey: null });
+
+  // carrega pontos do estado
+  const pts = await loadUfPoints(UF);
+
+  // monta heat points
+  const max = Math.max(0, ...items.map((x) => Number(x.count || 0)));
+
+  const heatPoints = [];
+  for (const p of pts) {
+    const lat = Number(p.lat);
+    const lng = Number(p.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+    const cityNorm = normTextGeo(p.city || p.name);
+    const c = cityCount.get(cityNorm) || 0;
+    if (c <= 0) continue;
+
+    // intensidade 0..1
+    const intensity = max > 0 ? c / max : 0;
+    heatPoints.push([lat, lng, intensity]);
+  }
+
+  // remove layer de estados (pra não “poluir” no drilldown)
+  if (GEO_STATES_LAYER) {
+    GEO_MAP.removeLayer(GEO_STATES_LAYER);
+    GEO_STATES_LAYER = null;
+  }
+
+  // remove heat anterior
+  if (GEO_HEAT) {
+    GEO_MAP.removeLayer(GEO_HEAT);
+    GEO_HEAT = null;
+  }
+
+  GEO_HEAT = L.heatLayer(heatPoints, {
+    radius: 22,
+    blur: 18,
+    maxZoom: 10,
+    minOpacity: 0.25,
+    gradient: { 0.2: "#ff6a00", 0.6: "#ff2e93", 1.0: "#ffffff" },
+  }).addTo(GEO_MAP);
+
+  // zoom aproximado pro estado: usa bounds dos pontos
+  const latlngs = heatPoints.map((x) => [x[0], x[1]]);
+  if (latlngs.length) {
+    try {
+      GEO_MAP.fitBounds(latlngs, { padding: [18, 18] });
+    } catch (_) {}
+  }
+
+  setText(
+    "geoSalesLegend",
+    `Período: últimos ${months} meses • ${UF} • Total (com geo): ${fmtInt(
+      data?.total || 0
+    )}`
+  );
+}
+
+async function loadGeoSales() {
+  await ensureShopSelected();
+  ensureGeoDomBound();
+  ensureGeoMap();
+
+  // Leaflet precisa recalcular tamanho quando a tab fica visível
+  setTimeout(() => {
+    try {
+      GEO_MAP && GEO_MAP.invalidateSize();
+    } catch (_) {}
+  }, 60);
+
+  if (GEO_VIEW === "UF" && GEO_UF) {
+    await renderGeoState(GEO_UF);
+  } else {
+    await renderGeoBrazil();
+  }
+}
+
 /* ---------------- Products (DB) ---------------- */
 async function loadProducts() {
   const grid = $("#products-grid");
@@ -862,7 +1309,7 @@ function initSyncButtons() {
       setText("orders-sync-status", "Sincronizando pedidos...");
       try {
         const res = await apiPost(
-          `/shops/${SHOP_PATH_PLACEHOLDER}/orders/sync?rangeDays=7`
+          `/shops/${SHOP_PATH_PLACEHOLDER}/orders/sync?rangeDays=180`
         );
         setText(
           "orders-sync-status",

@@ -6,6 +6,11 @@
     <title>DAVANTTI • Shopee API</title>
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/css/ads.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link rel="stylesheet" href="/css/geo-sales.css" />
   </head>
   <body>
     <!-- Topbar (fina) -->
@@ -80,6 +85,10 @@
           <button class="tab ml-nav-item" data-tab="ads">
             <span class="ml-nav-item__label">Ads</span>
             <span class="ml-nav-item__hint muted">CPC</span>
+          </button>
+          <button class="tab ml-nav-item" data-tab="geo-sales">
+            <span class="ml-nav-item__label">Geografia de Vendas</span>
+            <span class="ml-nav-item__hint muted">Mapa / Heatmap</span>
           </button>
         </div>
       </aside>
@@ -792,6 +801,91 @@
             </div>
           </div>
         </section>
+        <!-- GEO SALES -->
+        <section id="tab-geo-sales" class="tab-panel">
+          <div class="page-title">
+            <h2>Geografia de Vendas</h2>
+            <div class="page-subtitle muted">
+              Mapa interativo • Últimos
+              <span id="geoSalesMonthsLabel">6</span> meses
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-card__header">
+              <div>
+                <div class="section-title" id="geoSalesTitle">Brasil</div>
+                <div class="muted" id="geoSalesSubtitle">Vendas por estado</div>
+              </div>
+
+              <div
+                class="section-actions"
+                style="display: flex; gap: 10px; flex-wrap: wrap"
+              >
+                <div class="field">
+                  <label class="muted" for="geoSalesMonths">Período</label>
+                  <select id="geoSalesMonths" class="select">
+                    <option value="3">Últimos 3 meses</option>
+                    <option value="6" selected>Últimos 6 meses</option>
+                  </select>
+                </div>
+
+                <button
+                  id="geoSalesBack"
+                  class="btn btn-ghost"
+                  type="button"
+                  style="display: none"
+                >
+                  Voltar
+                </button>
+
+                <button
+                  id="geoSalesReload"
+                  class="btn btn-primary"
+                  type="button"
+                >
+                  Atualizar
+                </button>
+              </div>
+            </div>
+
+            <div class="section-card__body">
+              <div class="split" style="gap: 12px">
+                <div class="section-card" style="margin: 0; flex: 2">
+                  <div class="section-card__body">
+                    <div
+                      id="geoSalesMap"
+                      style="
+                        height: 560px;
+                        border-radius: 14px;
+                        overflow: hidden;
+                      "
+                    ></div>
+                    <div
+                      class="muted"
+                      id="geoSalesLegend"
+                      style="margin-top: 10px"
+                    ></div>
+                  </div>
+                </div>
+
+                <div class="section-card" style="margin: 0; flex: 1">
+                  <div class="section-card__header">
+                    <div>
+                      <div class="section-title">Índice</div>
+                      <div class="muted" id="geoSalesIndexSubtitle">
+                        Vendas por estado
+                      </div>
+                    </div>
+                  </div>
+                  <div class="section-card__body">
+                    <div id="geoSalesIndex" class="muted">Carregando...</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -808,6 +902,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="/js/ads.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

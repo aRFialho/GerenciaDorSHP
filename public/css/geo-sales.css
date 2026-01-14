@@ -1,0 +1,132 @@
+/* ===== Geografia de Vendas (Mapa + Índice) ===== */
+
+#geoSalesMap{
+  border:1px solid rgba(255,255,255,0.10);
+  background:rgba(255,255,255,0.04);
+}
+
+/* Leaflet: melhora visual no tema escuro */
+#geoSalesMap .leaflet-container{
+  background:rgba(10,10,14,0.55);
+  outline:none;
+}
+
+#geoSalesMap .leaflet-control-zoom a{
+  background:rgba(15,15,20,0.92);
+  color:rgba(255,255,255,0.92);
+  border:1px solid rgba(255,255,255,0.16);
+  box-shadow:none;
+}
+#geoSalesMap .leaflet-control-zoom a:hover{
+  background:rgba(255,255,255,0.08);
+}
+
+#geoSalesMap .leaflet-control-attribution{
+  background:rgba(15,15,20,0.70);
+  color:rgba(255,255,255,0.70);
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.10);
+  padding:4px 8px;
+}
+#geoSalesMap .leaflet-control-attribution a{
+  color:rgba(255,255,255,0.85);
+}
+
+/* Tooltip/popup */
+#geoSalesMap .leaflet-tooltip{
+  background:rgba(15,15,20,0.92);
+  color:rgba(255,255,255,0.92);
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:10px;
+  padding:6px 10px;
+  box-shadow:0 18px 40px rgba(0,0,0,0.35);
+}
+#geoSalesMap .leaflet-tooltip-top:before,
+#geoSalesMap .leaflet-tooltip-bottom:before,
+#geoSalesMap .leaflet-tooltip-left:before,
+#geoSalesMap .leaflet-tooltip-right:before{
+  border-top-color:rgba(255,255,255,0.14);
+  border-bottom-color:rgba(255,255,255,0.14);
+  border-left-color:rgba(255,255,255,0.14);
+  border-right-color:rgba(255,255,255,0.14);
+}
+
+/* Índice (lado direito) */
+.geo-index{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.geo-index-item{
+  border:1px solid rgba(255,255,255,0.10);
+  background:rgba(255,255,255,0.04);
+  border-radius:12px;
+  padding:10px 10px;
+  cursor:pointer;
+  transition:transform 120ms ease,border-color 120ms ease,background 120ms ease;
+}
+
+.geo-index-item:hover{
+  transform:translateY(-1px);
+  border-color:rgba(238,77,45,0.45);
+  background:rgba(255,255,255,0.06);
+}
+
+.geo-index-item.is-active{
+  border-color:rgba(238,77,45,0.70);
+  background:rgba(238,77,45,0.14);
+}
+
+.geo-index-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.geo-index-name{
+  font-weight:900;
+  letter-spacing:0.2px;
+}
+
+.geo-index-count{
+  font-weight:900;
+  color:rgba(255,255,255,0.90);
+}
+
+.geo-index-bar{
+  height:8px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.08);
+  overflow:hidden;
+  margin-top:8px;
+  border:1px solid rgba(255,255,255,0.08);
+}
+
+.geo-index-bar > div{
+  height:100%;
+  width:0%;
+  background:linear-gradient(135deg,#ff6a00,#ff2e93);
+  border-radius:999px;
+}
+
+/* Legenda (abaixo do mapa) */
+.geo-legend{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.geo-legend-swatch{
+  width:16px;
+  height:10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.10);
+}
+.geo-legend-label{
+  color:rgba(255,255,255,0.70);
+  font-size:12px;
+  font-weight:800;
+}
