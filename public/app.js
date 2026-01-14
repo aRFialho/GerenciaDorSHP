@@ -74,12 +74,7 @@ function initTabs() {
 
       // garante loja ativa antes de carregar módulos
 
-      if (
-        tab === "products" ||
-        tab === "orders" ||
-        tab === "geo-sales" ||
-        tab === "dashboard"
-      ) {
+      if (tab === "products" || tab === "orders" || tab === "geo-sales") {
         await ensureShopSelected();
       }
 
@@ -208,34 +203,49 @@ async function loadDashboard() {
     setText("dashGmvMtd", formatBRLCents(data.metrics.gmvMtdCents));
     setText("dashAvgPerDay", formatBRLCents(data.metrics.avgPerDayCents));
     setText("dashProjection", formatBRLCents(data.metrics.projectionCents));
-    setText("dashAdsStatus", "Ads não configurado");
+    setText("dashAdsStatus", "Ads: Ads não configurado");
     setText(
       "dashOrganicEstimated",
       formatBRLCents(data.metrics.organicEstimatedCents)
     );
     setText("dashOrdersCount", String(data.metrics.ordersCountMtd));
     setText("dashTicketAvg", formatBRLCents(data.metrics.ticketAvgCents));
-    setText("dashFormula", "(total do mês ÷ dia atual) × dias do mês");
-
+    setText(
+      "dashFormula",
+      "( total_vendas_mês_atual / dia_atual ) x dias_do_mês"
+    );
     const labels = data.dailyBars.map((d) => d.day);
     const values = data.dailyBars.map((d) => (d.gmvCents || 0) / 100);
 
-    const today = data.period.dayOfMonth;
-    const colors = labels.map((day) =>
-      day < today
-        ? "rgba(59,130,246,0.55)"
-        : day === today
-        ? "rgba(34,197,94,0.75)"
-        : "rgba(148,163,184,0.25)"
+    const today = Number(data?.period?.dayOfMonth || 1);
+
+    const colors = labels.map(
+      (day) =>
+        day < today
+          ? "rgba(255, 106, 0, 0.35)" // passado (laranja)
+          : day === today
+          ? "rgba(255, 46, 147, 0.55)" // hoje (rosa)
+          : "rgba(148, 163, 184, 0.18)" // futuro (cinza)
     );
 
     const ctx = document.getElementById("dashSalesChart")?.getContext("2d");
     if (DASH_CHART) DASH_CHART.destroy();
     if (ctx) {
+      if (!window.Chart) {
+        if (msg) msg.textContent = "Chart.js não carregou.";
+        return;
+      }
       DASH_CHART = new Chart(ctx, {
         type: "bar",
         data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
-        options: { responsive: true, plugins: { legend: { display: false } } },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false }, tooltip: { enabled: true } },
+          scales: {
+            x: { grid: { display: false }, ticks: { display: false } },
+            y: { grid: { display: false }, ticks: { display: false } },
+          },
+        },
       });
     }
 
@@ -2006,7 +2016,6 @@ async function boot() {
     await startShopeeOauthFlowIfRequested();
     const dashPanel = document.getElementById("tab-dashboard");
     if (dashPanel && dashPanel.classList.contains("active")) {
-      await ensureShopSelected();
       await loadDashboard();
     }
   } catch (e) {

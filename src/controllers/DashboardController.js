@@ -4,6 +4,7 @@ async function getActiveShopOrFail(req, res) {
   if (!req.auth) return res.status(401).json({ error: "unauthorized" });
   const shopDbId = req.auth.activeShopId || null;
   if (!shopDbId) return res.status(409).json({ error: "select_shop_required" });
+
   const shop = await prisma.shop.findFirst({
     where: { id: shopDbId, accountId: req.auth.accountId },
   });
@@ -12,69 +13,76 @@ async function getActiveShopOrFail(req, res) {
 }
 
 async function monthlySales(req, res) {
-  const shop = await getActiveShopOrFail(req, res);
-  if (!shop) return;
+  try {
+    const shop = await getActiveShopOrFail(req, res);
+    if (!shop) return;
 
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const daysInMonth = new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    0
-  ).getDate();
-  const dayOfMonth = now.getDate();
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const daysInMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0
+    ).getDate();
+    const dayOfMonth = now.getDate();
 
-  const orders = await prisma.order.findMany({
-    where: {
-      shopId: shop.id,
-      OR: [
-        { shopeeCreateTime: { gte: start, lte: now } },
-        { shopeeCreateTime: null, createdAt: { gte: start, lte: now } },
-      ],
-    },
-    select: { shopeeCreateTime: true, createdAt: true, gmvCents: true },
-  });
+    const orders = await prisma.order.findMany({
+      where: {
+        shopId: shop.id,
+        OR: [
+          { shopeeCreateTime: { gte: start, lte: now } },
+          { shopeeCreateTime: null, createdAt: { gte: start, lte: now } },
+        ],
+      },
+      select: { shopeeCreateTime: true, createdAt: true, gmvCents: true },
+    });
 
-  const daily = Array.from({ length: daysInMonth }, (_, i) => ({
-    day: i + 1,
-    gmvCents: 0,
-  }));
-  let gmvMtdCents = 0;
-  for (const o of orders) {
-    gmvMtdCents += o.gmvCents || 0;
-    daily[o.shopeeCreateTime.getDate() - 1].gmvCents += o.gmvCents || 0;
+    const daily = Array.from({ length: daysInMonth }, (_, i) => ({
+      day: i + 1,
+      gmvCents: 0,
+    }));
+    let gmvMtdCents = 0;
+
+    for (const o of orders) {
+      const dt = o.shopeeCreateTime || o.createdAt;
+      const cents = Number(o.gmvCents || 0);
+      gmvMtdCents += cents;
+      daily[dt.getDate() - 1].gmvCents += cents;
+    }
+
+    const avgPerDayCents = Math.round(gmvMtdCents / Math.max(1, dayOfMonth));
+    const projectionCents = avgPerDayCents * daysInMonth;
+    const ordersCountMtd = orders.length;
+    const ticketAvgCents = ordersCountMtd
+      ? Math.round(gmvMtdCents / ordersCountMtd)
+      : 0;
+
+    res.json({
+      period: {
+        label: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+          2,
+          "0"
+        )}`,
+        dayOfMonth,
+        daysInMonth,
+        progressPct: Math.round((dayOfMonth / daysInMonth) * 100),
+      },
+      metrics: {
+        gmvMtdCents,
+        avgPerDayCents,
+        projectionCents,
+        ordersCountMtd,
+        ticketAvgCents,
+        adsAttributedCents: null,
+        adsStatus: "not_configured",
+        organicEstimatedCents: gmvMtdCents,
+      },
+      dailyBars: daily,
+    });
+  } catch (e) {
+    console.error("monthlySales failed:", e);
+    res.status(500).json({ error: "dashboard_monthly_sales_failed" });
   }
-  const dt = o.shopeeCreateTime || o.createdAt;
-  daily[dt.getDate() - 1].gmvCents += o.gmvCents || 0;
-  const avgPerDayCents = Math.round(gmvMtdCents / Math.max(1, dayOfMonth));
-  const projectionCents = avgPerDayCents * daysInMonth;
-  const ordersCountMtd = orders.length;
-  const ticketAvgCents = ordersCountMtd
-    ? Math.round(gmvMtdCents / ordersCountMtd)
-    : 0;
-
-  res.json({
-    period: {
-      label: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
-        2,
-        "0"
-      )}`,
-      dayOfMonth,
-      daysInMonth,
-      progressPct: Math.round((dayOfMonth / daysInMonth) * 100),
-    },
-    metrics: {
-      gmvMtdCents,
-      avgPerDayCents,
-      projectionCents,
-      ordersCountMtd,
-      ticketAvgCents,
-      adsAttributedCents: null,
-      adsStatus: "not_configured",
-      organicEstimatedCents: gmvMtdCents,
-    },
-    dailyBars: daily,
-  });
 }
 
 module.exports = { monthlySales };
