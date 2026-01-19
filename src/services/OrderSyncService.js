@@ -358,18 +358,58 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
     for (const batch of batches) {
       if (batch.length === 0) continue;
 
-      const details = await requestShopeeAuthed({
-        method: "get",
-        path: "/api/v2/order/get_order_detail",
-        shopId: String(shopeeShopId),
-        query: {
-          order_sn_list: batch.join(","),
-          response_optional_fields:
-            "recipient_address,order_status,create_time,update_time,days_to_ship,ship_by_date,currency,total_amount,region,booking_sn,cod,advance_package,hot_listing_order,is_buyer_shop_collection,message_to_seller,reverse_shipping_fee",
-        },
-      });
+      let orderList = [];
 
-      const orderList = details?.response?.order_list || [];
+      try {
+        const details = await requestShopeeAuthed({
+          method: "get",
+          path: "/api/v2/order/get_order_detail",
+          shopId: String(shopeeShopId),
+          query: {
+            order_sn_list: batch.join(","),
+            response_optional_fields:
+              "recipient_address,order_status,create_time,update_time,days_to_ship,ship_by_date,currency,total_amount,region,booking_sn,cod,advance_package,hot_listing_order,is_buyer_shop_collection,message_to_seller,reverse_shipping_fee",
+          },
+        });
+
+        orderList = details?.response?.order_list || [];
+      } catch (e) {
+        const code = String(e?.shopee?.error || "");
+        if (code === "order_not_found" && batch.length > 1) {
+          // fallback: tenta 1 por 1
+          for (const sn of batch) {
+            try {
+              const details1 = await requestShopeeAuthed({
+                method: "get",
+                path: "/api/v2/order/get_order_detail",
+                shopId: String(shopeeShopId),
+                query: {
+                  order_sn_list: String(sn),
+                  response_optional_fields:
+                    "recipient_address,order_status,create_time,update_time,days_to_ship,ship_by_date,currency,total_amount,region,booking_sn,cod,advance_package,hot_listing_order,is_buyer_shop_collection,message_to_seller,reverse_shipping_fee",
+                },
+              });
+
+              const one = details1?.response?.order_list?.[0];
+              if (one) orderList.push(one);
+            } catch (e1) {
+              console.error(
+                "get_order_detail single failed:",
+                sn,
+                e1?.shopee || e1?.message || e1,
+              );
+            }
+          }
+        } else {
+          console.error(
+            "get_order_detail batch failed:",
+            e?.shopee || e?.message || e,
+          );
+          throw e;
+        }
+      }
+
+      // ✅ aqui usa o orderList que você montou (batch ou fallback)
       for (const d of orderList) {
         processed += 1;
         const { addressChanged, late, atRisk } = await upsertOrderAndSnapshot(
