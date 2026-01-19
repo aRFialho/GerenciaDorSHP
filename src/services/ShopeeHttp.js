@@ -59,7 +59,7 @@ async function requestShopee({
   };
 
   if (accessToken) params.access_token = accessToken;
-  if (shopId !== undefined && shopId !== null) params.shop_id = Number(shopId);
+  if (shopId !== undefined && shopId !== null) params.shop_id = String(shopId);
 
   let data = body;
 
