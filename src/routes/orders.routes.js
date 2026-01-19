@@ -24,7 +24,8 @@ router.get(
   requireDebugToken,
   DebugShopeeController.testShopeeOrderDetailMask,
 );
-
+router.get("/shops/active/orders", OrdersController.list);
+router.get("/shops/active/orders/:orderSn", OrdersController.detail);
 router.get(
   "/shops/active/orders/:orderSn/debug-totals",
   requireDebugToken,

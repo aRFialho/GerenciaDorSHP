@@ -529,6 +529,42 @@
           </div>
 
           <div id="orders-grid" class="grid"></div>
+          <div class="section-card orders-pagination">
+            <div class="section-card__body">
+              <div class="toolbar toolbar--between">
+                <div
+                  style="
+                    display: flex;
+                    gap: 10px;
+                    align-items: center;
+                    flex-wrap: wrap;
+                  "
+                >
+                  <span class="muted">Por página:</span>
+                  <select id="orders-page-size" class="select">
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="60" selected>60</option>
+                    <option value="100">100</option>
+                  </select>
+                  <div id="orders-page-info" class="muted">—</div>
+                </div>
+
+                <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                  <button id="orders-first" class="btn btn-ghost">
+                    Primeira
+                  </button>
+                  <button id="orders-prev" class="btn btn-ghost">
+                    Anterior
+                  </button>
+                  <button id="orders-next" class="btn btn-ghost">
+                    Próxima
+                  </button>
+                  <button id="orders-last" class="btn btn-ghost">Última</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
         <!-- ADS -->

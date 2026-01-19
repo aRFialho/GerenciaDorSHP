@@ -8,6 +8,10 @@ let GEO_STATIC = null;
 let DASH_CHART = null;
 let ME = null; // cache do /me
 let ACTIVE_SHOP_ID = null; // Shop.id (DB) vindo da sessão
+let ORDERS_PAGE = 1;
+let ORDERS_PAGE_SIZE = 60;
+let ORDERS_TOTAL_PAGES = 1;
+let ORDERS_TOTAL = 0;
 
 // Para Opção A: manter rotas /shops/:shopId/... mas backend ignora.
 // Usamos um placeholder fixo só para completar a URL.
@@ -316,6 +320,49 @@ function initSwitchShopShortcut() {
   });
 }
 
+let ORDERS_PAGER_BOUND = false;
+
+function initOrdersPager() {
+  if (ORDERS_PAGER_BOUND) return;
+  ORDERS_PAGER_BOUND = true;
+
+  const sel = $("#orders-page-size");
+  const first = $("#orders-first");
+  const prev = $("#orders-prev");
+  const next = $("#orders-next");
+  const last = $("#orders-last");
+
+  if (sel) {
+    sel.value = String(ORDERS_PAGE_SIZE);
+    sel.addEventListener("change", async () => {
+      ORDERS_PAGE_SIZE = Number(sel.value || 60);
+      ORDERS_PAGE = 1;
+      await loadOrders();
+    });
+  }
+
+  if (first)
+    first.addEventListener("click", async () => {
+      ORDERS_PAGE = 1;
+      await loadOrders();
+    });
+  if (prev)
+    prev.addEventListener("click", async () => {
+      ORDERS_PAGE = Math.max(1, ORDERS_PAGE - 1);
+      await loadOrders();
+    });
+  if (next)
+    next.addEventListener("click", async () => {
+      ORDERS_PAGE = Math.min(ORDERS_TOTAL_PAGES, ORDERS_PAGE + 1);
+      await loadOrders();
+    });
+  if (last)
+    last.addEventListener("click", async () => {
+      ORDERS_PAGE = ORDERS_TOTAL_PAGES;
+      await loadOrders();
+    });
+}
+
 /* ---------------- Orders (DB) ---------------- */
 
 let ORDERS_GRID_BOUND = false;
@@ -530,6 +577,7 @@ async function openOrderAddressChangeModal(orderSn) {
 }
 
 async function loadOrders() {
+  initOrdersPager();
   const grid = $("#orders-grid");
   bindOrdersGridClicks();
   grid.innerHTML = `<div class="card"><div class="muted">Carregando pedidos...</div></div>`;
@@ -537,9 +585,11 @@ async function loadOrders() {
   try {
     await ensureShopSelected();
 
-    const data = await apiGet(
-      `/shops/${SHOP_PATH_PLACEHOLDER}/orders?limit=60`,
-    );
+    const qs =
+      `page=${encodeURIComponent(String(ORDERS_PAGE))}` +
+      `&pageSize=${encodeURIComponent(String(ORDERS_PAGE_SIZE))}`;
+
+    const data = await apiGet(`/shops/${SHOP_PATH_PLACEHOLDER}/orders?${qs}`);
 
     const items = data.items || data.orders || [];
     if (!items.length) {
