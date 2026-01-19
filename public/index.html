@@ -98,145 +98,195 @@
       </aside>
 
       <main class="ml-main container">
-        <section id="tab-dashboard" class="tab-panel active">
+        <section id="tab-dashboard" class="tab-panel">
           <div class="dash-head">
             <div>
-              <div class="dash-title">Dashboard</div>
-              <div class="dash-subtitle muted">
-                Projeção do mês usando <strong id="dashFormula">—</strong>
+              <div class="dash-title" id="dashLiveTitle">
+                Vendas ao vivo (Hoje)
+              </div>
+              <div class="dash-subtitle" id="dashLiveSubtitle">
+                Atualizado agora
               </div>
             </div>
 
             <div class="dash-controls">
-              <div class="dash-toggle" id="dashModeToggle">
-                <button
-                  class="dash-toggle-btn is-active"
-                  id="dashModeMonth"
-                  type="button"
-                >
-                  Mês
-                </button>
-                <button
-                  class="dash-toggle-btn"
-                  id="dashModeToday"
-                  type="button"
-                >
-                  Hoje (ao vivo)
-                </button>
-              </div>
+              <label class="dash-switch">
+                <input id="dashLiveToggle" type="checkbox" />
+                <span class="dash-switch-track"
+                  ><span class="dash-switch-thumb"></span
+                ></span>
+              </label>
 
               <div class="dash-live">
-                <span class="dash-live-dot" title="Atualizando"></span>
-                <span class="muted">Atualizado:</span>
-                <span id="dashLiveUpdatedAt" class="muted">—</span>
+                <span class="dash-live-dot"></span>
+                <span id="dashLiveUpdatedAt">Atualizado agora</span>
               </div>
 
-              <button id="btnDashReload" class="btn btn-primary" type="button">
+              <button id="btnDashReload" class="btn btn-primary">
                 Atualizar
               </button>
             </div>
           </div>
 
-          <!-- Linha informativa compacta -->
-          <div class="dash-meta">
-            <div class="muted" id="dashAdsStatus">Ads não configurado</div>
-
-            <div class="dash-badges">
-              <span class="badge gray"
-                >Período: <span id="dashPeriodLabel">—</span></span
-              >
-              <span class="badge gray"
-                >Dia: <span id="dashDayLabel">—</span></span
-              >
-              <span class="badge gray"
-                >Progresso: <span id="dashProgressLabel">—</span></span
-              >
-            </div>
-          </div>
-
-          <!-- KPIs compactos -->
-          <div class="dash-kpis">
-            <div class="dash-kpi">
-              <div class="dash-kpi-top">
-                <div class="dash-kpi-title">Vendas</div>
-                <span class="badge" id="dashKpiModeBadge">MÊS</span>
+          <!-- ✅ LAYOUT MÊS (JS alterna com .is-hidden) -->
+          <div id="dashMonthLayout">
+            <div class="dash-kpis">
+              <div class="dash-kpi">
+                <div class="dash-kpi-title">GMV MTD</div>
+                <div class="dash-kpi-value" id="dashKpiGmvValue">—</div>
+                <div class="dash-kpi-sub">
+                  <span
+                    class="dash-trend dash-trend-up"
+                    id="dashKpiGmvTrendArrow"
+                    >↑</span
+                  >
+                  <span id="dashKpiGmvDelta">—</span>
+                </div>
               </div>
-              <div class="dash-kpi-value" id="dashGmvMtd">—</div>
-              <div class="dash-kpi-sub muted">GMV (mês atual)</div>
-            </div>
 
-            <div class="dash-kpi">
-              <div class="dash-kpi-top">
+              <div class="dash-kpi">
                 <div class="dash-kpi-title">Projeção</div>
-                <span class="badge gray">ESTIMADA</span>
+                <div class="dash-kpi-value" id="dashKpiProjectionValue">—</div>
+                <div class="dash-kpi-sub">
+                  <div class="dash-meter">
+                    <div class="dash-meter-bar" id="dashKpiProjectionBar"></div>
+                  </div>
+                  <span id="dashKpiProjectionMeta">—</span>
+                </div>
               </div>
-              <div class="dash-kpi-value" id="dashProjection">—</div>
-              <div class="dash-kpi-sub muted">Ritmo atual</div>
-            </div>
 
-            <div class="dash-kpi">
-              <div class="dash-kpi-top">
+              <div class="dash-kpi">
                 <div class="dash-kpi-title">Pedidos</div>
-                <span class="badge gray">MÊS</span>
+                <div class="dash-kpi-value" id="dashKpiOrdersValue">—</div>
+                <div class="dash-kpi-sub">
+                  <span
+                    class="dash-trend dash-trend-up"
+                    id="dashKpiOrdersTrendArrow"
+                    >↑</span
+                  >
+                  <span id="dashKpiOrdersToday">—</span>
+                </div>
               </div>
-              <div class="dash-kpi-value" id="dashOrdersCount">—</div>
-              <div class="dash-kpi-sub muted">Quantidade</div>
-            </div>
 
-            <div class="dash-kpi">
-              <div class="dash-kpi-top">
+              <div class="dash-kpi">
                 <div class="dash-kpi-title">Ticket médio</div>
-                <span class="badge gray">MÊS</span>
-              </div>
-              <div class="dash-kpi-value" id="dashTicketAvg">—</div>
-              <div class="dash-kpi-sub muted">GMV / pedidos</div>
-            </div>
-          </div>
-
-          <!-- Grid principal: gráfico + top vendidos -->
-          <div class="dash-grid">
-            <div class="dash-card dash-card-main">
-              <div class="dash-card-head">
-                <div>
-                  <div class="dash-card-title" id="dashChartTitle">
-                    Ritmo do mês
-                  </div>
-                  <div class="muted" id="dashChartSubtitle">
-                    Linha: acumulado + projeção • Ponto vermelho = hoje
-                  </div>
+                <div class="dash-kpi-value" id="dashKpiTicketValue">—</div>
+                <div class="dash-kpi-sub">
+                  <span
+                    class="dash-trend dash-trend-down"
+                    id="dashKpiTicketTrendArrow"
+                    >↓</span
+                  >
+                  <span id="dashKpiTicketDelta">—</span>
                 </div>
-                <div class="dash-card-right muted">
-                  Média/dia: <strong id="dashAvgPerDay">—</strong>
-                </div>
-              </div>
-
-              <div class="dash-card-body">
-                <canvas id="dashSalesChart" height="120"></canvas>
-                <div class="muted" id="dashMsg" style="margin-top: 10px"></div>
               </div>
             </div>
 
-            <div class="dash-card dash-card-side">
-              <div class="dash-card-head">
-                <div>
+            <div class="dash-grid-2">
+              <div class="dash-card">
+                <div class="dash-card-head">
+                  <div class="dash-card-title">Tendência de Vendas (Mês)</div>
+                  <div class="dash-card-right" id="dashTrendDelta">—</div>
+                </div>
+                <div class="dash-card-body">
+                  <canvas id="dashTrendMonthChart" height="120"></canvas>
+                </div>
+              </div>
+
+              <div class="dash-card">
+                <div class="dash-card-head">
                   <div class="dash-card-title">Top vendidos (mês)</div>
-                  <div class="muted">Mais vendidos no período atual</div>
+                  <div class="dash-card-right">GMV</div>
+                </div>
+                <div class="dash-card-body">
+                  <div id="dashTopSellersList" class="dash-top-target"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dash-grid-2">
+              <div class="dash-card">
+                <div class="dash-card-head">
+                  <div class="dash-card-title">Tendência de Vendas (Mês)</div>
+                  <div class="dash-card-right">Progresso</div>
+                </div>
+                <div class="dash-card-body">
+                  <canvas id="dashTrendRatioChart" height="120"></canvas>
                 </div>
               </div>
 
-              <div class="dash-card-body">
-                <div id="dashTopSellersList" class="dash-top-list">
-                  <div class="muted">Carregando...</div>
+              <div class="dash-card">
+                <div class="dash-card-head">
+                  <div class="dash-card-title">Resumo do mês</div>
+                  <div class="dash-card-right" id="dashMonthProgress">—</div>
                 </div>
-              </div>
-
-              <!-- Mantidos para compatibilidade (se você ainda usa esses valores no JS atual) -->
-              <div style="display: none">
-                <span id="dashAdsAttributed">—</span>
-                <span id="dashOrganicEstimated">—</span>
+                <div class="dash-card-body">
+                  <div class="dash-summary">
+                    <div class="dash-summary-row">
+                      <span>Período:</span
+                      ><strong id="dashMonthPeriod">—</strong>
+                    </div>
+                    <div class="dash-summary-row">
+                      <span>Dias decorridos:</span
+                      ><strong id="dashMonthDays">—</strong>
+                    </div>
+                    <div class="dash-summary-row">
+                      <span>Fórmula projeção:</span
+                      ><strong id="dashMonthFormula">—</strong>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+
+          <!-- ✅ LAYOUT HOJE (JS alterna com .is-hidden) -->
+          <div id="dashTodayLayout" class="is-hidden">
+            <!-- KPIs do HOJE (você vai preencher no loadDashboard() depois) -->
+            <div class="dash-kpis">
+              <div class="dash-kpi">
+                <div class="dash-kpi-title">GMV Hoje</div>
+                <div class="dash-kpi-value" id="dashTodayGmv">—</div>
+                <div class="dash-kpi-sub muted">Total do dia</div>
+              </div>
+
+              <div class="dash-kpi">
+                <div class="dash-kpi-title">Vs Ontem</div>
+                <div class="dash-kpi-value" id="dashTodayDelta">—</div>
+                <div class="dash-kpi-sub muted">Até a hora atual</div>
+              </div>
+
+              <div class="dash-kpi">
+                <div class="dash-kpi-title">Pedidos</div>
+                <div class="dash-kpi-value" id="dashTodayOrders">—</div>
+                <div class="dash-kpi-sub muted">Hoje</div>
+              </div>
+
+              <div class="dash-kpi">
+                <div class="dash-kpi-title">Ticket</div>
+                <div class="dash-kpi-value" id="dashTodayTicket">—</div>
+                <div class="dash-kpi-sub muted">Médio hoje</div>
+              </div>
+            </div>
+
+            <div class="dash-grid-2">
+              <div class="dash-card" style="grid-column: 1 / -1">
+                <div class="dash-card-head">
+                  <div class="dash-card-title">
+                    Vendas de hoje (comparado com ontem)
+                  </div>
+                  <div class="dash-card-right muted">
+                    Barras: hoje • Linha: ontem
+                  </div>
+                </div>
+                <div class="dash-card-body">
+                  <canvas id="dashTodayChart" height="140"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="dashMsg" class="muted" style="margin-top: 10px"></div>
         </section>
         <!-- AUTH -->
         <section id="tab-auth" class="tab-panel">

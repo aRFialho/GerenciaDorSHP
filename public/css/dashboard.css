@@ -298,3 +298,30 @@
 #tab-dashboard #btnDashReload{white-space:nowrap}
 #tab-dashboard #dashProjection.dash-pos{color:rgba(34,197,94,0.95)}
 #tab-dashboard #dashProjection.dash-neg{color:rgba(255,55,55,0.95)}
+#tab-dashboard .dash-grid-2{display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:start;margin-top:12px}
+@media (max-width:1100px){#tab-dashboard .dash-grid-2{grid-template-columns:1fr}}
+
+#tab-dashboard .dash-switch{display:inline-flex;align-items:center;cursor:pointer}
+#tab-dashboard .dash-switch input{display:none}
+#tab-dashboard .dash-switch-track{width:48px;height:28px;border-radius:999px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.10);position:relative;display:inline-block}
+#tab-dashboard .dash-switch-thumb{width:22px;height:22px;border-radius:999px;background:rgba(255,255,255,0.92);position:absolute;top:2px;left:2px;transition:transform .18s ease}
+#tab-dashboard .dash-switch input:checked + .dash-switch-track .dash-switch-thumb{transform:translateX(20px)}
+
+#tab-dashboard .dash-trend{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;font-weight:1000;font-size:12px;margin-right:6px}
+#tab-dashboard .dash-trend-up{background:rgba(34,197,94,0.18);color:rgba(34,197,94,0.95)}
+#tab-dashboard .dash-trend-down{background:rgba(255,55,55,0.18);color:rgba(255,55,55,0.95)}
+
+#tab-dashboard .dash-meter{height:8px;border-radius:999px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.08);overflow:hidden;display:inline-block;width:120px;margin-right:8px;vertical-align:middle}
+#tab-dashboard .dash-meter-bar{height:100%;width:0%;background:rgba(255,255,255,0.85)}
+
+#tab-dashboard .dash-top-target{display:flex;flex-direction:column;gap:10px}
+#tab-dashboard .dash-top-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;border:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.12);border-radius:12px}
+#tab-dashboard .dash-top-left{display:flex;align-items:flex-start;gap:10px;min-width:0}
+#tab-dashboard .dash-top-check{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.06);margin-top:2px;flex:0 0 auto}
+#tab-dashboard .dash-top-name{font-weight:900;font-size:13px;color:rgba(255,255,255,0.92);line-height:1.2;min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-box-orient:vertical}
+#tab-dashboard .dash-top-sub{font-size:12px;color:rgba(255,255,255,0.65);margin-top:4px}
+#tab-dashboard .dash-top-gmv{font-weight:1000;font-size:13px;color:rgba(255,255,255,0.92);white-space:nowrap}
+
+#tab-dashboard .dash-summary{display:flex;flex-direction:column;gap:10px}
+#tab-dashboard .dash-summary-row{display:flex;align-items:center;justify-content:space-between;gap:10px;color:rgba(255,255,255,0.75)}
+#tab-dashboard .dash-summary-row strong{color:rgba(255,255,255,0.92);font-weight:1000}

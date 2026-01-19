@@ -5,13 +5,15 @@ let PRODUCTS_Q = "";
 let PRODUCTS_SORT_BY = "updatedAt";
 let PRODUCTS_SORT_DIR = "desc";
 let GEO_STATIC = null;
-let DASH_CHART = null;
 let ME = null; // cache do /me
 let ACTIVE_SHOP_ID = null; // Shop.id (DB) vindo da sessão
 let ORDERS_PAGE = 1;
 let ORDERS_PAGE_SIZE = 60;
 let ORDERS_TOTAL_PAGES = 1;
 let ORDERS_TOTAL = 0;
+let DASH_CHART_MONTH = null;
+let DASH_CHART_TODAY = null;
+let DASH_CHART_MONTH_RATIO = null;
 
 // Para Opção A: manter rotas /shops/:shopId/... mas backend ignora.
 // Usamos um placeholder fixo só para completar a URL.
@@ -207,20 +209,35 @@ function fmtTimeNow() {
 function setDashMode(mode) {
   DASH_MODE = mode === "today" ? "today" : "month";
 
-  const btnMonth = document.getElementById("dashModeMonth");
-  const btnToday = document.getElementById("dashModeToday");
-  const badge = document.getElementById("dashKpiModeBadge");
+  document
+    .getElementById("dashMonthLayout")
+    ?.classList.toggle("is-hidden", DASH_MODE !== "month");
+  document
+    .getElementById("dashTodayLayout")
+    ?.classList.toggle("is-hidden", DASH_MODE !== "today");
 
-  if (btnMonth) btnMonth.classList.toggle("is-active", DASH_MODE === "month");
-  if (btnToday) btnToday.classList.toggle("is-active", DASH_MODE === "today");
-  if (badge) badge.textContent = DASH_MODE === "today" ? "HOJE" : "MÊS";
+  if (DASH_MODE === "today") {
+    if (DASH_CHART_MONTH) {
+      DASH_CHART_MONTH.destroy();
+      DASH_CHART_MONTH = null;
+    }
+    if (DASH_CHART_MONTH_RATIO) {
+      DASH_CHART_MONTH_RATIO.destroy();
+      DASH_CHART_MONTH_RATIO = null;
+    }
+  } else {
+    if (DASH_CHART_TODAY) {
+      DASH_CHART_TODAY.destroy();
+      DASH_CHART_TODAY = null;
+    }
+  }
 
-  // polling só no modo HOJE
+  const t = document.getElementById("dashLiveToggle");
+  if (t) t.checked = DASH_MODE === "today";
+
   if (DASH_MODE === "today") {
     if (DASH_POLL) clearInterval(DASH_POLL);
-    DASH_POLL = setInterval(() => {
-      loadDashboard({ silent: true });
-    }, 30000);
+    DASH_POLL = setInterval(() => loadDashboard({ silent: true }), 30000);
   } else {
     if (DASH_POLL) clearInterval(DASH_POLL);
     DASH_POLL = null;
@@ -230,53 +247,25 @@ function setDashMode(mode) {
 async function loadTopSellersMonth() {
   const list = document.getElementById("dashTopSellersList");
   if (!list) return;
-
   list.innerHTML = `<div class="muted">Carregando...</div>`;
-
   try {
     const data = await apiGet(
       `/shops/${SHOP_PATH_PLACEHOLDER}/dashboard/top-sellers-month`,
     );
     const items = Array.isArray(data?.items) ? data.items : [];
-
     if (!items.length) {
       list.innerHTML = `<div class="muted">Sem dados de top vendidos.</div>`;
       return;
     }
-
     list.innerHTML = items
       .slice(0, 5)
-      .map((p) => {
-        const title = escapeHtml(p.title || "—");
-        const sold = Number(p.sold || 0);
-
-        // preço pode ser min/max (inteiro), seguindo seu padrão do catálogo
-        let priceText = "Preço: —";
-        if (p.priceMin != null && p.priceMax != null) {
-          const pmin = formatBRLFixed90(p.priceMin);
-          const pmax = formatBRLFixed90(p.priceMax);
-          priceText =
-            p.priceMin === p.priceMax
-              ? `Preço: ${escapeHtml(pmin)}`
-              : `Preço: ${escapeHtml(pmin)} – ${escapeHtml(pmax)}`;
-        }
-
-        return `
-          <div class="dash-top-item">
-            <div class="dash-top-left">
-              <div class="dash-top-title">${title}</div>
-              <div class="dash-top-sub muted">${escapeHtml(priceText)}</div>
-            </div>
-            <div class="dash-top-right">
-              <div class="dash-top-metric">${sold.toLocaleString("pt-BR")} vendidos</div>
-              <div class="dash-top-metric-sub muted">mês atual</div>
-            </div>
-          </div>
-        `;
-      })
+      .map(
+        (x) =>
+          `<div class="dash-top-row"><div class="dash-top-left"><div class="dash-top-check"></div><div style="min-width:0;"><div class="dash-top-name">${escapeHtml(x.title || "—")}</div><div class="dash-top-sub muted">${Number(x.quantity || 0).toLocaleString("pt-BR")} itens</div></div></div><div class="dash-top-gmv">${escapeHtml(formatBRLCents(x.gmvCents || 0))}</div></div>`,
+      )
       .join("");
   } catch (e) {
-    list.innerHTML = `<div class="muted">Erro ao carregar Top vendidos: ${escapeHtml(e.message)}</div>`;
+    list.innerHTML = `<div class="muted">Erro: ${escapeHtml(e.message)}</div>`;
   }
 }
 
@@ -286,13 +275,12 @@ function renderMonthChart({
   dayOfMonth,
   daysInMonth,
 }) {
-  const canvas = document.getElementById("dashSalesChart");
+  const canvas = document.getElementById("dashTrendMonthChart");
   const ctx = canvas?.getContext?.("2d");
   if (!ctx || !window.Chart) return;
 
   const labels = Array.from({ length: daysInMonth }, (_, i) => String(i + 1));
 
-  // acumulado real (em R$)
   const daily = Array.from({ length: daysInMonth }, (_, i) => {
     const bar = dailyBars?.[i];
     return Number(bar?.gmvCents || 0) / 100;
@@ -305,20 +293,18 @@ function renderMonthChart({
     cum.push(acc);
   }
 
-  // projeção (em R$) usando a média do mês atual (avgPerDayCents)
   const avgPerDay = Number(avgPerDayCents || 0) / 100;
   const projection = labels.map((d) => avgPerDay * Number(d));
 
-  // ponto vermelho no dia atual
   const idx = Math.max(
     0,
     Math.min(Number(dayOfMonth || 1) - 1, daysInMonth - 1),
   );
   const todayPoint = [{ x: labels[idx], y: cum[idx] }];
 
-  if (DASH_CHART) DASH_CHART.destroy();
+  if (DASH_CHART_MONTH) DASH_CHART_MONTH.destroy();
 
-  DASH_CHART = new Chart(ctx, {
+  DASH_CHART_MONTH = new Chart(ctx, {
     type: "line",
     data: {
       labels,
@@ -357,13 +343,150 @@ function renderMonthChart({
     },
     options: {
       responsive: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: true },
-      },
+      plugins: { legend: { display: false }, tooltip: { enabled: true } },
       scales: {
         x: { grid: { display: false }, ticks: { display: false } },
         y: { grid: { display: false }, ticks: { display: false } },
+      },
+    },
+  });
+}
+
+function clamp01(x) {
+  const n = Number(x);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function renderMonthRatioChart({
+  dailyBars,
+  avgPerDayCents,
+  daysInMonth,
+  dayOfMonth,
+}) {
+  const canvas = document.getElementById("dashTrendRatioChart");
+  const ctx = canvas?.getContext?.("2d");
+  if (!ctx || !window.Chart) return;
+
+  const labels = Array.from({ length: daysInMonth }, (_, i) => String(i + 1));
+
+  // soma diária em R$
+  const daily = Array.from({ length: daysInMonth }, (_, i) => {
+    const bar = dailyBars?.[i];
+    return Number(bar?.gmvCents || 0) / 100;
+  });
+
+  // acumulado em R$
+  const cum = [];
+  let acc = 0;
+  for (let i = 0; i < daysInMonth; i++) {
+    acc += daily[i] || 0;
+    cum.push(acc);
+  }
+
+  // projeção acumulada por dia em R$ (avgPerDayCents vem em cents)
+  const avgPerDay = Number(avgPerDayCents || 0) / 100;
+  const proj = labels.map((d) => avgPerDay * Number(d));
+
+  // ratio em % (0..100)
+  const ratioPct = labels.map((_, i) => {
+    const denom = proj[i] || 0;
+    if (denom <= 0) return 0;
+    return clamp01(cum[i] / denom) * 100;
+  });
+
+  // índice do dia atual
+  const idx = Math.max(
+    0,
+    Math.min(Number(dayOfMonth || 1) - 1, daysInMonth - 1),
+  );
+  const todayPoint = [{ x: labels[idx], y: ratioPct[idx] }];
+
+  // linha guia 100%
+  const line100 = labels.map(() => 100);
+
+  if (DASH_CHART_MONTH_RATIO) DASH_CHART_MONTH_RATIO.destroy();
+
+  DASH_CHART_MONTH_RATIO = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Progresso",
+          data: ratioPct,
+          borderColor: "rgba(59, 130, 246, 0.92)",
+          backgroundColor: "rgba(59, 130, 246, 0.12)",
+          fill: false,
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 2,
+        },
+        {
+          label: "Meta",
+          data: line100,
+          borderColor: "rgba(255,255,255,0.18)",
+          borderDash: [6, 6],
+          pointRadius: 0,
+          borderWidth: 1,
+          fill: false,
+        },
+        {
+          label: "Hoje",
+          type: "scatter",
+          data: todayPoint,
+          pointRadius: 5,
+          pointHoverRadius: 6,
+          pointBackgroundColor: "rgba(255, 55, 55, 1)",
+          pointBorderColor: "rgba(255,255,255,0.85)",
+          pointBorderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            // título: "Dia 12"
+            title: (items) => {
+              const it = items?.[0];
+              const day = it?.label ?? "";
+              return day ? `Dia ${day}` : "";
+            },
+            // corpo: "Progresso: 87%" + "Meta: 100%"
+            label: (ctx) => {
+              const y = Number(ctx.parsed?.y);
+              if (
+                ctx.dataset?.label === "Progresso" ||
+                ctx.dataset?.label === "Hoje"
+              ) {
+                const pct = Number.isFinite(y) ? Math.round(y) : 0;
+                return `Progresso: ${pct}%`;
+              }
+              if (ctx.dataset?.label === "Meta") {
+                return "Meta: 100%";
+              }
+              return "";
+            },
+          },
+          filter: (ctx) => {
+            // mostra tooltip apenas para Progresso + Hoje + Meta (evita ruído)
+            const lbl = String(ctx.dataset?.label || "");
+            return lbl === "Progresso" || lbl === "Hoje" || lbl === "Meta";
+          },
+        },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { display: false } },
+        y: {
+          min: 0,
+          max: 100,
+          grid: { display: false },
+          ticks: { display: false },
+        },
       },
     },
   });
@@ -374,7 +497,7 @@ function renderTodayChartCompare({
   hourlyBarsYesterday,
   currentHour,
 }) {
-  const canvas = document.getElementById("dashSalesChart");
+  const canvas = document.getElementById("dashTodayChart");
   const ctx = canvas?.getContext?.("2d");
   if (!ctx || !window.Chart) return;
 
@@ -395,9 +518,9 @@ function renderTodayChartCompare({
   );
   const pointY = today[h] || 0;
 
-  if (DASH_CHART) DASH_CHART.destroy();
+  if (DASH_CHART_TODAY) DASH_CHART_TODAY.destroy();
 
-  DASH_CHART = new Chart(ctx, {
+  DASH_CHART_TODAY = new Chart(ctx, {
     type: "bar",
     data: {
       labels,
@@ -445,6 +568,14 @@ function renderTodayChartCompare({
   });
 }
 
+function setWidthPct(id, pct) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const x = Number(pct);
+  const safe = Number.isFinite(x) ? Math.max(0, Math.min(100, x)) : 0;
+  el.style.width = `${safe}%`;
+}
+
 async function loadDashboard(opts = {}) {
   await ensureShopSelected();
 
@@ -454,47 +585,51 @@ async function loadDashboard(opts = {}) {
   const updatedAtEl = document.getElementById("dashLiveUpdatedAt");
   if (updatedAtEl) updatedAtEl.textContent = fmtTimeNow();
 
+  // título do header (alvo)
+  setText(
+    "dashLiveTitle",
+    DASH_MODE === "today" ? "Vendas ao vivo (Hoje)" : "Vendas (Mês)",
+  );
+  setText(
+    "dashLiveSubtitle",
+    DASH_MODE === "today"
+      ? "Comparado com ontem até a hora atual"
+      : "Projeção e tendência do mês",
+  );
+
   try {
     if (DASH_MODE === "today") {
       const data = await apiGet(
         `/shops/${SHOP_PATH_PLACEHOLDER}/dashboard/today-sales`,
       );
 
-      setText("dashPeriodLabel", data?.period?.label || "Hoje");
-      setText("dashDayLabel", data?.period?.dayLabel || "—");
-      setText("dashProgressLabel", "—");
+      // KPIs HOJE (IDs do seu HTML)
+      setText(
+        "dashTodayGmv",
+        formatBRLCents(data?.metrics?.gmvTodayCents || 0),
+      );
 
-      setText("dashGmvMtd", formatBRLCents(data?.metrics?.gmvTodayCents || 0));
-
-      // ✅ “Projeção” vira a variação vs ontem até a hora atual
       const pct = data?.metrics?.deltaPct;
       setText(
-        "dashProjection",
+        "dashTodayDelta",
         pct == null ? "—" : `${pct > 0 ? "+" : ""}${pct}%`,
       );
-      const projEl = document.getElementById("dashProjection");
-      if (projEl) {
-        projEl.classList.remove("dash-pos", "dash-neg");
+
+      // (opcional) cor verde/vermelho se você tiver .dash-pos/.dash-neg no CSS
+      const deltaEl = document.getElementById("dashTodayDelta");
+      if (deltaEl) {
+        deltaEl.classList.remove("dash-pos", "dash-neg");
         if (pct != null)
-          projEl.classList.add(pct >= 0 ? "dash-pos" : "dash-neg");
+          deltaEl.classList.add(pct >= 0 ? "dash-pos" : "dash-neg");
       }
-      setText("dashOrdersCount", String(data?.metrics?.ordersCountToday || 0));
+
+      setText("dashTodayOrders", String(data?.metrics?.ordersCountToday || 0));
       setText(
-        "dashTicketAvg",
+        "dashTodayTicket",
         formatBRLCents(data?.metrics?.ticketAvgTodayCents || 0),
       );
-      setText("dashAvgPerDay", "—");
 
-      setText("dashFormula", "Hoje vs ontem (até a hora atual)");
-      setText("dashAdsStatus", "Ads: Ads não configurado");
-
-      const title = document.getElementById("dashChartTitle");
-      const subtitle = document.getElementById("dashChartSubtitle");
-      if (title) title.textContent = "Vendas de hoje (comparado com ontem)";
-      if (subtitle)
-        subtitle.textContent =
-          "Barras: hoje • Linha: ontem • Ponto vermelho: hora atual";
-
+      // chart HOJE (canvas #dashTodayChart)
       renderTodayChartCompare({
         hourlyBarsToday: data?.hourlyBarsToday || [],
         hourlyBarsYesterday: data?.hourlyBarsYesterday || [],
@@ -505,73 +640,151 @@ async function loadDashboard(opts = {}) {
       return;
     }
 
-    // ✅ MÊS (padrão)
+    // ===== MÊS =====
     const data = await apiGet(
       `/shops/${SHOP_PATH_PLACEHOLDER}/dashboard/monthly-sales`,
     );
 
-    setText("dashPeriodLabel", data?.period?.label || "—");
+    const gmvMtdCents = Number(data?.metrics?.gmvMtdCents || 0);
+    const projectionCents = Number(data?.metrics?.projectionCents || 0);
+    const avgPerDayCents = Number(data?.metrics?.avgPerDayCents || 0);
+    const ordersCountMtd = Number(data?.metrics?.ordersCountMtd || 0);
+    const ticketAvgCents = Number(data?.metrics?.ticketAvgCents || 0);
+
+    const dayOfMonth = Number(data?.period?.dayOfMonth || 1);
+    const daysInMonth = Number(data?.period?.daysInMonth || 30);
+    const progressPct = data?.period?.progressPct;
+
+    // KPIs MÊS (IDs do seu HTML)
+    setText("dashKpiGmvValue", formatBRLCents(gmvMtdCents));
+    setText("dashKpiProjectionValue", formatBRLCents(projectionCents));
+    setText("dashKpiOrdersValue", String(ordersCountMtd));
+    setText("dashKpiTicketValue", formatBRLCents(ticketAvgCents));
+    const cmp = data?.compare?.delta || null;
+
+    // GMV delta
+    if (cmp) {
+      setTrendArrow("dashKpiGmvTrendArrow", cmp.gmvDeltaPct);
+      const gmvPctTxt =
+        cmp.gmvDeltaPct == null
+          ? "—"
+          : `${cmp.gmvDeltaPct > 0 ? "+" : ""}${cmp.gmvDeltaPct}%`;
+      const gmvValTxt = `${cmp.gmvDeltaCents >= 0 ? "+" : ""}${formatBRLCents(cmp.gmvDeltaCents || 0)}`;
+      setText("dashKpiGmvDelta", `${gmvPctTxt} • ${gmvValTxt}`);
+    } else {
+      setText("dashKpiGmvDelta", "—");
+    }
+
+    // Orders delta
+    if (cmp) {
+      setTrendArrow("dashKpiOrdersTrendArrow", cmp.ordersDeltaPct);
+      const ordPctTxt =
+        cmp.ordersDeltaPct == null
+          ? "—"
+          : `${cmp.ordersDeltaPct > 0 ? "+" : ""}${cmp.ordersDeltaPct}%`;
+      const ordValTxt = fmtSigned(cmp.ordersDeltaCount || 0);
+      setText("dashKpiOrdersToday", `${ordPctTxt} • ${ordValTxt}`);
+    } else {
+      setText("dashKpiOrdersToday", "—");
+    }
+
+    // Ticket delta
+    if (cmp) {
+      setTrendArrow("dashKpiTicketTrendArrow", cmp.ticketDeltaPct);
+      const tPctTxt =
+        cmp.ticketDeltaPct == null
+          ? "—"
+          : `${cmp.ticketDeltaPct > 0 ? "+" : ""}${cmp.ticketDeltaPct}%`;
+      const tValTxt = `${cmp.ticketDeltaCents >= 0 ? "+" : ""}${formatBRLCents(cmp.ticketDeltaCents || 0)}`;
+      setText("dashKpiTicketDelta", `${tPctTxt} • ${tValTxt}`);
+    } else {
+      setText("dashKpiTicketDelta", "—");
+    }
+    // barra da projeção: quanto do projetado já foi atingido
+    const projRatio =
+      projectionCents > 0 ? (gmvMtdCents / projectionCents) * 100 : 0;
+    setWidthPct("dashKpiProjectionBar", projRatio);
     setText(
-      "dashDayLabel",
-      `${data?.period?.dayOfMonth || "—"}/${data?.period?.daysInMonth || "—"}`,
-    );
-    setText(
-      "dashProgressLabel",
-      data?.period?.progressPct != null ? `${data.period.progressPct}%` : "—",
+      "dashKpiProjectionMeta",
+      projectionCents > 0
+        ? `${Math.round(Math.max(0, Math.min(999, projRatio)))}%`
+        : "—",
     );
 
-    setText("dashGmvMtd", formatBRLCents(data?.metrics?.gmvMtdCents || 0));
-    setText(
-      "dashAvgPerDay",
-      formatBRLCents(data?.metrics?.avgPerDayCents || 0),
-    );
-    setText(
-      "dashProjection",
-      formatBRLCents(data?.metrics?.projectionCents || 0),
-    );
-    document
-      .getElementById("dashProjection")
-      ?.classList.remove("dash-pos", "dash-neg");
-    setText("dashOrdersCount", String(data?.metrics?.ordersCountMtd || 0));
-    setText(
-      "dashTicketAvg",
-      formatBRLCents(data?.metrics?.ticketAvgCents || 0),
-    );
+    // card header direito
+    const gmvDeltaPct = data?.compare?.delta?.gmvDeltaPct ?? null;
 
     setText(
-      "dashFormula",
+      "dashTrendDelta",
+      gmvDeltaPct == null
+        ? "—"
+        : `${gmvDeltaPct > 0 ? "+" : ""}${gmvDeltaPct}% vs M-1`,
+    );
+
+    // resumo do mês
+    setText("dashMonthProgress", progressPct != null ? `${progressPct}%` : "—");
+    setText(
+      "dashMonthPeriod",
+      data?.period?.label || `${dayOfMonth}/${daysInMonth}`,
+    );
+    setText("dashMonthDays", `${dayOfMonth} / ${daysInMonth}`);
+    setText(
+      "dashMonthFormula",
       "( total_vendas_mês_atual / dia_atual ) x dias_do_mês",
     );
-    setText("dashAdsStatus", "Ads: Ads não configurado");
 
-    const title = document.getElementById("dashChartTitle");
-    const subtitle = document.getElementById("dashChartSubtitle");
-    if (title) title.textContent = "Ritmo do mês";
-    if (subtitle)
-      subtitle.textContent =
-        "Linha: acumulado + projeção • Ponto vermelho = hoje";
-
+    // charts MÊS
     renderMonthChart({
       dailyBars: data?.dailyBars || [],
-      avgPerDayCents: data?.metrics?.avgPerDayCents || 0,
-      dayOfMonth: data?.period?.dayOfMonth || 1,
-      daysInMonth: data?.period?.daysInMonth || 30,
+      avgPerDayCents: avgPerDayCents,
+      dayOfMonth,
+      daysInMonth,
     });
 
-    // Top vendidos (mês)
+    renderMonthRatioChart({
+      dailyBars: data?.dailyBars || [],
+      avgPerDayCents: avgPerDayCents,
+      daysInMonth,
+      dayOfMonth,
+    });
+
+    // top sellers (GMV)
     await loadTopSellersMonth();
 
     if (msg) msg.textContent = "";
   } catch (e) {
-    // Se endpoint novo ainda não existir, mostra mensagem amigável
     const text = String(e?.message || e);
-    if (msg) {
-      if (text.includes("404"))
-        msg.textContent =
-          "Endpoint do dashboard ainda não disponível (verifique today-sales/top-sellers).";
-      else msg.textContent = `Erro: ${text}`;
-    }
+    if (msg) msg.textContent = `Erro: ${text}`;
   }
+}
+
+function setTrendArrow(arrowId, deltaPct) {
+  const el = document.getElementById(arrowId);
+  if (!el) return;
+
+  el.classList.remove("dash-trend-up", "dash-trend-down");
+
+  if (deltaPct == null || !Number.isFinite(Number(deltaPct))) {
+    el.textContent = "↑";
+    el.classList.add("dash-trend-up");
+    return;
+  }
+
+  const x = Number(deltaPct);
+  if (x >= 0) {
+    el.textContent = "↑";
+    el.classList.add("dash-trend-up");
+  } else {
+    el.textContent = "↓";
+    el.classList.add("dash-trend-down");
+  }
+}
+
+function fmtSigned(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "0";
+  const abs = Math.abs(x).toLocaleString("pt-BR");
+  return (x >= 0 ? "+" : "-") + abs;
 }
 
 async function promptSelectShop(shops) {
@@ -2376,12 +2589,8 @@ async function boot() {
   document
     .getElementById("btnDashReload")
     ?.addEventListener("click", () => loadDashboard({ silent: false }));
-  document.getElementById("dashModeMonth")?.addEventListener("click", () => {
-    setDashMode("month");
-    loadDashboard({ silent: false });
-  });
-  document.getElementById("dashModeToday")?.addEventListener("click", () => {
-    setDashMode("today");
+  document.getElementById("dashLiveToggle")?.addEventListener("change", (e) => {
+    setDashMode(e.target.checked ? "today" : "month");
     loadDashboard({ silent: false });
   });
   setDashMode("month");

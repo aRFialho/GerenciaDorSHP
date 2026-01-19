@@ -161,6 +161,96 @@ function extractGmvCents(detail) {
   return Math.round(v * 100);
 }
 
+function parseMoneyToCents(v) {
+  if (v == null) return 0;
+
+  // Shopee costuma mandar número como string ("12.34") ou number
+  if (typeof v === "string") v = Number(v.replace(",", "."));
+  if (!Number.isFinite(v)) return 0;
+
+  return Math.round(v * 100);
+}
+
+function num(v) {
+  if (v == null) return 0;
+  if (typeof v === "string") v = Number(v.replace(",", "."));
+  return Number.isFinite(v) ? Number(v) : 0;
+}
+
+async function persistOrderItems({ shopInternalId, order, detail }) {
+  const items = Array.isArray(detail?.item_list) ? detail.item_list : [];
+
+  await prisma.orderItem.deleteMany({
+    where: { shopId: shopInternalId, orderId: order.id },
+  });
+
+  if (!items.length) return;
+
+  // peso = preço_base * quantidade (escala não importa)
+  const weights = items.map((it) => {
+    const quantity = Math.max(
+      0,
+      Number(it?.model_quantity_purchased ?? it?.quantity ?? 0) || 0,
+    );
+
+    const priceBase =
+      num(it?.model_discounted_price) ||
+      num(it?.item_price) ||
+      num(it?.original_price) ||
+      num(it?.model_original_price) ||
+      0;
+
+    const weight = priceBase * quantity;
+    return { it, quantity, priceBase, weight };
+  });
+
+  const totalWeight = weights.reduce((s, x) => s + x.weight, 0);
+
+  // rateio com ajuste de arredondamento pra fechar exatamente no total do pedido
+  let remaining = Number(order.gmvCents || 0);
+
+  const rows = weights.map((x, idx) => {
+    const it = x.it;
+
+    const itemId = it?.item_id != null ? BigInt(String(it.item_id)) : null;
+    const modelId = it?.model_id != null ? BigInt(String(it.model_id)) : null;
+
+    const name = it?.item_name || it?.name || null;
+    const sku = it?.item_sku || it?.model_sku || it?.sku || null;
+
+    // preçoCents: opcional (só para exibição). Como não temos certeza da escala,
+    // deixo como 0 por enquanto (ou você pode armazenar a "base" em outro campo).
+    const priceCents = 0;
+
+    let gmvCents = 0;
+    if (totalWeight > 0) {
+      if (idx === weights.length - 1) {
+        // último recebe o resto pra fechar
+        gmvCents = remaining;
+      } else {
+        gmvCents = Math.round(
+          (Number(order.gmvCents || 0) * x.weight) / totalWeight,
+        );
+        remaining -= gmvCents;
+      }
+    }
+
+    return {
+      shopId: shopInternalId,
+      orderId: order.id,
+      itemId,
+      modelId,
+      sku,
+      name,
+      quantity: x.quantity,
+      priceCents,
+      gmvCents,
+    };
+  });
+
+  await prisma.orderItem.createMany({ data: rows });
+}
+
 async function upsertOrderAndSnapshot(shopInternalId, detail) {
   const orderSn = String(detail.order_sn);
   const gmvCandidate = extractGmvCents(detail);
@@ -215,7 +305,8 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
       reverseShippingFee: detail.reverse_shipping_fee ?? null,
     },
   });
-
+  // ✅ salva itens do pedido para ranking por GMV do mês
+  await persistOrderItems({ shopInternalId, order, detail });
   const addr = detail.recipient_address || null;
   if (addr) {
     await persistOrderGeoAddressOnce({ shopInternalId, order, addr });
@@ -384,7 +475,7 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
           query: {
             order_sn_list: batch.join(","),
             response_optional_fields:
-              "recipient_address,order_status,create_time,update_time,days_to_ship,ship_by_date,currency,total_amount,region,booking_sn,cod,advance_package,hot_listing_order,is_buyer_shop_collection,message_to_seller,reverse_shipping_fee",
+              "recipient_address,order_status,create_time,update_time,days_to_ship,ship_by_date,currency,total_amount,region,booking_sn,cod,advance_package,hot_listing_order,is_buyer_shop_collection,message_to_seller,reverse_shipping_fee,item_list",
           },
         });
 

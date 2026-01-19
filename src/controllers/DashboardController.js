@@ -13,6 +13,47 @@ async function getActiveShopOrFail(req, res) {
   return shop;
 }
 
+function startOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+}
+
+function addMonths(d, n) {
+  const x = new Date(d);
+  x.setMonth(x.getMonth() + n);
+  return x;
+}
+
+function clampDayOfMonth(year, monthIndex, day) {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  return Math.min(day, lastDay);
+}
+
+function pctDelta(curVal, prevVal) {
+  if (!prevVal) return null;
+  return Math.round(((curVal - prevVal) / prevVal) * 100);
+}
+
+async function aggMtd({ shopId, from, to }) {
+  const agg = await prisma.order.aggregate({
+    where: {
+      shopId,
+      ...paidOrderWhere(),
+      OR: [
+        { shopeeCreateTime: { gte: from, lte: to } },
+        { shopeeCreateTime: null, createdAt: { gte: from, lte: to } },
+      ],
+    },
+    _sum: { gmvCents: true },
+    _count: { _all: true },
+  });
+
+  const gmv = Number(agg?._sum?.gmvCents || 0);
+  const orders = Number(agg?._count?._all || 0);
+  const ticket = orders > 0 ? Math.round(gmv / orders) : 0;
+
+  return { gmvMtdCents: gmv, ordersCountMtd: orders, ticketAvgCents: ticket };
+}
+
 async function monthlySales(req, res) {
   try {
     const shop = await getActiveShopOrFail(req, res);
@@ -27,6 +68,32 @@ async function monthlySales(req, res) {
     ).getDate();
     const dayOfMonth = now.getDate();
 
+    // ----- RANGE MTD "espelho" do mês anterior (mesmos dias/horário) -----
+    const prevMonthDate = addMonths(now, -1);
+    const prevFrom = startOfMonth(prevMonthDate);
+
+    const prevDay = clampDayOfMonth(
+      prevFrom.getFullYear(),
+      prevFrom.getMonth(),
+      now.getDate(),
+    );
+    const prevTo = new Date(
+      prevFrom.getFullYear(),
+      prevFrom.getMonth(),
+      prevDay,
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds(),
+    );
+
+    const prevAgg = await aggMtd({
+      shopId: shop.id,
+      from: prevFrom,
+      to: prevTo,
+    });
+
+    // ----- Pedidos do mês (para montar dailyBars) -----
     const orders = await prisma.order.findMany({
       where: {
         shopId: shop.id,
@@ -50,7 +117,11 @@ async function monthlySales(req, res) {
       const dt = o.shopeeCreateTime || o.createdAt;
       const cents = Number(o.gmvCents || 0);
       gmvMtdCents += cents;
-      dailyBars[dt.getDate() - 1].gmvCents += cents;
+
+      const d = dt.getDate();
+      if (d >= 1 && d <= daysInMonth) {
+        dailyBars[d - 1].gmvCents += cents;
+      }
     }
 
     const avgPerDayCents = Math.round(gmvMtdCents / Math.max(1, dayOfMonth));
@@ -60,6 +131,20 @@ async function monthlySales(req, res) {
     const ticketAvgCents = ordersCountMtd
       ? Math.round(gmvMtdCents / ordersCountMtd)
       : 0;
+
+    const compare = {
+      prev: prevAgg,
+      delta: {
+        gmvDeltaCents: gmvMtdCents - prevAgg.gmvMtdCents,
+        gmvDeltaPct: pctDelta(gmvMtdCents, prevAgg.gmvMtdCents),
+
+        ordersDeltaCount: ordersCountMtd - prevAgg.ordersCountMtd,
+        ordersDeltaPct: pctDelta(ordersCountMtd, prevAgg.ordersCountMtd),
+
+        ticketDeltaCents: ticketAvgCents - prevAgg.ticketAvgCents,
+        ticketDeltaPct: pctDelta(ticketAvgCents, prevAgg.ticketAvgCents),
+      },
+    };
 
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.set("Pragma", "no-cache");
@@ -83,6 +168,7 @@ async function monthlySales(req, res) {
         organicEstimatedCents: gmvMtdCents,
       },
       dailyBars,
+      compare,
     });
   } catch (e) {
     console.error("dashboard.monthlySales failed:", e);
@@ -201,8 +287,9 @@ async function todaySales(req, res) {
 }
 
 /**
- * Fallback: como não existe OrderItem no schema, não dá pra calcular "top vendidos do mês" real.
- * Aqui usamos Product.sold (geral) como ranking para preencher o widget.
+ * Fallback: sem OrderItem ainda, não dá pra calcular top do mês por GMV real.
+ * Aqui retorna "quantity" baseado em Product.sold (geral) e "gmvCents" zerado
+ * só pra não quebrar o widget no front.
  */
 async function topSellersMonth(req, res) {
   try {
@@ -213,20 +300,20 @@ async function topSellersMonth(req, res) {
       where: { shopId: shop.id },
       orderBy: [{ sold: "desc" }, { updatedAt: "desc" }],
       take: 5,
-      select: {
-        itemId: true,
-        title: true,
-        sold: true,
-        priceMin: true,
-        priceMax: true,
-      },
+      select: { title: true, sold: true },
     });
 
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.set("Pragma", "no-cache");
     res.set("Expires", "0");
 
-    res.json({ items });
+    res.json({
+      items: items.map((p) => ({
+        title: p.title || "—",
+        quantity: Number(p.sold || 0),
+        gmvCents: 0,
+      })),
+    });
   } catch (e) {
     console.error("dashboard.topSellersMonth failed:", e);
     res.status(500).json({

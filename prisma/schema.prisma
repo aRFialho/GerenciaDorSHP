@@ -73,14 +73,14 @@ model Shop {
   accountId Int?
   account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  shopId       BigInt            @unique
-  region       String?
-  status       String            @default("UNKNOWN")
-  geoAddresses OrderGeoAddress[]
-  tokens       OAuthToken?
-  orders       Order[]
-  products     Product[]
-
+  shopId         BigInt             @unique
+  region         String?
+  status         String             @default("UNKNOWN")
+  geoAddresses   OrderGeoAddress[]
+  tokens         OAuthToken?
+  orders         Order[]
+  products       Product[]
+  orderItems     OrderItem[]
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   sessions       Session[]
@@ -132,9 +132,9 @@ model Order {
 
   addressSnapshots OrderAddressSnapshot[]
   addressAlerts    OrderAddressChangeAlert[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  items            OrderItem[]
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
 
   @@unique([shopId, orderSn])
   @@index([shopId, orderStatus])
@@ -231,8 +231,9 @@ model Product {
   images ProductImage[]
   models ProductModel[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  orderItems OrderItem[]
 
   @@unique([shopId, itemId])
   @@index([shopId, status])
@@ -321,4 +322,37 @@ model OrderAddressChangeAlert {
   @@unique([orderId, newHash])
   @@index([orderId, detectedAt])
   @@index([resolvedAt])
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shopId Int
+  shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  orderId Int
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // IDs Shopee
+  itemId  BigInt?
+  modelId BigInt?
+
+  sku  String?
+  name String?
+
+  quantity   Int @default(0)
+  priceCents Int @default(0) // unitário
+  gmvCents   Int @default(0) // subtotal do item no pedido
+
+  // vínculo opcional com seu catálogo
+  productId Int?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  // evita duplicar o mesmo item/model dentro do mesmo pedido
+  @@unique([orderId, itemId, modelId])
+  @@index([shopId, orderId])
+  @@index([shopId, itemId])
+  @@index([shopId, productId])
 }
