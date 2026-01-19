@@ -22,7 +22,7 @@ async function monthlySales(req, res) {
     const daysInMonth = new Date(
       now.getFullYear(),
       now.getMonth() + 1,
-      0
+      0,
     ).getDate();
     const dayOfMonth = now.getDate();
 
@@ -57,11 +57,15 @@ async function monthlySales(req, res) {
       ? Math.round(gmvMtdCents / ordersCountMtd)
       : 0;
 
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+
     res.json({
       period: {
         label: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
           2,
-          "0"
+          "0",
         )}`,
         dayOfMonth,
         daysInMonth,
@@ -81,12 +85,10 @@ async function monthlySales(req, res) {
     });
   } catch (e) {
     console.error("dashboard.monthlySales failed:", e);
-    res
-      .status(500)
-      .json({
-        error: "dashboard_monthly_sales_failed",
-        message: String(e?.message || e),
-      });
+    res.status(500).json({
+      error: "dashboard_monthly_sales_failed",
+      message: String(e?.message || e),
+    });
   }
 }
 
