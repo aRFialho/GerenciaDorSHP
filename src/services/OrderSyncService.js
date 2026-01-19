@@ -327,55 +327,48 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
   const timeTo = nowTs();
   const timeFrom = timeTo - rangeDays * 24 * 60 * 60;
 
-  let cursor = "";
-  let more = true;
+  const WINDOW_DAYS = 14;
+  const windowSec = WINDOW_DAYS * 24 * 60 * 60;
 
   let processed = 0;
   let addressChangedCount = 0;
   let lateCount = 0;
   let atRiskCount = 0;
 
-  while (more) {
-    const list = await requestShopeeAuthed({
-      method: "get",
-      path: "/api/v2/order/get_order_list",
-      shopId: String(shopeeShopId),
-      query: {
-        time_range_field: "update_time",
-        time_from: timeFrom,
-        time_to: timeTo,
-        page_size: pageSize,
-        cursor,
-      },
-    });
+  for (let windowTo = timeTo; windowTo > timeFrom; windowTo -= windowSec) {
+    const windowFrom = Math.max(timeFrom, windowTo - windowSec);
 
-    const listOrders = list?.response?.order_list || [];
-    console.log(
-      "[sync] get_order_list count:",
-      listOrders.length,
-      "more:",
-      Boolean(list?.response?.more),
-      "cursor:",
-      cursor,
-    );
+    let cursor = "";
+    let more = true;
 
-    const orderSns = listOrders.map((o) => o.order_sn).filter(Boolean);
-    console.log(
-      "[sync] orderSns count:",
-      orderSns.length,
-      "sample:",
-      orderSns.slice(0, 3),
-    );
+    while (more) {
+      const list = await requestShopeeAuthed({
+        method: "get",
+        path: "/api/v2/order/get_order_list",
+        shopId: String(shopeeShopId),
+        query: {
+          time_range_field: "create_time",
+          time_from: windowFrom,
+          time_to: windowTo,
+          page_size: pageSize,
+          cursor,
+        },
+      });
 
-    const batches = chunk(orderSns, 20);
-    for (const batch of batches) {
-      if (batch.length === 0) continue;
+      // Shopee pode responder erro no body com HTTP 200
+      if (list?.error) {
+        throw new Error(
+          `Shopee get_order_list failed: ${list.error} ${list.message || ""}`,
+        );
+      }
 
-      console.log("[sync] calling get_order_detail batch size:", batch.length);
+      const listOrders = list?.response?.order_list || [];
+      const orderSns = listOrders.map((o) => o.order_sn).filter(Boolean);
 
-      let orderList = [];
+      const batches = chunk(orderSns, 20);
+      for (const batch of batches) {
+        if (batch.length === 0) continue;
 
-      try {
         const details = await requestShopeeAuthed({
           method: "get",
           path: "/api/v2/order/get_order_detail",
@@ -387,58 +380,28 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
           },
         });
 
-        orderList = details?.response?.order_list || [];
-      } catch (e) {
-        const code = String(e?.shopee?.error || "");
-        if (code === "order_not_found" && batch.length > 1) {
-          // fallback: tenta 1 por 1
-          for (const sn of batch) {
-            try {
-              const details1 = await requestShopeeAuthed({
-                method: "get",
-                path: "/api/v2/order/get_order_detail",
-                shopId: String(shopeeShopId),
-                query: {
-                  order_sn_list: String(sn),
-                  response_optional_fields:
-                    "recipient_address,order_status,create_time,update_time,days_to_ship,ship_by_date,currency,total_amount,region,booking_sn,cod,advance_package,hot_listing_order,is_buyer_shop_collection,message_to_seller,reverse_shipping_fee",
-                },
-              });
-
-              const one = details1?.response?.order_list?.[0];
-              if (one) orderList.push(one);
-            } catch (e1) {
-              console.error(
-                "get_order_detail single failed:",
-                sn,
-                e1?.shopee || e1?.message || e1,
-              );
-            }
-          }
-        } else {
-          console.error(
-            "get_order_detail batch failed:",
-            e?.shopee || e?.message || e,
+        if (details?.error) {
+          throw new Error(
+            `Shopee get_order_detail failed: ${details.error} ${details.message || ""}`,
           );
-          throw e;
+        }
+
+        const orderList = details?.response?.order_list || [];
+        for (const d of orderList) {
+          processed += 1;
+          const { addressChanged, late, atRisk } = await upsertOrderAndSnapshot(
+            shopRow.id,
+            d,
+          );
+          if (addressChanged) addressChangedCount += 1;
+          if (late) lateCount += 1;
+          if (atRisk) atRiskCount += 1;
         }
       }
 
-      for (const d of orderList) {
-        processed += 1;
-        const { addressChanged, late, atRisk } = await upsertOrderAndSnapshot(
-          shopRow.id,
-          d,
-        );
-        if (addressChanged) addressChangedCount += 1;
-        if (late) lateCount += 1;
-        if (atRisk) atRiskCount += 1;
-      }
+      more = Boolean(list?.response?.more);
+      cursor = String(list?.response?.next_cursor || "");
     }
-
-    more = Boolean(list?.response?.more);
-    cursor = String(list?.response?.next_cursor || "");
-    if (!more) break;
   }
 
   return {
