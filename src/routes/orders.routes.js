@@ -36,6 +36,17 @@ router.get(
   "/shops/active/dashboard/monthly-sales",
   DashboardController.monthlySales,
 );
+
+router.get(
+  "/shops/active/dashboard/today-sales",
+  DashboardController.todaySales,
+);
+
+router.get(
+  "/shops/active/dashboard/top-sellers-month",
+  DashboardController.topSellersMonth,
+);
+
 const DebugController = require("../controllers/DebugController");
 router.get("/debug/egress-ip", requireDebugToken, DebugController.egressIp);
 

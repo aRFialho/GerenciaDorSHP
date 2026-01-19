@@ -32,6 +32,7 @@ async function monthlySales(req, res) {
           { shopeeCreateTime: null, createdAt: { gte: start, lte: now } },
         ],
       },
+      orderStatus: { notIn: ["CANCELLED", "UNPAID", "TO_RETURN"] },
       select: { shopeeCreateTime: true, createdAt: true, gmvCents: true },
     });
 

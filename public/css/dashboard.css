@@ -1,39 +1,120 @@
-/* Dashboard layout (isolado) */
-#tab-dashboard .page-subtitle strong{color:rgba(255,255,255,0.92)}
-#tab-dashboard .page-subtitle strong#dashFormula{font-weight:900}
-
-/* GRID 1 (KPIs principais) = 4 colunas */
-#tab-dashboard > .section-grid:nth-of-type(1){
-  grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:12px;
-}
-@media (max-width:1200px){
-  #tab-dashboard > .section-grid:nth-of-type(1){grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-@media (max-width:640px){
-  #tab-dashboard > .section-grid:nth-of-type(1){grid-template-columns:1fr}
+/* Dashboard (novo layout compacto/premium) */
+#tab-dashboard{
+  --dash-bg: rgba(255,255,255,0.04);
+  --dash-bg-2: rgba(255,255,255,0.06);
+  --dash-border: rgba(255,255,255,0.08);
+  --dash-text: rgba(255,255,255,0.92);
+  --dash-muted: rgba(255,255,255,0.65);
+  --dash-accent: rgba(255,106,0,1);
+  --dash-accent-2: rgba(255,46,147,1);
+  --dash-red: rgba(255,55,55,1);
 }
 
-/* GRID 2 (Ritmo do mês) = 1 coluna, full width */
-#tab-dashboard > .section-grid:nth-of-type(2){
-  grid-template-columns:1fr;
+#tab-dashboard .dash-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:14px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
 }
 
-/* GRID 3 (KPIs secundários) = 3 colunas */
-#tab-dashboard > .section-grid:nth-of-type(3){
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:12px;
-}
-@media (max-width:980px){
-  #tab-dashboard > .section-grid:nth-of-type(3){grid-template-columns:1fr}
+#tab-dashboard .dash-title{
+  font-size:22px;
+  font-weight:900;
+  letter-spacing:-0.4px;
+  color:var(--dash-text);
 }
 
-/* Ajuste visual do card do ritmo (gráfico) */
-#tab-dashboard #dashSalesChart{
-  width:100% !important;
+#tab-dashboard .dash-subtitle{
+  margin-top:2px;
+  font-size:12px;
+  color:var(--dash-muted);
+}
+#tab-dashboard .dash-subtitle strong{color:var(--dash-text)}
+#tab-dashboard .dash-subtitle strong#dashFormula{font-weight:900}
+
+#tab-dashboard .dash-controls{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
 }
 
-/* BADGES do dashboard (não conflitar com badges de alertas) */
+/* Toggle Hoje/Mês */
+#tab-dashboard .dash-toggle{
+  display:inline-flex;
+  padding:4px;
+  border:1px solid var(--dash-border);
+  background:rgba(0,0,0,0.18);
+  border-radius:999px;
+}
+
+#tab-dashboard .dash-toggle-btn{
+  appearance:none;
+  border:0;
+  cursor:pointer;
+  padding:8px 12px;
+  border-radius:999px;
+  font-weight:900;
+  font-size:12px;
+  color:rgba(255,255,255,0.75);
+  background:transparent;
+}
+
+#tab-dashboard .dash-toggle-btn.is-active{
+  background:rgba(255,255,255,0.10);
+  color:rgba(255,255,255,0.92);
+  box-shadow:0 6px 16px rgba(0,0,0,0.18);
+}
+
+/* Live dot + updated at */
+#tab-dashboard .dash-live{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border:1px solid var(--dash-border);
+  background:rgba(0,0,0,0.16);
+  border-radius:999px;
+}
+
+#tab-dashboard .dash-live-dot{
+  width:9px;
+  height:9px;
+  border-radius:999px;
+  background:var(--dash-red);
+  box-shadow:0 0 0 0 rgba(255,55,55,0.55);
+  animation:dashPulse 1.25s ease-out infinite;
+}
+
+@keyframes dashPulse{
+  0%{box-shadow:0 0 0 0 rgba(255,55,55,0.55)}
+  100%{box-shadow:0 0 0 10px rgba(255,55,55,0)}
+}
+
+/* Linha meta compacta */
+#tab-dashboard .dash-meta{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:10px 12px;
+  border:1px solid var(--dash-border);
+  background:rgba(255,255,255,0.04);
+  border-radius:14px;
+  margin-bottom:12px;
+}
+
+#tab-dashboard .dash-badges{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+/* Badges do dashboard (isolado) */
 #tab-dashboard .badge{
   display:inline-flex;
   align-items:center;
@@ -52,19 +133,166 @@
 #tab-dashboard .badge.gray{
   border-color:rgba(255,255,255,0.18);
   background:rgba(255,255,255,0.06);
-  color:rgba(255,255,255,0.88);
+  color:rgba(255,255,255,0.84);
 }
 
-/* Botões do topo do dashboard (mantém o padrão) */
-#tab-dashboard #btnDashReload{white-space:nowrap}
+/* KPIs */
+#tab-dashboard .dash-kpis{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:12px;
+}
+@media (max-width:1100px){
+  #tab-dashboard .dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:620px){
+  #tab-dashboard .dash-kpis{grid-template-columns:1fr}
+}
 
-/* Melhorar leitura dos valores KPI */
-#tab-dashboard .kpi-value{
+#tab-dashboard .dash-kpi{
+  border:1px solid var(--dash-border);
+  background:var(--dash-bg);
+  border-radius:16px;
+  padding:12px 12px;
+}
+
+#tab-dashboard .dash-kpi-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+#tab-dashboard .dash-kpi-title{
+  font-weight:900;
+  font-size:12px;
+  letter-spacing:0.2px;
+  color:rgba(255,255,255,0.85);
+  text-transform:uppercase;
+}
+
+#tab-dashboard .dash-kpi-value{
   font-size:26px;
-  letter-spacing:-0.2px;
+  font-weight:1000;
+  letter-spacing:-0.4px;
+  color:rgba(255,255,255,0.96);
+  line-height:1.05;
 }
 
-/* Card informativo (barra azul) deixa mais “print-like” */
-#tab-dashboard .section-card[style*="border-left"]{
-  background:rgba(255,255,255,0.05);
+#tab-dashboard .dash-kpi-sub{
+  margin-top:6px;
+  font-size:12px;
+  color:var(--dash-muted);
 }
+
+/* Grid principal */
+#tab-dashboard .dash-grid{
+  display:grid;
+  grid-template-columns:2fr 1fr;
+  gap:12px;
+  align-items:start;
+}
+@media (max-width:1100px){
+  #tab-dashboard .dash-grid{grid-template-columns:1fr}
+}
+
+/* Cards */
+#tab-dashboard .dash-card{
+  border:1px solid var(--dash-border);
+  background:var(--dash-bg);
+  border-radius:16px;
+  overflow:hidden;
+}
+
+#tab-dashboard .dash-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  background:rgba(0,0,0,0.12);
+}
+
+#tab-dashboard .dash-card-title{
+  font-weight:1000;
+  font-size:14px;
+  letter-spacing:-0.2px;
+  color:rgba(255,255,255,0.92);
+}
+
+#tab-dashboard .dash-card-right{
+  font-size:12px;
+  color:var(--dash-muted);
+  white-space:nowrap;
+}
+
+#tab-dashboard .dash-card-body{
+  padding:12px 12px;
+}
+
+/* Chart */
+#tab-dashboard #dashSalesChart{
+  width:100% !important;
+}
+
+/* Top vendidos */
+#tab-dashboard .dash-top-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+#tab-dashboard .dash-top-item{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 10px;
+  border:1px solid rgba(255,255,255,0.06);
+  background:rgba(0,0,0,0.12);
+  border-radius:12px;
+}
+
+#tab-dashboard .dash-top-left{
+  min-width:0;
+}
+
+#tab-dashboard .dash-top-title{
+  font-weight:900;
+  font-size:13px;
+  color:rgba(255,255,255,0.92);
+  line-height:1.2;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+}
+
+#tab-dashboard .dash-top-sub{
+  margin-top:4px;
+  font-size:12px;
+  color:var(--dash-muted);
+}
+
+#tab-dashboard .dash-top-right{
+  text-align:right;
+  flex-shrink:0;
+}
+
+#tab-dashboard .dash-top-metric{
+  font-weight:1000;
+  font-size:13px;
+  color:rgba(255,255,255,0.92);
+}
+
+#tab-dashboard .dash-top-metric-sub{
+  margin-top:4px;
+  font-size:12px;
+  color:var(--dash-muted);
+}
+
+/* Ajuste do botão de atualizar */
+#tab-dashboard #btnDashReload{white-space:nowrap}
