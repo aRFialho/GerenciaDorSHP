@@ -152,23 +152,13 @@ function isOrderClosed(orderStatus) {
 }
 
 function extractGmvCents(detail) {
-  const keys = [
-    "total_amount",
-    "totalAmount",
-    "order_total",
-    "orderTotal",
-    "gmv",
-    "total",
-  ];
-  for (const k of keys) {
-    let v = detail?.[k];
-    if (v == null) continue;
-    if (typeof v === "string") v = Number(v.replace(",", "."));
-    if (!Number.isFinite(v)) continue;
-    if (Number.isInteger(v) && v >= 1000) return v; // assume já em centavos
-    return Math.round(v * 100); // assume em reais
-  }
-  return null;
+  let v = detail?.total_amount;
+  if (v == null) return null;
+
+  if (typeof v === "string") v = Number(v.replace(",", "."));
+  if (!Number.isFinite(v)) return null;
+
+  return Math.round(v * 100);
 }
 
 async function upsertOrderAndSnapshot(shopInternalId, detail) {
@@ -204,7 +194,7 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
       reverseShippingFee: detail.reverse_shipping_fee ?? null,
     },
     update: {
-      gmvCents: gmvCandidate ?? 0,
+      ...(gmvCandidate != null ? { gmvCents: gmvCandidate } : {}),
       orderStatus: detail.order_status || null,
       region: detail.region || null,
       currency: detail.currency || null,
@@ -382,6 +372,7 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
             "days_to_ship",
             "ship_by_date",
             "currency",
+            "total_amount",
             "region",
             "booking_sn",
             "cod",
@@ -399,7 +390,7 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
         processed += 1;
         const { addressChanged, late, atRisk } = await upsertOrderAndSnapshot(
           shopRow.id,
-          d
+          d,
         );
         if (addressChanged) addressChangedCount += 1;
         if (late) lateCount += 1;
