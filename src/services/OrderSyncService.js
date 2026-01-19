@@ -363,7 +363,7 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
         path: "/api/v2/order/get_order_detail",
         shopId: String(shopeeShopId),
         query: {
-          order_sn_list: batch,
+          order_sn_list: batch.join(","),
           response_optional_fields: [
             "recipient_address",
             "order_status",
