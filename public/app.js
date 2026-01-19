@@ -198,6 +198,26 @@ let DASH_POLL = null;
 // Reaproveita seu DASH_CHART global existente
 // let DASH_CHART = null;
 
+const CHART_TICK_COLOR = "rgba(255,255,255,0.70)";
+const CHART_GRID_COLOR = "rgba(255,255,255,0.08)";
+
+function fmtBRL(v) {
+  const n = Number(v || 0);
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function fmtBRLCompact(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return (
+    "R$ " +
+    new Intl.NumberFormat("pt-BR", {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(n)
+  );
+}
+
 function fmtTimeNow() {
   return new Date().toLocaleTimeString("pt-BR", {
     hour: "2-digit",
@@ -343,10 +363,33 @@ function renderMonthChart({
     },
     options: {
       responsive: true,
-      plugins: { legend: { display: false }, tooltip: { enabled: true } },
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: CHART_TICK_COLOR } },
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            title: (items) =>
+              items?.[0]?.label ? `Dia ${items[0].label}` : "",
+            label: (ctx) =>
+              `${ctx.dataset?.label || "—"}: ${fmtBRL(ctx.parsed?.y || 0)}`,
+          },
+        },
+      },
       scales: {
-        x: { grid: { display: false }, ticks: { display: false } },
-        y: { grid: { display: false }, ticks: { display: false } },
+        x: {
+          grid: { display: false },
+          ticks: { display: true, color: CHART_TICK_COLOR, maxTicksLimit: 10 },
+        },
+        y: {
+          grid: { color: CHART_GRID_COLOR },
+          ticks: {
+            display: true,
+            color: CHART_TICK_COLOR,
+            callback: (v) => fmtBRLCompact(v),
+          },
+        },
       },
     },
   });
@@ -445,47 +488,28 @@ function renderMonthRatioChart({
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { display: false },
+        legend: { display: true, labels: { color: CHART_TICK_COLOR } },
         tooltip: {
-          enabled: true,
-          callbacks: {
-            // título: "Dia 12"
-            title: (items) => {
-              const it = items?.[0];
-              const day = it?.label ?? "";
-              return day ? `Dia ${day}` : "";
-            },
-            // corpo: "Progresso: 87%" + "Meta: 100%"
-            label: (ctx) => {
-              const y = Number(ctx.parsed?.y);
-              if (
-                ctx.dataset?.label === "Progresso" ||
-                ctx.dataset?.label === "Hoje"
-              ) {
-                const pct = Number.isFinite(y) ? Math.round(y) : 0;
-                return `Progresso: ${pct}%`;
-              }
-              if (ctx.dataset?.label === "Meta") {
-                return "Meta: 100%";
-              }
-              return "";
-            },
-          },
-          filter: (ctx) => {
-            // mostra tooltip apenas para Progresso + Hoje + Meta (evita ruído)
-            const lbl = String(ctx.dataset?.label || "");
-            return lbl === "Progresso" || lbl === "Hoje" || lbl === "Meta";
-          },
+          /* mantém o que você já fez */
         },
       },
       scales: {
-        x: { grid: { display: false }, ticks: { display: false } },
+        x: {
+          grid: { display: false },
+          ticks: { display: true, color: CHART_TICK_COLOR, maxTicksLimit: 10 },
+        },
         y: {
           min: 0,
           max: 100,
-          grid: { display: false },
-          ticks: { display: false },
+          grid: { color: CHART_GRID_COLOR },
+          ticks: {
+            display: true,
+            color: CHART_TICK_COLOR,
+            callback: (v) => `${v}%`,
+          },
         },
       },
     },
@@ -559,10 +583,36 @@ function renderTodayChartCompare({
     },
     options: {
       responsive: true,
-      plugins: { legend: { display: false }, tooltip: { enabled: true } },
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: CHART_TICK_COLOR } },
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            title: (items) => (items?.[0]?.label ? `${items[0].label}:00` : ""),
+            label: (ctx) =>
+              `${ctx.dataset?.label || "—"}: ${fmtBRL(ctx.parsed?.y || 0)}`,
+          },
+          filter: (ctx) => {
+            const lbl = String(ctx.dataset?.label || "");
+            return lbl === "Hoje" || lbl === "Ontem"; // deixa “Agora” fora do tooltip (opcional)
+          },
+        },
+      },
       scales: {
-        x: { grid: { display: false }, ticks: { display: false } },
-        y: { grid: { display: false }, ticks: { display: false } },
+        x: {
+          grid: { display: false },
+          ticks: { display: true, color: CHART_TICK_COLOR, maxTicksLimit: 12 },
+        },
+        y: {
+          grid: { color: CHART_GRID_COLOR },
+          ticks: {
+            display: true,
+            color: CHART_TICK_COLOR,
+            callback: (v) => fmtBRLCompact(v),
+          },
+        },
       },
     },
   });

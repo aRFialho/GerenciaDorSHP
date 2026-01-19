@@ -325,3 +325,9 @@
 #tab-dashboard .dash-summary{display:flex;flex-direction:column;gap:10px}
 #tab-dashboard .dash-summary-row{display:flex;align-items:center;justify-content:space-between;gap:10px;color:rgba(255,255,255,0.75)}
 #tab-dashboard .dash-summary-row strong{color:rgba(255,255,255,0.92);font-weight:1000}
+/* trava a área do gráfico */
+#tab-dashboard .dash-card-body{height:180px}
+#tab-dashboard #dashTodayLayout .dash-card-body{height:240px}
+
+/* garante que o canvas ocupa a área, sem crescer sozinho */
+#tab-dashboard canvas{width:100%!important;height:100%!important;display:block}
