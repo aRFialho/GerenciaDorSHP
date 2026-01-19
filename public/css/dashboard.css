@@ -296,3 +296,5 @@
 
 /* Ajuste do botão de atualizar */
 #tab-dashboard #btnDashReload{white-space:nowrap}
+#tab-dashboard #dashProjection.dash-pos{color:rgba(34,197,94,0.95)}
+#tab-dashboard #dashProjection.dash-neg{color:rgba(255,55,55,0.95)}

@@ -369,7 +369,11 @@ function renderMonthChart({
   });
 }
 
-function renderTodayChart({ hourlyBars }) {
+function renderTodayChartCompare({
+  hourlyBarsToday,
+  hourlyBarsYesterday,
+  currentHour,
+}) {
   const canvas = document.getElementById("dashSalesChart");
   const ctx = canvas?.getContext?.("2d");
   if (!ctx || !window.Chart) return;
@@ -377,10 +381,19 @@ function renderTodayChart({ hourlyBars }) {
   const labels = Array.from({ length: 24 }, (_, i) =>
     String(i).padStart(2, "0"),
   );
-  const values = Array.from(
-    { length: 24 },
-    (_, i) => Number(hourlyBars?.[i]?.gmvCents || 0) / 100,
+
+  const today = labels.map(
+    (_, i) => Number(hourlyBarsToday?.[i]?.gmvCents || 0) / 100,
   );
+  const yesterday = labels.map(
+    (_, i) => Number(hourlyBarsYesterday?.[i]?.gmvCents || 0) / 100,
+  );
+
+  const h = Math.max(
+    0,
+    Math.min(Number(currentHour ?? new Date().getHours()), 23),
+  );
+  const pointY = today[h] || 0;
 
   if (DASH_CHART) DASH_CHART.destroy();
 
@@ -390,10 +403,34 @@ function renderTodayChart({ hourlyBars }) {
       labels,
       datasets: [
         {
-          data: values,
+          label: "Hoje",
+          data: today,
           backgroundColor: "rgba(255, 46, 147, 0.45)",
-          borderColor: "rgba(255, 46, 147, 0.80)",
+          borderColor: "rgba(255, 46, 147, 0.85)",
           borderWidth: 1,
+          order: 2,
+        },
+        {
+          label: "Ontem",
+          type: "line",
+          data: yesterday,
+          borderColor: "rgba(148, 163, 184, 0.75)",
+          backgroundColor: "rgba(148, 163, 184, 0.10)",
+          pointRadius: 0,
+          tension: 0.25,
+          borderWidth: 2,
+          order: 1,
+        },
+        {
+          label: "Agora",
+          type: "scatter",
+          data: [{ x: labels[h], y: pointY }],
+          pointRadius: 5,
+          pointHoverRadius: 6,
+          pointBackgroundColor: "rgba(255, 55, 55, 1)",
+          pointBorderColor: "rgba(255,255,255,0.85)",
+          pointBorderWidth: 1,
+          order: 0,
         },
       ],
     },
@@ -419,37 +456,50 @@ async function loadDashboard(opts = {}) {
 
   try {
     if (DASH_MODE === "today") {
-      // ✅ HOJE (ao vivo)
       const data = await apiGet(
         `/shops/${SHOP_PATH_PLACEHOLDER}/dashboard/today-sales`,
       );
 
-      // Esses IDs existem no HTML novo e também no antigo
       setText("dashPeriodLabel", data?.period?.label || "Hoje");
       setText("dashDayLabel", data?.period?.dayLabel || "—");
-      setText(
-        "dashProgressLabel",
-        data?.period?.progressPct != null ? `${data.period.progressPct}%` : "—",
-      );
+      setText("dashProgressLabel", "—");
 
       setText("dashGmvMtd", formatBRLCents(data?.metrics?.gmvTodayCents || 0));
-      setText("dashProjection", "—");
+
+      // ✅ “Projeção” vira a variação vs ontem até a hora atual
+      const pct = data?.metrics?.deltaPct;
+      setText(
+        "dashProjection",
+        pct == null ? "—" : `${pct > 0 ? "+" : ""}${pct}%`,
+      );
+      const projEl = document.getElementById("dashProjection");
+      if (projEl) {
+        projEl.classList.remove("dash-pos", "dash-neg");
+        if (pct != null)
+          projEl.classList.add(pct >= 0 ? "dash-pos" : "dash-neg");
+      }
       setText("dashOrdersCount", String(data?.metrics?.ordersCountToday || 0));
       setText(
         "dashTicketAvg",
-        formatBRLCents(data?.metrics?.ticketAvgCents || 0),
+        formatBRLCents(data?.metrics?.ticketAvgTodayCents || 0),
       );
       setText("dashAvgPerDay", "—");
 
-      setText("dashFormula", "Hoje (ao vivo)");
+      setText("dashFormula", "Hoje vs ontem (até a hora atual)");
       setText("dashAdsStatus", "Ads: Ads não configurado");
 
       const title = document.getElementById("dashChartTitle");
       const subtitle = document.getElementById("dashChartSubtitle");
-      if (title) title.textContent = "Vendas de hoje (hora a hora)";
-      if (subtitle) subtitle.textContent = "Barras: GMV por hora";
+      if (title) title.textContent = "Vendas de hoje (comparado com ontem)";
+      if (subtitle)
+        subtitle.textContent =
+          "Barras: hoje • Linha: ontem • Ponto vermelho: hora atual";
 
-      renderTodayChart({ hourlyBars: data?.hourlyBars || [] });
+      renderTodayChartCompare({
+        hourlyBarsToday: data?.hourlyBarsToday || [],
+        hourlyBarsYesterday: data?.hourlyBarsYesterday || [],
+        currentHour: data?.metrics?.currentHour,
+      });
 
       if (msg) msg.textContent = "";
       return;
@@ -479,6 +529,9 @@ async function loadDashboard(opts = {}) {
       "dashProjection",
       formatBRLCents(data?.metrics?.projectionCents || 0),
     );
+    document
+      .getElementById("dashProjection")
+      ?.classList.remove("dash-pos", "dash-neg");
     setText("dashOrdersCount", String(data?.metrics?.ordersCountMtd || 0));
     setText(
       "dashTicketAvg",
