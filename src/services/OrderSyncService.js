@@ -364,24 +364,8 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
         shopId: String(shopeeShopId),
         query: {
           order_sn_list: batch.join(","),
-          response_optional_fields: [
-            "recipient_address",
-            "order_status",
-            "create_time",
-            "update_time",
-            "days_to_ship",
-            "ship_by_date",
-            "currency",
-            "total_amount",
-            "region",
-            "booking_sn",
-            "cod",
-            "advance_package",
-            "hot_listing_order",
-            "is_buyer_shop_collection",
-            "message_to_seller",
-            "reverse_shipping_fee",
-          ],
+          response_optional_fields:
+            "recipient_address,order_status,create_time,update_time,days_to_ship,ship_by_date,currency,total_amount,region,booking_sn,cod,advance_package,hot_listing_order,is_buyer_shop_collection,message_to_seller,reverse_shipping_fee",
         },
       });
 
