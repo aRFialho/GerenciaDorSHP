@@ -1,4 +1,6 @@
 const prisma = require("../config/db");
+const { Prisma } = require("@prisma/client");
+const { PAID_EXCLUDED_STATUSES } = require("../utils/orderStatusRules");
 
 function normalizeStr(v) {
   return String(v || "")
@@ -94,19 +96,46 @@ async function byState(req, res) {
   if (!shop) return;
 
   const months = parseMonths(req.query.months);
+  const mode = String(req.query.mode || "total").toLowerCase();
+
   const to = new Date();
   const from = new Date();
   from.setMonth(from.getMonth() - months);
 
-  // Agrupa por stateNorm/state e depois consolida por UF (porque pode ter "sp" e "sao paulo")
-  const rows = await prisma.orderGeoAddress.groupBy({
-    by: ["stateNorm", "state"],
-    where: {
-      shopId: shop.id,
-      shopeeCreateTime: { gte: from },
-    },
-    _count: { _all: true },
-  });
+  let rows;
+
+  if (mode === "pagos") {
+    rows = await prisma.$queryRaw(
+      Prisma.sql`
+        SELECT oga."stateNorm" AS "stateNorm",
+               oga."state"     AS "state",
+               COUNT(*)        AS "count"
+        FROM "OrderGeoAddress" oga
+        JOIN "Order" o ON o."id" = oga."orderId"
+        WHERE oga."shopId" = ${shop.id}
+          AND oga."shopeeCreateTime" >= ${from}
+          AND o."orderStatus" IS NOT NULL
+          AND o."orderStatus" NOT IN (${Prisma.join(PAID_EXCLUDED_STATUSES)})
+        GROUP BY oga."stateNorm", oga."state"
+      `,
+    );
+  } else {
+    // total/feitos: mesmo comportamento atual (sem filtro por status)
+    const grouped = await prisma.orderGeoAddress.groupBy({
+      by: ["stateNorm", "state"],
+      where: {
+        shopId: shop.id,
+        shopeeCreateTime: { gte: from },
+      },
+      _count: { _all: true },
+    });
+
+    rows = grouped.map((r) => ({
+      stateNorm: r.stateNorm,
+      state: r.state,
+      count: r._count._all,
+    }));
+  }
 
   const agg = new Map(); // uf -> { uf, count }
   for (const r of rows) {
@@ -114,7 +143,7 @@ async function byState(req, res) {
     if (!uf) continue;
 
     const prev = agg.get(uf) || { uf, count: 0 };
-    prev.count += r._count._all;
+    prev.count += Number(r.count) || 0;
     agg.set(uf, prev);
   }
 
@@ -131,6 +160,7 @@ async function byCityInState(req, res) {
   const months = parseMonths(req.query.months);
   const uf = String(req.params.uf || "").toUpperCase();
   const stateNorms = normsForUF(uf);
+  const mode = String(req.query.mode || "total").toLowerCase();
 
   if (!stateNorms.length) {
     res.status(400).json({ error: "invalid_uf", message: "UF inválida." });
@@ -141,19 +171,50 @@ async function byCityInState(req, res) {
   const from = new Date();
   from.setMonth(from.getMonth() - months);
 
-  const rows = await prisma.orderGeoAddress.groupBy({
-    by: ["cityNorm", "city"],
-    where: {
-      shopId: shop.id,
-      shopeeCreateTime: { gte: from },
-      stateNorm: { in: stateNorms },
-      cityNorm: { not: null }, // ✅ importante
-    },
-    _count: { _all: true },
-  });
+  let rows;
+
+  if (mode === "pagos") {
+    rows = await prisma.$queryRaw(
+      Prisma.sql`
+        SELECT oga."cityNorm" AS "cityNorm",
+               oga."city"     AS "city",
+               COUNT(*)       AS "count"
+        FROM "OrderGeoAddress" oga
+        JOIN "Order" o ON o."id" = oga."orderId"
+        WHERE oga."shopId" = ${shop.id}
+          AND oga."shopeeCreateTime" >= ${from}
+          AND oga."stateNorm" IN (${Prisma.join(stateNorms)})
+          AND oga."cityNorm" IS NOT NULL
+          AND o."orderStatus" IS NOT NULL
+          AND o."orderStatus" NOT IN (${Prisma.join(PAID_EXCLUDED_STATUSES)})
+        GROUP BY oga."cityNorm", oga."city"
+      `,
+    );
+  } else {
+    const grouped = await prisma.orderGeoAddress.groupBy({
+      by: ["cityNorm", "city"],
+      where: {
+        shopId: shop.id,
+        shopeeCreateTime: { gte: from },
+        stateNorm: { in: stateNorms },
+        cityNorm: { not: null },
+      },
+      _count: { _all: true },
+    });
+
+    rows = grouped.map((r) => ({
+      cityNorm: r.cityNorm,
+      city: r.city,
+      count: r._count._all,
+    }));
+  }
 
   const items = rows
-    .map((r) => ({ city: r.city, cityNorm: r.cityNorm, count: r._count._all }))
+    .map((r) => ({
+      city: r.city,
+      cityNorm: r.cityNorm,
+      count: Number(r.count) || 0,
+    }))
     .sort((a, b) => b.count - a.count);
 
   const total = items.reduce((s, x) => s + x.count, 0);

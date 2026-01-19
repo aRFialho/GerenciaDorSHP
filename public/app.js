@@ -69,7 +69,7 @@ function initTabs() {
 
       tabs.forEach((b) => b.classList.toggle("active", b === btn));
       panels.forEach((p) =>
-        p.classList.toggle("active", p.id === `tab-${tab}`)
+        p.classList.toggle("active", p.id === `tab-${tab}`),
       );
 
       // garante loja ativa antes de carregar módulos
@@ -109,7 +109,7 @@ function initModal() {
 
 function kv(k, v) {
   return `<div class="kv"><div class="k">${escapeHtml(
-    k
+    k,
   )}</div><div class="v">${v}</div></div>`;
 }
 
@@ -166,7 +166,7 @@ async function ensureShopSelected() {
     openModal(
       "Conectar Shopee",
       `<div class="muted">Nenhuma loja vinculada a esta conta ainda.</div>
-       <div class="muted" style="margin-top:10px;">Conecte sua Shopee na aba Autenticação.</div>`
+       <div class="muted" style="margin-top:10px;">Conecte sua Shopee na aba Autenticação.</div>`,
     );
     return;
   }
@@ -190,13 +190,13 @@ async function loadDashboard() {
 
   try {
     const data = await apiGet(
-      `/shops/${SHOP_PATH_PLACEHOLDER}/dashboard/monthly-sales`
+      `/shops/${SHOP_PATH_PLACEHOLDER}/dashboard/monthly-sales`,
     );
 
     setText("dashPeriodLabel", data.period.label);
     setText(
       "dashDayLabel",
-      `${data.period.dayOfMonth}/${data.period.daysInMonth}`
+      `${data.period.dayOfMonth}/${data.period.daysInMonth}`,
     );
     setText("dashProgressLabel", `${data.period.progressPct}%`);
 
@@ -206,17 +206,17 @@ async function loadDashboard() {
     setText("dashAdsStatus", "Ads: Ads não configurado");
     setText(
       "dashAdsAttributed",
-      formatBRLCents(data.metrics.adsAttributedCents || 0)
+      formatBRLCents(data.metrics.adsAttributedCents || 0),
     );
     setText(
       "dashOrganicEstimated",
-      formatBRLCents(data.metrics.organicEstimatedCents)
+      formatBRLCents(data.metrics.organicEstimatedCents),
     );
     setText("dashOrdersCount", String(data.metrics.ordersCountMtd));
     setText("dashTicketAvg", formatBRLCents(data.metrics.ticketAvgCents));
     setText(
       "dashFormula",
-      "( total_vendas_mês_atual / dia_atual ) x dias_do_mês"
+      "( total_vendas_mês_atual / dia_atual ) x dias_do_mês",
     );
     const labels = data.dailyBars.map((d) => d.day);
     const values = data.dailyBars.map((d) => (d.gmvCents || 0) / 100);
@@ -228,8 +228,8 @@ async function loadDashboard() {
         day < today
           ? "rgba(255, 106, 0, 0.35)" // passado (laranja)
           : day === today
-          ? "rgba(255, 46, 147, 0.55)" // hoje (rosa)
-          : "rgba(148, 163, 184, 0.18)" // futuro (cinza)
+            ? "rgba(255, 46, 147, 0.55)" // hoje (rosa)
+            : "rgba(148, 163, 184, 0.18)", // futuro (cinza)
     );
 
     const ctx = document.getElementById("dashSalesChart")?.getContext("2d");
@@ -268,7 +268,7 @@ async function promptSelectShop(shops) {
       const status = s.status ? ` • ${escapeHtml(String(s.status))}` : "";
       return `
         <button class="btn btn-primary" data-select-shop="${escapeHtml(
-          String(s.id)
+          String(s.id),
         )}" style="width:100%; margin-top:10px;">
           ${title}${region}${status}
         </button>
@@ -279,7 +279,7 @@ async function promptSelectShop(shops) {
   openModal(
     "Selecione a loja",
     `<div class="muted">Esta conta possui mais de uma loja vinculada. Escolha qual deseja acessar agora.</div>
-     <div style="margin-top:12px;">${optionsHtml}</div>`
+     <div style="margin-top:12px;">${optionsHtml}</div>`,
   );
 
   $all("[data-select-shop]").forEach((btn) => {
@@ -291,7 +291,7 @@ async function promptSelectShop(shops) {
       } catch (e) {
         $("#modal-body").innerHTML =
           `<div class="muted">Erro ao selecionar loja: ${escapeHtml(
-            e.message
+            e.message,
           )}</div>` + `<div style="margin-top:12px;">${optionsHtml}</div>`;
       }
     });
@@ -364,7 +364,7 @@ async function refreshOrdersAddressAlertsBadge() {
 
   try {
     const data = await apiGet(
-      `/shops/${SHOP_PATH_PLACEHOLDER}/orders/address-alerts?limit=500`
+      `/shops/${SHOP_PATH_PLACEHOLDER}/orders/address-alerts?limit=500`,
     );
 
     const items = Array.isArray(data?.items) ? data.items : [];
@@ -470,7 +470,7 @@ function initOrdersAlertsPopover() {
 async function openOrderAddressChangeModal(orderSn) {
   openModal(
     `Endereço alterado • Pedido ${escapeHtml(orderSn)}`,
-    `<div class="muted">Carregando comparação...</div>`
+    `<div class="muted">Carregando comparação...</div>`,
   );
 
   try {
@@ -478,15 +478,14 @@ async function openOrderAddressChangeModal(orderSn) {
 
     const data = await apiGet(
       `/shops/${SHOP_PATH_PLACEHOLDER}/orders/${encodeURIComponent(
-        orderSn
-      )}/address-alerts`
+        orderSn,
+      )}/address-alerts`,
     );
 
     const items = Array.isArray(data?.items) ? data.items : [];
     if (!items.length) {
-      $(
-        "#modal-body"
-      ).innerHTML = `<div class="muted">Não há alertas abertos para este pedido.</div>`;
+      $("#modal-body").innerHTML =
+        `<div class="muted">Não há alertas abertos para este pedido.</div>`;
       return;
     }
 
@@ -525,7 +524,7 @@ async function openOrderAddressChangeModal(orderSn) {
     $("#modal-body").innerHTML = html;
   } catch (e) {
     $("#modal-body").innerHTML = `<div class="muted">Erro: ${escapeHtml(
-      e.message
+      e.message,
     )}</div>`;
   }
 }
@@ -539,7 +538,7 @@ async function loadOrders() {
     await ensureShopSelected();
 
     const data = await apiGet(
-      `/shops/${SHOP_PATH_PLACEHOLDER}/orders?limit=60`
+      `/shops/${SHOP_PATH_PLACEHOLDER}/orders?limit=60`,
     );
 
     const items = data.items || data.orders || [];
@@ -571,7 +570,7 @@ async function loadOrders() {
                      ${
                        alertCount > 1
                          ? `<span class="order-addr-alert-badge">${escapeHtml(
-                             String(alertCount)
+                             String(alertCount),
                            )}</span>`
                          : ""
                      }
@@ -591,7 +590,7 @@ async function loadOrders() {
     await refreshOrdersAddressAlertsBadge();
   } catch (e) {
     grid.innerHTML = `<div class="card"><div class="muted">Erro ao carregar pedidos: ${escapeHtml(
-      e.message
+      e.message,
     )}</div></div>`;
   }
 }
@@ -599,14 +598,14 @@ async function loadOrders() {
 async function openOrderDetail(orderSn) {
   openModal(
     `Pedido ${escapeHtml(orderSn)}`,
-    `<div class="muted">Carregando detalhes...</div>`
+    `<div class="muted">Carregando detalhes...</div>`,
   );
 
   try {
     await ensureShopSelected();
 
     const data = await apiGet(
-      `/shops/${SHOP_PATH_PLACEHOLDER}/orders/${encodeURIComponent(orderSn)}`
+      `/shops/${SHOP_PATH_PLACEHOLDER}/orders/${encodeURIComponent(orderSn)}`,
     );
 
     const order = data.order || data;
@@ -616,7 +615,7 @@ async function openOrderDetail(orderSn) {
     html += `<div style="margin-bottom:10px;">
       <span class="badge">Status: ${escapeHtml(order.orderStatus || "—")}</span>
       <span class="badge gray" style="margin-left:8px;">Order SN: ${escapeHtml(
-        order.orderSn
+        order.orderSn,
       )}</span>
     </div>`;
 
@@ -624,19 +623,19 @@ async function openOrderDetail(orderSn) {
       "Ship By",
       order.shipByDate
         ? escapeHtml(new Date(order.shipByDate).toLocaleString("pt-BR"))
-        : "—"
+        : "—",
     );
     html += kv(
       "Create Time",
       order.shopeeCreateTime
         ? escapeHtml(new Date(order.shopeeCreateTime).toLocaleString("pt-BR"))
-        : "—"
+        : "—",
     );
     html += kv(
       "Update Time",
       order.shopeeUpdateTime
         ? escapeHtml(new Date(order.shopeeUpdateTime).toLocaleString("pt-BR"))
-        : "—"
+        : "—",
     );
     html += kv("Region", escapeHtml(order.region || "—"));
     html += kv("Currency", escapeHtml(order.currency || "—"));
@@ -653,7 +652,7 @@ async function openOrderDetail(orderSn) {
         "Criado em",
         snap.createdAt
           ? escapeHtml(new Date(snap.createdAt).toLocaleString("pt-BR"))
-          : "—"
+          : "—",
       );
     } else {
       html += `<div class="muted" style="margin-top:14px;">Sem snapshot de endereço salvo ainda.</div>`;
@@ -661,11 +660,10 @@ async function openOrderDetail(orderSn) {
 
     $("#modal-body").innerHTML = html;
   } catch (e) {
-    $(
-      "#modal-body"
-    ).innerHTML = `<div class="muted">Erro ao carregar detalhes: ${escapeHtml(
-      e.message
-    )}</div>`;
+    $("#modal-body").innerHTML =
+      `<div class="muted">Erro ao carregar detalhes: ${escapeHtml(
+        e.message,
+      )}</div>`;
   }
 }
 
@@ -676,7 +674,7 @@ let GEO_VIEW = "BR"; // "BR" | "UF"
 let GEO_UF = null;
 let GEO_LEGEND_CTRL = null;
 let GEO_MONTHS = 6;
-
+let GEO_MODE = "total"; // "total" | "feitos" | "pagos"
 let GEO_MAP = null;
 let GEO_BASE = null;
 let GEO_STATES_LAYER = null;
@@ -774,7 +772,14 @@ function ensureGeoDomBound() {
   const sel = $("#geoSalesMonths");
   const btnReload = $("#geoSalesReload");
   const btnBack = $("#geoSalesBack");
-
+  const selMode = $("#geoSalesMode");
+  if (selMode) {
+    GEO_MODE = String(selMode.value || "total");
+    selMode.addEventListener("change", async () => {
+      GEO_MODE = String(selMode.value || "total");
+      await loadGeoSales();
+    });
+  }
   if (sel) {
     GEO_MONTHS = Number(sel.value || 6);
     setText("geoSalesMonthsLabel", String(GEO_MONTHS));
@@ -853,16 +858,16 @@ function renderGeoIndex(items, { mode, activeKey }) {
           <div class="geo-index-item ${
             active ? "is-active" : ""
           }" data-geo-item="${escapeHtml(key)}" data-geo-mode="${escapeHtml(
-          mode
-        )}">
+            mode,
+          )}">
             <div class="geo-index-top">
               <div class="geo-index-name">${escapeHtml(name)}</div>
               <div class="geo-index-count">${escapeHtml(
-                fmtInt(x.count || 0)
+                fmtInt(x.count || 0),
               )}</div>
             </div>
             <div class="geo-index-bar"><div style="width:${pct.toFixed(
-              2
+              2,
             )}%"></div></div>
           </div>
         `;
@@ -944,7 +949,7 @@ function setMapLegend({ max, title }) {
     const div = L.DomUtil.create("div", "geo-map-legend");
 
     const head = `<div class="geo-map-legend__title">${escapeHtml(
-      title
+      title,
     )}</div>`;
     if (!ranges.length) {
       div.innerHTML =
@@ -959,7 +964,7 @@ function setMapLegend({ max, title }) {
         const swatch = colorForRatio(ratio);
         const label = r.to >= max ? `${r.from}+` : `${r.from}–${r.to}`;
         return `<div class="geo-map-legend__item"><span class="geo-map-legend__swatch" style="background:${swatch};"></span><span class="geo-map-legend__label">${escapeHtml(
-          label
+          label,
         )} vendas</span></div>`;
       })
       .join("");
@@ -991,16 +996,15 @@ async function renderGeoBrazil() {
   const months = GEO_MONTHS || 6;
   setText("geoSalesLegend", "Carregando…");
 
+  const mode = GEO_MODE || "total";
   const data = await apiGet(
-    `/shops/${SHOP_PATH_PLACEHOLDER}/geo/sales?months=${encodeURIComponent(
-      String(months)
-    )}`
+    `/shops/${SHOP_PATH_PLACEHOLDER}/geo/sales?months=${encodeURIComponent(String(months))}&mode=${encodeURIComponent(mode)}`,
   );
   const items = Array.isArray(data?.items) ? data.items : [];
 
   // mapa uf -> count
   const countMap = new Map(
-    items.map((x) => [String(x.uf).toUpperCase(), Number(x.count || 0)])
+    items.map((x) => [String(x.uf).toUpperCase(), Number(x.count || 0)]),
   );
   const max = Math.max(0, ...Array.from(countMap.values()));
   setMapLegend({ max, title: "Vendas (UF)" });
@@ -1064,8 +1068,8 @@ async function renderGeoBrazil() {
   setText(
     "geoSalesLegend",
     `Período: últimos ${months} meses • Total (com geo): ${fmtInt(
-      data?.total || 0
-    )}`
+      data?.total || 0,
+    )}`,
   );
 }
 
@@ -1086,10 +1090,9 @@ async function renderGeoState(uf) {
   setText("geoSalesLegend", "Carregando…");
 
   // carrega agregação por cidade
+  const mode = GEO_MODE || "total";
   const data = await apiGet(
-    `/shops/${SHOP_PATH_PLACEHOLDER}/geo/sales/${encodeURIComponent(
-      UF
-    )}?months=${encodeURIComponent(String(months))}`
+    `/shops/${SHOP_PATH_PLACEHOLDER}/geo/sales/${encodeURIComponent(UF)}?months=${encodeURIComponent(String(months))}&mode=${encodeURIComponent(mode)}`,
   );
 
   const items = Array.isArray(data?.items) ? data.items : [];
@@ -1097,7 +1100,7 @@ async function renderGeoState(uf) {
     items.map((x) => [
       String(x.cityNorm || normTextGeo(x.city)),
       Number(x.count || 0),
-    ])
+    ]),
   );
 
   // index (lado direito)
@@ -1155,8 +1158,8 @@ async function renderGeoState(uf) {
   setText(
     "geoSalesLegend",
     `Período: últimos ${months} meses • ${UF} • Total (com geo): ${fmtInt(
-      data?.total || 0
-    )}`
+      data?.total || 0,
+    )}`,
   );
 }
 
@@ -1206,7 +1209,7 @@ async function loadProducts() {
       "products-page-info",
       `Página ${PRODUCTS_PAGE} de ${PRODUCTS_TOTAL_PAGES} • Total: ${
         meta.total ?? "—"
-      }`
+      }`,
     );
 
     const prev = $("#products-prev");
@@ -1282,18 +1285,17 @@ async function loadProducts() {
       });
     });
   } catch (e) {
-    $(
-      "#products-grid"
-    ).innerHTML = `<div class="card"><div class="muted">Erro ao carregar produtos: ${escapeHtml(
-      e.message
-    )}</div></div>`;
+    $("#products-grid").innerHTML =
+      `<div class="card"><div class="muted">Erro ao carregar produtos: ${escapeHtml(
+        e.message,
+      )}</div></div>`;
   }
 }
 
 async function openProductDetail(itemId) {
   openModal(
     `Produto ${escapeHtml(itemId)}`,
-    `<div class="muted">Carregando detalhes...</div>`
+    `<div class="muted">Carregando detalhes...</div>`,
   );
 
   try {
@@ -1301,8 +1303,8 @@ async function openProductDetail(itemId) {
 
     const data = await apiGet(
       `/shops/${SHOP_PATH_PLACEHOLDER}/products/${encodeURIComponent(
-        itemId
-      )}/full`
+        itemId,
+      )}/full`,
     );
 
     const p = data.product || data;
@@ -1340,7 +1342,7 @@ async function openProductDetail(itemId) {
             : "";
 
           return `<div class="card">${escapeHtml(name)}: ${escapeHtml(
-            values || "—"
+            values || "—",
           )}</div>`;
         })
         .join("");
@@ -1351,7 +1353,7 @@ async function openProductDetail(itemId) {
 
       if (extra.daysToShip != null) {
         html += `<div class="card">Days to ship: ${escapeHtml(
-          extra.daysToShip
+          extra.daysToShip,
         )}</div>`;
       }
 
@@ -1365,7 +1367,7 @@ async function openProductDetail(itemId) {
                 ? String(l.estimated_shipping_fee)
                 : "—";
             return `<div class="card">${escapeHtml(name)} • Ativo: ${escapeHtml(
-              enabled
+              enabled,
             )} • Frete estimado: ${escapeHtml(fee)}</div>`;
           })
           .join("");
@@ -1378,9 +1380,9 @@ async function openProductDetail(itemId) {
       if (extra.dimension) {
         const d = extra.dimension;
         html += `<div class="card">Pacote: ${escapeHtml(
-          d.package_length ?? "—"
+          d.package_length ?? "—",
         )} x ${escapeHtml(d.package_width ?? "—")} x ${escapeHtml(
-          d.package_height ?? "—"
+          d.package_height ?? "—",
         )}</div>`;
       }
 
@@ -1398,8 +1400,8 @@ async function openProductDetail(itemId) {
           .map(
             (im) =>
               `<div class="card"><img src="${escapeHtml(
-                im.url
-              )}" alt="" style="width:100%; border-radius:12px; border:1px solid rgba(255,255,255,0.10);" /></div>`
+                im.url,
+              )}" alt="" style="width:100%; border-radius:12px; border:1px solid rgba(255,255,255,0.10);" /></div>`,
           )
           .join("") +
         `</div>`;
@@ -1413,14 +1415,14 @@ async function openProductDetail(itemId) {
             <div class="card" style="margin:10px 0;">
               <div class="card-title">${escapeHtml(m.name || "Modelo")}</div>
               <div class="muted">Model ID: ${escapeHtml(
-                String(m.modelId)
+                String(m.modelId),
               )}</div>
               <div class="muted">SKU: ${escapeHtml(m.sku || "—")}</div>
               <div class="muted">Estoque: ${escapeHtml(
-                m.stock ?? "—"
+                m.stock ?? "—",
               )} • Vendidos: ${escapeHtml(m.sold ?? "—")}</div>
               <div class="muted">Preço: ${escapeHtml(
-                formatBRLFixed90(m.price)
+                formatBRLFixed90(m.price),
               )}</div>
             </div>
           `;
@@ -1432,11 +1434,10 @@ async function openProductDetail(itemId) {
 
     $("#modal-body").innerHTML = html;
   } catch (e) {
-    $(
-      "#modal-body"
-    ).innerHTML = `<div class="muted">Erro ao carregar detalhes: ${escapeHtml(
-      e.message
-    )}</div>`;
+    $("#modal-body").innerHTML =
+      `<div class="muted">Erro ao carregar detalhes: ${escapeHtml(
+        e.message,
+      )}</div>`;
   }
 }
 
@@ -1451,11 +1452,11 @@ function initSyncButtons() {
       setText("orders-sync-status", "Sincronizando pedidos...");
       try {
         const res = await apiPost(
-          `/shops/${SHOP_PATH_PLACEHOLDER}/orders/sync?rangeDays=180`
+          `/shops/${SHOP_PATH_PLACEHOLDER}/orders/sync?rangeDays=180`,
         );
         setText(
           "orders-sync-status",
-          `OK • Processados: ${res?.summary?.processed ?? "—"}`
+          `OK • Processados: ${res?.summary?.processed ?? "—"}`,
         );
         await loadOrders();
       } catch (e) {
@@ -1469,11 +1470,11 @@ function initSyncButtons() {
       setText("products-sync-status", "Sincronizando produtos...");
       try {
         const res = await apiPost(
-          `/shops/${SHOP_PATH_PLACEHOLDER}/products/sync`
+          `/shops/${SHOP_PATH_PLACEHOLDER}/products/sync`,
         );
         setText(
           "products-sync-status",
-          `OK • Upserted: ${res?.summary?.upserted ?? "—"}`
+          `OK • Upserted: ${res?.summary?.upserted ?? "—"}`,
         );
         await loadProducts();
       } catch (e) {
@@ -1622,7 +1623,7 @@ function openShopSwitcherModal({ shops, role, activeShopId }) {
 
           return `
             <button class="btn btn-primary" data-select-shop="${escapeHtml(
-              String(s.id)
+              String(s.id),
             )}" style="width:100%; margin-top:10px;">
               ${title}${region}${status}${isActive ? ` • (ATIVA)` : ""}
             </button>
@@ -1666,7 +1667,7 @@ function openShopSwitcherModal({ shops, role, activeShopId }) {
 
   openModal(
     "Trocar loja",
-    `<div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start;">${left}${right}</div>`
+    `<div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start;">${left}${right}</div>`,
   );
 
   // selecionar loja (qualquer usuário pode)
@@ -1694,7 +1695,7 @@ function openShopSwitcherModal({ shops, role, activeShopId }) {
         else
           openModal(
             "Erro",
-            `<div class="muted">Não foi possível gerar o link.</div>`
+            `<div class="muted">Não foi possível gerar o link.</div>`,
           );
       } catch (e) {
         openModal("Erro", `<div class="muted">${escapeHtml(e.message)}</div>`);
@@ -1826,16 +1827,16 @@ async function loadAdmin() {
     if (btnCreate) {
       btnCreate.addEventListener("click", async () => {
         const name = String(
-          document.getElementById("admin-new-name")?.value || ""
+          document.getElementById("admin-new-name")?.value || "",
         ).trim();
         const email = String(
-          document.getElementById("admin-new-email")?.value || ""
+          document.getElementById("admin-new-email")?.value || "",
         ).trim();
         const password = String(
-          document.getElementById("admin-new-pass")?.value || ""
+          document.getElementById("admin-new-pass")?.value || "",
         );
         const newRole = String(
-          document.getElementById("admin-new-role")?.value || "VIEWER"
+          document.getElementById("admin-new-role")?.value || "VIEWER",
         ).toUpperCase();
 
         if (!name || !email || !password) {
@@ -1864,7 +1865,7 @@ async function loadAdmin() {
       btn.addEventListener("click", async () => {
         const userId = Number(btn.getAttribute("data-role-toggle"));
         const current = String(
-          btn.getAttribute("data-current-role") || "VIEWER"
+          btn.getAttribute("data-current-role") || "VIEWER",
         ).toUpperCase();
         const nextRole = current === "ADMIN" ? "VIEWER" : "ADMIN";
 
@@ -1874,7 +1875,7 @@ async function loadAdmin() {
         } catch (e) {
           openModal(
             "Erro",
-            `<div class="muted">${escapeHtml(e.message)}</div>`
+            `<div class="muted">${escapeHtml(e.message)}</div>`,
           );
         }
       });
@@ -1891,10 +1892,10 @@ async function loadAdmin() {
         <div class="muted">Atualize nome/e-mail e (opcional) defina uma nova senha.</div>
         <div style="margin-top:12px; display:grid; gap:10px;">
           <input id="edit-user-name" class="input" placeholder="Nome" value="${escapeHtml(
-            u.name || ""
+            u.name || "",
           )}" />
           <input id="edit-user-email" class="input" placeholder="E-mail" value="${escapeHtml(
-            u.email || ""
+            u.email || "",
           )}" />
           <input id="edit-user-pass" class="input" placeholder="Nova senha (opcional)" type="password" />
         </div>
@@ -1903,20 +1904,20 @@ async function loadAdmin() {
           <button id="btn-del-user" class="btn btn-ghost">Excluir usuário</button>
         </div>
         <div id="edit-user-msg" class="muted" style="margin-top:10px;"></div>
-      `
+      `,
         );
 
         document
           .getElementById("btn-save-user")
           ?.addEventListener("click", async () => {
             const name = String(
-              document.getElementById("edit-user-name")?.value || ""
+              document.getElementById("edit-user-name")?.value || "",
             ).trim();
             const email = String(
-              document.getElementById("edit-user-email")?.value || ""
+              document.getElementById("edit-user-email")?.value || "",
             ).trim();
             const password = String(
-              document.getElementById("edit-user-pass")?.value || ""
+              document.getElementById("edit-user-pass")?.value || "",
             );
 
             try {
@@ -1933,9 +1934,8 @@ async function loadAdmin() {
               closeModal();
               await loadAdmin();
             } catch (e) {
-              document.getElementById(
-                "edit-user-msg"
-              ).textContent = `Erro: ${e.message}`;
+              document.getElementById("edit-user-msg").textContent =
+                `Erro: ${e.message}`;
             }
           });
 
@@ -1949,16 +1949,15 @@ async function loadAdmin() {
               closeModal();
               await loadAdmin();
             } catch (e) {
-              document.getElementById(
-                "edit-user-msg"
-              ).textContent = `Erro: ${e.message}`;
+              document.getElementById("edit-user-msg").textContent =
+                `Erro: ${e.message}`;
             }
           });
       });
     });
   } catch (e) {
     root.innerHTML = `<div class="muted">Erro no Admin: ${escapeHtml(
-      e.message
+      e.message,
     )}</div>`;
   }
 }

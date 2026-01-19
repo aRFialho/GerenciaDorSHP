@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="utf-8" />
@@ -1033,7 +1033,14 @@
                     <option value="6" selected>Últimos 6 meses</option>
                   </select>
                 </div>
-
+                <div class="field">
+                  <label class="muted" for="geoSalesMode">Filtro</label>
+                  <select id="geoSalesMode" class="select">
+                    <option value="total" selected>Total (todos)</option>
+                    <option value="feitos">Pedidos feitos (todos)</option>
+                    <option value="pagos">Pedidos pagos</option>
+                  </select>
+                </div>
                 <button
                   id="geoSalesBack"
                   class="btn btn-ghost"

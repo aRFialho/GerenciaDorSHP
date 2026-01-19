@@ -1,22 +1,19 @@
 const prisma = require("../config/db");
-
+const { paidOrderWhere } = require("../utils/orderStatusRules");
 async function getActiveShopOrFail(req, res) {
   if (!req.auth) return res.status(401).json({ error: "unauthorized" });
   const shopDbId = req.auth.activeShopId || null;
   if (!shopDbId) return res.status(409).json({ error: "select_shop_required" });
-
   const shop = await prisma.shop.findFirst({
     where: { id: shopDbId, accountId: req.auth.accountId },
   });
   if (!shop) return res.status(404).json({ error: "shop_not_found" });
   return shop;
 }
-
 async function monthlySales(req, res) {
   try {
     const shop = await getActiveShopOrFail(req, res);
     if (!shop) return;
-
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const daysInMonth = new Date(
@@ -29,6 +26,7 @@ async function monthlySales(req, res) {
     const orders = await prisma.order.findMany({
       where: {
         shopId: shop.id,
+        ...paidOrderWhere(),
         OR: [
           { shopeeCreateTime: { gte: start, lte: now } },
           { shopeeCreateTime: null, createdAt: { gte: start, lte: now } },
@@ -63,10 +61,7 @@ async function monthlySales(req, res) {
 
     res.json({
       period: {
-        label: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
-          2,
-          "0",
-        )}`,
+        label: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
         dayOfMonth,
         daysInMonth,
         progressPct: Math.round((dayOfMonth / daysInMonth) * 100),
@@ -91,5 +86,4 @@ async function monthlySales(req, res) {
     });
   }
 }
-
 module.exports = { monthlySales };

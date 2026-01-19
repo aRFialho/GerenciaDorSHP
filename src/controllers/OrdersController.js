@@ -21,13 +21,11 @@ async function getActiveShopOrFail(req, res) {
   }
   return shop;
 }
-
 function normalizeStatus(s) {
   return String(s || "")
     .toUpperCase()
     .trim();
 }
-
 const HIDDEN_STATUSES = [
   "COMPLETED", // finalizado
   "CANCELLED", // cancelado
@@ -36,48 +34,88 @@ const HIDDEN_STATUSES = [
   "IN_CANCEL", // em cancelamento
   "TO_RETURN", // em devolução
 ];
-
 async function list(req, res) {
   const shop = await getActiveShopOrFail(req, res);
   if (!shop) return;
-
+  const page = Math.max(Number(req.query.page || 1), 1);
+  const pageSize = Math.min(Math.max(Number(req.query.pageSize || 60), 1), 200);
   const limit = Math.min(Number(req.query.limit || 60), 200);
-
-  const items = await prisma.order.findMany({
-    where: {
-      shopId: shop.id,
-      NOT: { orderStatus: { in: HIDDEN_STATUSES } },
-    },
-    orderBy: { shopeeUpdateTime: "desc" },
-    take: limit,
-    select: {
-      id: true,
-      orderSn: true,
-      orderStatus: true,
-      shipByDate: true,
-      daysToShip: true,
-      shopeeCreateTime: true,
-      shopeeUpdateTime: true,
-      region: true,
-      currency: true,
-    },
-  });
-
+  let whereClause = { shopId: shop.id };
+  let usePagination = true; // ✅ Se vier status (CSV), filtra explicitamente e NÃO aplica hidden
+  if (req.query.status) {
+    const statuses = String(req.query.status)
+      .split(",")
+      .map(normalizeStatus)
+      .filter(Boolean);
+    whereClause.orderStatus = { in: statuses };
+  } else {
+    // ✅ Compatibilidade: mantém a regra atual quando não há status
+    whereClause.NOT = { orderStatus: { in: HIDDEN_STATUSES } };
+  } // ✅ Compatibilidade: se veio limit e NÃO veio page/pageSize, mantém resposta antiga {items}
+  if (req.query.limit && !req.query.page && !req.query.pageSize) {
+    usePagination = false;
+  }
+  const total = await prisma.order.count({ where: whereClause });
+  let items;
+  if (usePagination) {
+    const skip = (page - 1) * pageSize;
+    items = await prisma.order.findMany({
+      where: whereClause,
+      orderBy: { shopeeUpdateTime: "desc" },
+      skip,
+      take: pageSize,
+      select: {
+        id: true,
+        orderSn: true,
+        orderStatus: true,
+        shipByDate: true,
+        daysToShip: true,
+        shopeeCreateTime: true,
+        shopeeUpdateTime: true,
+        region: true,
+        currency: true,
+      },
+    });
+  } else {
+    items = await prisma.order.findMany({
+      where: whereClause,
+      orderBy: { shopeeUpdateTime: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        orderSn: true,
+        orderStatus: true,
+        shipByDate: true,
+        daysToShip: true,
+        shopeeCreateTime: true,
+        shopeeUpdateTime: true,
+        region: true,
+        currency: true,
+      },
+    });
+  }
   if (!items.length) {
-    res.json({ items: [] });
+    const response = usePagination
+      ? {
+          items: [],
+          pagination: {
+            page,
+            pageSize,
+            total,
+            totalPages: Math.ceil(total / pageSize),
+          },
+        }
+      : { items: [] };
+    res.json(response);
     return;
   }
-
   const orderIds = items.map((o) => o.id);
-
   const grouped = await prisma.orderAddressChangeAlert.groupBy({
     by: ["orderId"],
     where: { resolvedAt: null, orderId: { in: orderIds } },
     _count: { _all: true },
   });
-
   const countMap = new Map(grouped.map((g) => [g.orderId, g._count._all]));
-
   const enrichedItems = items.map((o) => {
     const c = countMap.get(o.id) || 0;
     return {
@@ -86,8 +124,18 @@ async function list(req, res) {
       addressAlertCount: c,
     };
   });
-
-  res.json({ items: enrichedItems });
+  const response = usePagination
+    ? {
+        items: enrichedItems,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      }
+    : { items: enrichedItems };
+  res.json(response);
 }
 async function detail(req, res) {
   const { orderSn } = req.params;
