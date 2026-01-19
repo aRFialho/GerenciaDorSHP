@@ -337,7 +337,7 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
 
   for (let windowTo = timeTo; windowTo > timeFrom; windowTo -= windowSec) {
     const windowFrom = Math.max(timeFrom, windowTo - windowSec);
-
+    console.log("[sync] window", { windowFrom, windowTo });
     let cursor = "";
     let more = true;
 
@@ -363,6 +363,14 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
       }
 
       const listOrders = list?.response?.order_list || [];
+      console.log(
+        "[sync] listOrders:",
+        listOrders.length,
+        "more:",
+        Boolean(list?.response?.more),
+        "cursor:",
+        cursor,
+      );
       const orderSns = listOrders.map((o) => o.order_sn).filter(Boolean);
 
       const batches = chunk(orderSns, 20);
@@ -414,6 +422,10 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
       late: lateCount,
       atRisk: atRiskCount,
     },
+    warning:
+      processed === 0
+        ? "Nenhum pedido retornado pela Shopee no período. Verifique shop_id, permissões do token e filtros do get_order_list."
+        : null,
   };
 }
 
