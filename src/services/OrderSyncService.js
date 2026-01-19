@@ -349,14 +349,29 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
       },
     });
 
-    const orderSns = (list?.response?.order_list || [])
-      .map((o) => o.order_sn)
-      .filter(Boolean);
+    const listOrders = list?.response?.order_list || [];
+    console.log(
+      "[sync] get_order_list count:",
+      listOrders.length,
+      "more:",
+      Boolean(list?.response?.more),
+      "cursor:",
+      cursor,
+    );
+
+    const orderSns = listOrders.map((o) => o.order_sn).filter(Boolean);
+    console.log(
+      "[sync] orderSns count:",
+      orderSns.length,
+      "sample:",
+      orderSns.slice(0, 3),
+    );
 
     const batches = chunk(orderSns, 20);
-
     for (const batch of batches) {
       if (batch.length === 0) continue;
+
+      console.log("[sync] calling get_order_detail batch size:", batch.length);
 
       let orderList = [];
 
@@ -409,7 +424,6 @@ async function syncOrdersForShop({ shopeeShopId, rangeDays, pageSize = 50 }) {
         }
       }
 
-      // ✅ aqui usa o orderList que você montou (batch ou fallback)
       for (const d of orderList) {
         processed += 1;
         const { addressChanged, late, atRisk } = await upsertOrderAndSnapshot(
