@@ -47,7 +47,7 @@ async function testShopeeOrderDetailMask(req, res, next) {
     if (!orderSn) return res.status(400).json({ error: "orderSn_required" });
 
     const responseOptionalFields = String(
-      req.query.fields || "recipient_address,total_amount,pay_time"
+      req.query.fields || "recipient_address,total_amount,pay_time",
     );
 
     const raw = await ShopeeOrderService.getOrderDetail({
@@ -70,6 +70,43 @@ async function testShopeeOrderDetailMask(req, res, next) {
   }
 }
 
+async function debugOrderTotals(req, res, next) {
+  try {
+    const shop = await getActiveShopOrFail(req, res);
+    if (!shop) return;
+
+    const orderSn = String(req.params.orderSn || "").trim();
+    if (!orderSn) return res.status(400).json({ error: "orderSn_required" });
+
+    const responseOptionalFields = String(
+      req.query.fields || "total_amount,pay_time,currency",
+    );
+
+    const raw = await ShopeeOrderService.getOrderDetail({
+      shopId: String(shop.shopId), // ✅ Shopee shop_id real
+      orderSnList: [orderSn],
+      responseOptionalFields,
+    });
+
+    const masked = responseHasMaskedStars(raw);
+
+    const first = raw?.response?.order_list?.[0] || null;
+
+    return res.json({
+      ok: true,
+      masked,
+      fields: responseOptionalFields,
+      order_sn: first?.order_sn || orderSn,
+      currency: first?.currency || null,
+      total_amount: first?.total_amount ?? null,
+      pay_time: first?.pay_time ?? null,
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
 module.exports = {
   testShopeeOrderDetailMask,
+  debugOrderTotals,
 };

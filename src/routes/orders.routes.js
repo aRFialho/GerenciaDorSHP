@@ -8,7 +8,6 @@ const OrderAddressAlertsController = require("../controllers/OrderAddressAlertsC
 const GeoSalesController = require("../controllers/GeoSalesController");
 const DashboardController = require("../controllers/DashboardController");
 const router = express.Router();
-
 router.use(requireAuth);
 
 // 🌎 Geografia de vendas (mapa)
@@ -18,16 +17,23 @@ router.get("/shops/active/geo/sales/:uf", GeoSalesController.byCityInState);
 router.get(
   "/shops/active/orders/:orderSn/debug-shopee-detail",
   requireDebugToken,
-  DebugShopeeController.testShopeeOrderDetailMask
+  DebugShopeeController.testShopeeOrderDetailMask,
 );
 router.get(
   "/shops/:shopId/orders/:orderSn/debug-shopee-detail",
   requireDebugToken,
-  DebugShopeeController.testShopeeOrderDetailMask
+  DebugShopeeController.testShopeeOrderDetailMask,
 );
+
+router.get(
+  "/shops/active/orders/:orderSn/debug-totals",
+  requireDebugToken,
+  DebugShopeeController.debugOrderTotals,
+);
+
 router.get(
   "/shops/active/dashboard/monthly-sales",
-  DashboardController.monthlySales
+  DashboardController.monthlySales,
 );
 const DebugController = require("../controllers/DebugController");
 router.get("/debug/egress-ip", requireDebugToken, DebugController.egressIp);
@@ -35,15 +41,15 @@ router.get("/debug/egress-ip", requireDebugToken, DebugController.egressIp);
 // ✅ Alertas (popup + modal + resolver)
 router.get(
   "/shops/active/orders/address-alerts",
-  OrderAddressAlertsController.listOpen
+  OrderAddressAlertsController.listOpen,
 );
 router.get(
   "/shops/active/orders/:orderSn/address-alerts",
-  OrderAddressAlertsController.getOpenByOrderSn
+  OrderAddressAlertsController.getOpenByOrderSn,
 );
 router.patch(
   "/shops/active/orders/address-alerts/:id/resolve",
-  OrderAddressAlertsController.resolve
+  OrderAddressAlertsController.resolve,
 );
 
 router.get("/shops/:shopId/orders", OrdersController.list);
