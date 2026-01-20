@@ -89,10 +89,131 @@ function initTabs() {
       if (tab === "admin") loadAdmin();
       if (tab === "geo-sales") loadGeoSales();
       if (tab === "dashboard") loadDashboard();
+      if (tab === "seo") loadSeoKeywords();
     });
   });
 }
+function renderSeoList(rootId, rows, { rightLabelFn, barPctFn } = {}) {
+  const root = document.getElementById(rootId);
+  if (!root) return;
 
+  if (!rows?.length) {
+    root.innerHTML = `<div class="muted">Sem dados.</div>`;
+    return;
+  }
+
+  root.innerHTML = rows
+    .slice(0, 20)
+    .map((r) => {
+      const term = escapeHtml(r.term || r.uf || r.text || "—");
+      const sub = r.sub ? escapeHtml(r.sub) : "";
+      const right = rightLabelFn ? escapeHtml(rightLabelFn(r)) : "";
+      const pct = barPctFn
+        ? Math.max(0, Math.min(100, Number(barPctFn(r) || 0)))
+        : null;
+
+      return `
+        <div class="seo-row">
+          <div class="seo-row__left" style="min-width:0;">
+            <div class="seo-row__term">${term}</div>
+            ${sub ? `<div class="seo-row__sub">${sub}</div>` : ""}
+            ${
+              pct != null
+                ? `<div class="seo-bar"><div style="width:${pct.toFixed(1)}%"></div></div>`
+                : ""
+            }
+          </div>
+          <div class="seo-row__right">${right}</div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+async function loadSeoKeywords() {
+  const q = String(document.getElementById("seoQ")?.value || "").trim();
+  const period = String(document.getElementById("seoPeriod")?.value || "30d");
+  const msg = document.getElementById("seoMsg");
+
+  if (!q) {
+    if (msg) msg.textContent = "Digite uma palavra para buscar.";
+    return;
+  }
+
+  if (msg) msg.textContent = "Carregando…";
+
+  try {
+    const data = await apiGet(
+      `/seo/keywords?q=${encodeURIComponent(q)}&period=${encodeURIComponent(period)}`,
+    );
+
+    // TOP
+    renderSeoList(
+      "seoTopList",
+      (data?.related?.top || []).map((x) => ({
+        term: x.term,
+        score: Number(x.score || 0),
+        sub: "Trends • Top",
+      })),
+      {
+        rightLabelFn: (r) => String(r.score || 0),
+        barPctFn: (r) => (Number(r.score || 0) / 100) * 100,
+      },
+    );
+
+    // RISING
+    renderSeoList(
+      "seoRisingList",
+      (data?.related?.rising || []).map((x) => ({
+        term: x.term,
+        growthPct: x.growthPct,
+        sub: "Trends • Rising",
+      })),
+      {
+        rightLabelFn: (r) =>
+          r.growthPct == null
+            ? "—"
+            : Number(r.growthPct) >= 9999
+              ? "Breakout"
+              : `${r.growthPct}%`,
+      },
+    );
+
+    // UF
+    renderSeoList(
+      "seoUfList",
+      (data?.byUf || []).map((x) => ({
+        uf: x.uf,
+        interest: Number(x.interest || 0),
+        sub: "BR • UF",
+      })),
+      {
+        rightLabelFn: (r) => `${r.interest}`,
+        barPctFn: (r) => (Number(r.interest || 0) / 100) * 100,
+      },
+    );
+
+    // SUGGEST
+    renderSeoList(
+      "seoSuggestList",
+      (data?.suggestions || []).map((t) => ({ text: t, sub: "Autocomplete" })),
+      { rightLabelFn: () => "" },
+    );
+
+    if (msg) msg.textContent = "";
+  } catch (e) {
+    if (msg) msg.textContent = `Erro: ${String(e?.message || e)}`;
+  }
+}
+
+function initSeo() {
+  document
+    .getElementById("btnSeoSearch")
+    ?.addEventListener("click", loadSeoKeywords);
+  document.getElementById("seoQ")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") loadSeoKeywords();
+  });
+}
 /* ---------------- Modal ---------------- */
 function openModal(title, html) {
   $("#modal-title").textContent = title;
@@ -2636,6 +2757,7 @@ async function boot() {
   initHeaderButtons();
   initAuthTab();
   initOrdersAlertsPopover();
+  initSeo();
   document
     .getElementById("btnDashReload")
     ?.addEventListener("click", () => loadDashboard({ silent: false }));

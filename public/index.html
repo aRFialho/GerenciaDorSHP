@@ -94,6 +94,10 @@
             <span class="ml-nav-item__label">Geografia de Vendas</span>
             <span class="ml-nav-item__hint muted">Mapa / Heatmap</span>
           </button>
+          <button class="tab ml-nav-item" data-tab="seo">
+            <span class="ml-nav-item__label">SEO</span>
+            <span class="ml-nav-item__hint muted">Palavras‑chave / UF</span>
+          </button>
         </div>
       </aside>
 
@@ -1118,6 +1122,93 @@
                   <div class="section-card__body">
                     <div id="geoSalesIndex" class="muted">Carregando...</div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section id="tab-seo" class="tab-panel">
+          <div class="page-title">
+            <h2>Palavras‑chave & SEO</h2>
+            <div class="page-subtitle muted">
+              Ideias + relevância (Trends) + interesse por UF (0–100).
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-card__header">
+              <div>
+                <div class="section-title">Buscar</div>
+                <div class="muted">
+                  Digite uma palavra e veja relacionadas + ranking por UF.
+                </div>
+              </div>
+
+              <div
+                class="section-actions"
+                style="
+                  display: flex;
+                  gap: 10px;
+                  flex-wrap: wrap;
+                  align-items: flex-end;
+                "
+              >
+                <div class="field">
+                  <label class="muted" for="seoQ">Palavra</label>
+                  <input
+                    id="seoQ"
+                    class="input"
+                    placeholder="Ex.: tênis feminino"
+                  />
+                </div>
+                <div class="field">
+                  <label class="muted" for="seoPeriod">Período</label>
+                  <select id="seoPeriod" class="select">
+                    <option value="7d">7d</option>
+                    <option value="30d" selected>30d</option>
+                    <option value="90d">90d</option>
+                  </select>
+                </div>
+                <button id="btnSeoSearch" class="btn btn-primary">
+                  Buscar
+                </button>
+              </div>
+            </div>
+
+            <div class="section-card__body">
+              <div id="seoMsg" class="muted"></div>
+
+              <div class="seo-grid">
+                <div class="seo-card">
+                  <div class="seo-card__head">
+                    <div class="seo-card__title">Relacionadas (Top)</div>
+                    <div class="seo-card__right muted">Relevância</div>
+                  </div>
+                  <div id="seoTopList" class="seo-list"></div>
+                </div>
+
+                <div class="seo-card">
+                  <div class="seo-card__head">
+                    <div class="seo-card__title">Relacionadas (Rising)</div>
+                    <div class="seo-card__right muted">Crescimento</div>
+                  </div>
+                  <div id="seoRisingList" class="seo-list"></div>
+                </div>
+
+                <div class="seo-card">
+                  <div class="seo-card__head">
+                    <div class="seo-card__title">Interesse por UF</div>
+                    <div class="seo-card__right muted">Índice 0–100</div>
+                  </div>
+                  <div id="seoUfList" class="seo-list"></div>
+                </div>
+
+                <div class="seo-card">
+                  <div class="seo-card__head">
+                    <div class="seo-card__title">Sugestões (Autocomplete)</div>
+                    <div class="seo-card__right muted">Ideias</div>
+                  </div>
+                  <div id="seoSuggestList" class="seo-list"></div>
                 </div>
               </div>
             </div>
