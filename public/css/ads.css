@@ -1,9 +1,17 @@
 /* ===========================
-   ADS — Theme-aligned (glass/dark)
+   ADS — Neo cockpit (glass/dark + glow)
    Scoped to #tab-ads to avoid conflicts
 =========================== */
 
-#tab-ads .muted{color:var(--muted)}
+#tab-ads{
+  --ads-bg: var(--card);
+  --ads-bg2: var(--card-strong);
+  --ads-border: var(--border);
+  --ads-text: var(--text);
+  --ads-muted: var(--muted);
+}
+
+#tab-ads .muted{color:var(--ads-muted)}
 
 /* KPI grid (Ads) */
 #tab-ads .kpi-grid{
@@ -18,33 +26,47 @@
 }
 
 #tab-ads .kpi{
-  border:1px solid var(--border);
-  background:var(--card);
+  border:1px solid rgba(255,255,255,0.10);
+  background:linear-gradient(180deg,var(--ads-bg),rgba(255,255,255,0.02));
   border-radius:var(--radius-sm);
   padding:10px;
+  backdrop-filter:blur(10px);
+  box-shadow:0 10px 40px rgba(0,0,0,0.22);
+  transition:transform var(--t200), box-shadow var(--t260), border-color var(--t260), filter var(--t200);
+}
+
+#tab-ads .kpi:hover{
+  transform:translateY(-1px);
+  border-color:rgba(255,255,255,0.16);
+  box-shadow:0 14px 52px rgba(0,0,0,0.36), var(--glow-blue);
 }
 
 #tab-ads .kpi-label{
   font-size:12px;
-  color:var(--muted);
+  color:rgba(255,255,255,0.65);
+  font-weight:900;
+  letter-spacing:0.4px;
+  text-transform:uppercase;
 }
 
 #tab-ads .kpi-value{
   font-size:16px;
-  font-weight:900;
-  color:var(--text);
-  margin-top:4px;
+  font-weight:1000;
+  color:var(--ads-text);
+  margin-top:6px;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 
-/* Tables in Ads (keep same theme) */
+/* Tables in Ads (neo glass) */
 #tab-ads .table-wrap{
   overflow:auto;
-  border:1px solid var(--border);
+  border:1px solid rgba(255,255,255,0.12);
   border-radius:var(--radius-sm);
   background:rgba(0,0,0,0.12);
+  backdrop-filter:blur(10px);
+  box-shadow:0 10px 40px rgba(0,0,0,0.20);
 }
 
 #tab-ads .table{
@@ -59,17 +81,32 @@
   border-bottom:1px solid rgba(255,255,255,0.08);
   text-align:left;
   vertical-align:middle;
+  color:rgba(255,255,255,0.86);
 }
 
 #tab-ads .table thead th{
-  background:rgba(255,255,255,0.06);
-  font-weight:900;
-  color:var(--text);
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.05));
+  font-weight:1000;
+  color:rgba(255,255,255,0.92);
+  border-bottom:1px solid rgba(255,255,255,0.12);
+  backdrop-filter:blur(10px);
+}
+
+#tab-ads .table tbody tr{
+  transition:background var(--t200), outline-color var(--t200);
 }
 
 #tab-ads .table tbody tr:hover{
-  background:rgba(255,255,255,0.05);
+  background:rgba(255,255,255,0.06);
   cursor:pointer;
+}
+
+#tab-ads .table tbody tr.is-selected{
+  background:linear-gradient(90deg, rgba(168,85,247,0.16), rgba(34,211,238,0.08));
+  outline:1px solid rgba(255,255,255,0.14);
 }
 
 /* Split area (Campaign detail + linked items) */
@@ -80,6 +117,7 @@
   margin-top:12px;
 }
 
+/* Product thumb */
 #tab-ads .product-thumb{
   width:34px;
   height:34px;
@@ -106,6 +144,150 @@
   flex-wrap:wrap;
 }
 
+/* ===========================
+   Badges (neo variants)
+=========================== */
+#tab-ads .badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:1000;
+  line-height:1;
+  white-space:nowrap;
+  border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.06);
+  color:rgba(255,255,255,0.90);
+}
+
+#tab-ads .badge-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.45);
+}
+
+#tab-ads .badge--green{
+  background:rgba(34,197,94,0.14);
+  border-color:rgba(34,197,94,0.35);
+  color:rgba(230,255,248,0.95);
+}
+#tab-ads .badge--green .badge-dot{ background:var(--up); }
+
+#tab-ads .badge--gray{
+  background:rgba(148,163,184,0.12);
+  border-color:rgba(148,163,184,0.22);
+  color:rgba(255,255,255,0.86);
+}
+#tab-ads .badge--gray .badge-dot{ background:#94a3b8; }
+
+#tab-ads .badge--yellow{
+  background:rgba(245,158,11,0.14);
+  border-color:rgba(245,158,11,0.30);
+  color:rgba(255,244,220,0.95);
+}
+#tab-ads .badge--yellow .badge-dot{ background:#f59e0b; }
+
+#tab-ads .badge--red{
+  background:rgba(255,90,106,0.14);
+  border-color:rgba(255,90,106,0.34);
+  color:rgba(255,230,230,0.95);
+}
+#tab-ads .badge--red .badge-dot{ background:var(--down); }
+
+/* ===========================
+   CPC cards list (neo)
+=========================== */
+#tab-ads .cpc-cards{display:flex;flex-direction:column}
+
+#tab-ads #cpcCampaignListWrap{
+  max-height:420px;
+  overflow:auto;
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:var(--radius-sm);
+  background:rgba(0,0,0,0.12);
+  backdrop-filter:blur(10px);
+  box-shadow:0 10px 40px rgba(0,0,0,0.20);
+}
+@media (max-width:768px){
+  #tab-ads #cpcCampaignListWrap{max-height:320px}
+}
+
+#tab-ads .cpc-card{
+  display:grid;
+  grid-template-columns:52px 1fr 120px;
+  gap:12px;
+  padding:12px;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  transition:background var(--t200), outline-color var(--t200);
+}
+
+#tab-ads .cpc-card:hover{
+  background:rgba(255,255,255,0.06);
+  cursor:pointer;
+}
+
+#tab-ads .cpc-card.is-selected{
+  background:linear-gradient(90deg, rgba(168,85,247,0.16), rgba(34,211,238,0.08));
+  outline:1px solid rgba(255,255,255,0.14);
+}
+
+#tab-ads .cpc-card:last-child{border-bottom:0}
+
+#tab-ads .cpc-card__thumb{
+  width:46px;
+  height:46px;
+  border-radius:10px;
+  object-fit:cover;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.10);
+}
+#tab-ads .cpc-card__thumb--ph{display:block}
+
+#tab-ads .cpc-card__title{
+  font-weight:1000;
+  color:rgba(255,255,255,0.92);
+  line-height:1.15;
+}
+
+#tab-ads .cpc-card__meta{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-top:6px;
+}
+
+#tab-ads .cpc-card__grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin-top:10px;
+}
+
+#tab-ads .cpc-card__grid .v,
+#tab-ads .cpc-card__right .v{
+  font-weight:1000;
+  margin-top:2px;
+  color:rgba(255,255,255,0.92);
+}
+
+#tab-ads .cpc-card__right{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  justify-content:center;
+  color:rgba(255,255,255,0.80);
+}
+
+@media (max-width:900px){
+  #tab-ads .cpc-card{grid-template-columns:52px 1fr}
+  #tab-ads .cpc-card__right{grid-column:2;align-items:flex-start;margin-top:6px}
+  #tab-ads .cpc-card__grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
 /* Responsive */
 @media (max-width: 1100px){
   #tab-ads .kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -117,95 +299,3 @@
   #tab-ads .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   #tab-ads .kpi-grid-sm{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-
-/* ===========================
-   Badges (Shopee-like)
-=========================== */
-
-#tab-ads .badge{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:4px 10px;
-  border-radius:999px;
-  font-size:12px;
-  font-weight:800;
-  line-height:1;
-  white-space:nowrap;
-  border:1px solid rgba(255,255,255,0.12);
-  background:rgba(255,255,255,0.06);
-  color:var(--text);
-}
-
-#tab-ads .badge-dot{
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  background:rgba(255,255,255,0.5);
-}
-
-#tab-ads .badge--green{
-  background:rgba(22,163,74,0.18);
-  border-color:rgba(34,197,94,0.35);
-  color:#bbf7d0;
-}
-#tab-ads .badge--green .badge-dot{ background:#22c55e; }
-
-#tab-ads .badge--gray{
-  background:rgba(148,163,184,0.14);
-  border-color:rgba(148,163,184,0.28);
-  color:#e5e7eb;
-}
-#tab-ads .badge--gray .badge-dot{ background:#94a3b8; }
-
-#tab-ads .badge--yellow{
-  background:rgba(245,158,11,0.16);
-  border-color:rgba(245,158,11,0.35);
-  color:#fde68a;
-}
-#tab-ads .badge--yellow .badge-dot{ background:#f59e0b; }
-
-#tab-ads .badge--red{
-  background:rgba(220,38,38,0.18);
-  border-color:rgba(239,68,68,0.35);
-  color:#fecaca;
-}
-#tab-ads .badge--red .badge-dot{ background:#ef4444; }
-
-/* Linha selecionada (ajuda a ficar parecido com a Shopee) */
-#tab-ads .table tbody tr.is-selected{
-  background:rgba(255,255,255,0.08);
-  outline:1px solid rgba(255,255,255,0.12);
-}
-
-#tab-ads .cpc-cards{display:flex;flex-direction:column}
-#tab-ads .cpc-card{display:grid;grid-template-columns:52px 1fr 120px;gap:12px;padding:12px;border-bottom:1px solid rgba(255,255,255,0.08)}
-#tab-ads .cpc-card:hover{background:rgba(255,255,255,0.05);cursor:pointer}
-#tab-ads .cpc-card.is-selected{background:rgba(255,255,255,0.08);outline:1px solid rgba(255,255,255,0.12)}
-
-#tab-ads .cpc-card__thumb{width:46px;height:46px;border-radius:10px;object-fit:cover;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10)}
-#tab-ads .cpc-card__thumb--ph{display:block}
-
-#tab-ads .cpc-card__title{font-weight:900;color:var(--text);line-height:1.15}
-#tab-ads .cpc-card__meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px}
-#tab-ads .cpc-card__grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:10px}
-#tab-ads .cpc-card__grid .v{font-weight:900;margin-top:2px}
-#tab-ads .cpc-card__right{display:flex;flex-direction:column;align-items:flex-end;justify-content:center}
-#tab-ads .cpc-card__right .v{font-weight:900;margin-top:2px}
-
-@media (max-width:900px){
-  #tab-ads .cpc-card{grid-template-columns:52px 1fr}
-  #tab-ads .cpc-card__right{grid-column:2;align-items:flex-start;margin-top:6px}
-  #tab-ads .cpc-card__grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-#tab-ads #cpcCampaignListWrap{
-  max-height:420px;
-  overflow:auto;
-  border:1px solid var(--border);
-  border-radius:var(--radius-sm);
-  background:rgba(0,0,0,0.12);
-}
-@media (max-width:768px){
-  #tab-ads #cpcCampaignListWrap{max-height:320px}
-}
-#tab-ads .cpc-card:last-child{border-bottom:0}

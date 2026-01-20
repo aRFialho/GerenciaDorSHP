@@ -20,6 +20,58 @@ let cpcFilterTimer = null;
 let cpcStatusBucket = "active"; // padrão Shopee: Em andamento
 let lastCpcProductPerfRows = [];
 
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  return v || fallback;
+}
+
+const NEO = {
+  purple: cssVar("--purple", "#A855F7"),
+  blue: cssVar("--blue", "#3B82F6"),
+  cyan: cssVar("--cyan", "#22D3EE"),
+  up: cssVar("--up", "#22C55E"),
+  down: cssVar("--down", "#FF5A6A"),
+  tick: "rgba(255,255,255,0.70)",
+  grid: "rgba(255,255,255,0.10)",
+  tooltipBg: "rgba(15,15,20,0.92)",
+  tooltipBorder: "rgba(255,255,255,0.14)",
+};
+
+const neoGlowPlugin = {
+  id: "neoGlow",
+  beforeDatasetDraw(chart, args) {
+    const ds = chart.data.datasets?.[args.index];
+    if (!ds || !ds.neoGlowColor) return;
+
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.shadowBlur = ds.neoGlowBlur ?? 18;
+    ctx.shadowColor = ds.neoGlowColor;
+  },
+  afterDatasetDraw(chart, args) {
+    const ds = chart.data.datasets?.[args.index];
+    if (!ds || !ds.neoGlowColor) return;
+    chart.ctx.restore();
+  },
+};
+
+if (window.Chart && typeof Chart.register === "function") {
+  Chart.register(neoGlowPlugin);
+}
+
+function fmtMoneyBR(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function fmtNumberBR(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString("pt-BR") : "—";
+}
+
 /* ===========================
    Helpers
 =========================== */
@@ -45,14 +97,14 @@ function resetCpcPager() {
 function updateCpcPager(total) {
   cpcPager.totalPages = Math.max(
     1,
-    Math.ceil((total || 0) / cpcPager.pageSize)
+    Math.ceil((total || 0) / cpcPager.pageSize),
   );
   cpcPager.page = clamp(cpcPager.page, 1, cpcPager.totalPages);
 }
 function renderCpcPager() {
   setText(
     "cpcCampaignPageInfo",
-    `Página ${cpcPager.page} de ${cpcPager.totalPages}`
+    `Página ${cpcPager.page} de ${cpcPager.totalPages}`,
   );
   setDisabled("cpcCampaignFirst", cpcPager.page === 1);
   setDisabled("cpcCampaignPrev", cpcPager.page === 1);
@@ -125,7 +177,7 @@ function setCpcStatusBucket(next) {
 
   const tabs = document.querySelectorAll("#cpcStatusTabs .status-tab");
   tabs.forEach((b) =>
-    b.classList.toggle("is-active", b.dataset.status === cpcStatusBucket)
+    b.classList.toggle("is-active", b.dataset.status === cpcStatusBucket),
   );
 
   // compat: mantém o select antigo coerente
@@ -135,8 +187,8 @@ function setCpcStatusBucket(next) {
       cpcStatusBucket === "all"
         ? "all"
         : cpcStatusBucket === "active"
-        ? "active"
-        : "inactive";
+          ? "active"
+          : "inactive";
   }
 }
 
@@ -170,10 +222,10 @@ function badgeHtml(text, tone) {
     tone === "green"
       ? "badge badge--green"
       : tone === "yellow"
-      ? "badge badge--yellow"
-      : tone === "red"
-      ? "badge badge--red"
-      : "badge badge--gray";
+        ? "badge badge--yellow"
+        : tone === "red"
+          ? "badge badge--red"
+          : "badge badge--gray";
 
   return `<span class="${cls}"><span class="badge-dot"></span>${t}</span>`;
 }
@@ -317,18 +369,78 @@ function safeDestroyChart(ch) {
   return null;
 }
 
+function makeNeoGradient(ctx, chartArea, stops) {
+  const g = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+  for (const [p, c] of stops) g.addColorStop(p, c);
+  return g;
+}
+
 function renderLineChart(canvasId, labels, datasets) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return null;
 
-  return new Chart(canvas, {
+  const ctx = canvas.getContext("2d");
+  function makeNeoGradient(ctx, chartArea, stops) {
+    const g = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+    for (const [p, c] of stops) g.addColorStop(p, c);
+    return g;
+  }
+  return new Chart(ctx, {
     type: "line",
     data: { labels, datasets },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
-      plugins: { legend: { display: true } },
-      scales: { y: { beginAtZero: true } },
+
+      animation: { duration: 280 },
+
+      plugins: {
+        legend: {
+          display: true,
+          labels: {
+            color: "rgba(255,255,255,0.86)",
+            boxWidth: 10,
+            boxHeight: 10,
+          },
+        },
+        tooltip: {
+          backgroundColor: NEO.tooltipBg,
+          borderColor: NEO.tooltipBorder,
+          borderWidth: 1,
+          titleColor: "rgba(255,255,255,0.92)",
+          bodyColor: "rgba(255,255,255,0.90)",
+          displayColors: true,
+          callbacks: {
+            label(ctx) {
+              const label = ctx.dataset?.label || "";
+              const v = ctx.parsed?.y;
+
+              const isMoney =
+                label.toLowerCase().includes("gasto") ||
+                label.toLowerCase().includes("gmv") ||
+                label.toLowerCase().includes("saldo") ||
+                label.toLowerCase().includes("budget") ||
+                label.toLowerCase().includes("orçamento");
+
+              const text = isMoney ? fmtMoneyBR(v) : fmtNumberBR(v);
+              return `${label}: ${text}`;
+            },
+          },
+        },
+      },
+
+      scales: {
+        x: {
+          ticks: { color: NEO.tick, maxRotation: 0, autoSkip: true },
+          grid: { color: NEO.grid },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: NEO.tick },
+          grid: { color: NEO.grid },
+        },
+      },
     },
   });
 }
@@ -392,7 +504,7 @@ function exportCpcCampaignsCsv() {
   if (!cpcCampaignsView.length) {
     return setMsg(
       "cpcCampaignMsg",
-      "Nada para exportar. Ajuste o filtro/ordem ou clique em Atualizar."
+      "Nada para exportar. Ajuste o filtro/ordem ou clique em Atualizar.",
     );
   }
 
@@ -442,7 +554,7 @@ function exportCpcLinkedItemsCsv() {
   if (!set)
     return setMsg(
       "cpcCampaignMsg",
-      "Sem dados de settings para a campanha selecionada. Clique em Atualizar."
+      "Sem dados de settings para a campanha selecionada. Clique em Atualizar.",
     );
 
   const common = set.common_info || {};
@@ -452,7 +564,7 @@ function exportCpcLinkedItemsCsv() {
     ? set.auto_product_ads_info
     : [];
   const autoMap = new Map(
-    autoInfo.filter((x) => x.item_id).map((x) => [String(x.item_id), x])
+    autoInfo.filter((x) => x.item_id).map((x) => [String(x.item_id), x]),
   );
 
   const { dateFrom, dateTo } = getDates();
@@ -480,7 +592,7 @@ function exportCpcProductPerfCsv() {
   if (!lastCpcProductPerfRows.length) {
     return setMsg(
       "cpcItemsMsg",
-      "Nada para exportar. Selecione uma campanha e aguarde carregar o desempenho."
+      "Nada para exportar. Selecione uma campanha e aguarde carregar o desempenho.",
     );
   }
 
@@ -591,7 +703,7 @@ function applyCpcCampaignView() {
   const bucket = getCpcStatusBucket();
   if (bucket !== "all") {
     rows = rows.filter(
-      (x) => statusBucketFromCampaignStatus(x.campaign_status) === bucket
+      (x) => statusBucketFromCampaignStatus(x.campaign_status) === bucket,
     );
   }
 
@@ -648,12 +760,12 @@ function renderCpcCampaignCards(rows) {
     const id = String(x.campaign_id || "");
     const img = x.thumbnail_url
       ? `<img class="cpc-card__thumb" src="${escAttr(
-          x.thumbnail_url
+          x.thumbnail_url,
         )}" onerror="this.style.display='none'">`
       : `<div class="cpc-card__thumb cpc-card__thumb--ph"></div>`;
     const status = badgeHtml(
       x.campaign_status || "—",
-      statusTone(x.campaign_status)
+      statusTone(x.campaign_status),
     );
     const type = badgeHtml(x.ad_type || "—", "gray");
     const diag = diagnosisHtml(x);
@@ -682,19 +794,19 @@ function renderCpcCampaignCards(rows) {
             x.budget != null ? fmtMoney(x.budget) : "—"
           }</div></div>
           <div><div class="muted">Gasto</div><div class="v">${fmtMoney(
-            x.expense
+            x.expense,
           )}</div></div>
           <div><div class="muted">GMV Dir.</div><div class="v">${fmtMoney(
-            x.direct_gmv
+            x.direct_gmv,
           )}</div></div>
           <div><div class="muted">ROAS Dir.</div><div class="v">${
             x.direct_roas != null ? Number(x.direct_roas).toFixed(2) : "—"
           }</div></div>
           <div><div class="muted">Imp.</div><div class="v">${fmtInt(
-            x.impression
+            x.impression,
           )}</div></div>
           <div><div class="muted">Cliques</div><div class="v">${fmtInt(
-            x.clicks
+            x.clicks,
           )}</div></div>
           <div><div class="muted">ACOS Dir.</div><div class="v">${acosTxt}
           </div></div>
@@ -741,7 +853,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const sortEl = document.getElementById("cpcCampaignSortBy");
   const statusEl = document.getElementById("cpcCampaignStatusFilter");
   const btnExportCpcPerf = document.getElementById(
-    "btnExportCpcProductPerfCsv"
+    "btnExportCpcProductPerfCsv",
   );
   if (btnExportCpcPerf) {
     btnExportCpcPerf.addEventListener("click", () => exportCpcProductPerfCsv());
@@ -815,11 +927,11 @@ document.addEventListener("DOMContentLoaded", () => {
     btnExportCpc.addEventListener("click", () => exportCpcCampaignsCsv());
 
   const btnExportCpcLinked = document.getElementById(
-    "btnExportCpcLinkedItemsCsv"
+    "btnExportCpcLinkedItemsCsv",
   );
   if (btnExportCpcLinked)
     btnExportCpcLinked.addEventListener("click", () =>
-      exportCpcLinkedItemsCsv()
+      exportCpcLinkedItemsCsv(),
     );
 
   // Reload + pager
@@ -867,7 +979,7 @@ document.addEventListener(
     setCpcStatusBucket("active");
     setTimeout(() => loadAdsAll(), 0);
   },
-  true
+  true,
 );
 
 /* ===========================
@@ -953,7 +1065,7 @@ function computeGroupAgg(group) {
   const ids = Array.isArray(group?.campaign_ids) ? group.campaign_ids : [];
 
   const byCampaign = new Map(
-    cpcCampaignsMaster.map((x) => [String(x.campaign_id), x])
+    cpcCampaignsMaster.map((x) => [String(x.campaign_id), x]),
   );
 
   let totals = {
@@ -1021,22 +1133,22 @@ function renderGroupSummary(group) {
   box.innerHTML = `
     <div class="kpi-grid kpi-grid-sm">
       <div class="kpi"><div class="kpi-label">Campanhas</div><div class="kpi-value">${fmtInt(
-        totals.campaigns
+        totals.campaigns,
       )}</div></div>
       <div class="kpi"><div class="kpi-label">Gasto</div><div class="kpi-value">${fmtMoney(
-        totals.expense
+        totals.expense,
       )}</div></div>
       <div class="kpi"><div class="kpi-label">GMV Dir.</div><div class="kpi-value">${fmtMoney(
-        totals.direct_gmv
+        totals.direct_gmv,
       )}</div></div>
       <div class="kpi"><div class="kpi-label">Budget (soma)</div><div class="kpi-value">${fmtMoney(
-        totals.budget
+        totals.budget,
       )}</div></div>
       <div class="kpi"><div class="kpi-label">Crédito (est.)</div><div class="kpi-value">${fmtMoney(
-        totals.credit_estimated
+        totals.credit_estimated,
       )}</div></div>
       <div class="kpi"><div class="kpi-label">Itens (união)</div><div class="kpi-value">${fmtInt(
-        linkedItems.length
+        linkedItems.length,
       )}</div></div>
     </div>
     <div class="muted" style="margin-top:8px;">
@@ -1121,7 +1233,7 @@ function renderGroupItemsInline(group) {
         }" onerror="this.style.display='none'">
         <div>
           <div style="font-weight:700">${escHtml(
-            it.title || "Item " + it.item_id
+            it.title || "Item " + it.item_id,
           )}</div>
           <div class="muted">ID: ${escHtml(it.item_id)}</div>
         </div>
@@ -1129,7 +1241,7 @@ function renderGroupItemsInline(group) {
     `;
 
       return `<tr><td>${productHtml}</td><td>${escHtml(
-        it.product_name || "—"
+        it.product_name || "—",
       )}</td><td>${escHtml(it.status || "—")}</td></tr>`;
     })
     .join("");
@@ -1199,7 +1311,7 @@ function openAdsGroupCreateModal() {
       <div class="actions" style="margin-top:14px;">
         <button id="btnAdsGroupCreateSubmit" class="btn btn-primary">Criar</button>
       </div>
-    `
+    `,
   );
 
   const submit = document.getElementById("btnAdsGroupCreateSubmit");
@@ -1246,25 +1358,25 @@ function openAdsGroupEditModal() {
       <div class="field">
         <label class="muted">Nome</label>
         <input id="adsGroupName" class="input" type="text" value="${escAttr(
-          g.name || ""
+          g.name || "",
         )}">
       </div>
       <div class="field" style="margin-top:10px;">
         <label class="muted">Descrição</label>
         <input id="adsGroupDesc" class="input" type="text" value="${escAttr(
-          g.description || ""
+          g.description || "",
         )}">
       </div>
       <div class="field" style="margin-top:10px;">
         <label class="muted">Campaign IDs (CSV)</label>
         <input id="adsGroupCampaignIds" class="input" type="text" value="${escAttr(
-          (g.campaign_ids || []).join(", ")
+          (g.campaign_ids || []).join(", "),
         )}">
       </div>
       <div class="actions" style="margin-top:14px;">
         <button id="btnAdsGroupEditSubmit" class="btn btn-primary">Salvar</button>
       </div>
-    `
+    `,
   );
 
   const submit = document.getElementById("btnAdsGroupEditSubmit");
@@ -1336,8 +1448,8 @@ async function loadCpcBalance() {
 async function loadCpcDaily(dateFrom, dateTo) {
   const j = await apiGet(
     `/shops/active/ads/performance/daily?dateFrom=${encodeURIComponent(
-      dateFrom
-    )}&dateTo=${encodeURIComponent(dateTo)}`
+      dateFrom,
+    )}&dateTo=${encodeURIComponent(dateTo)}`,
   );
 
   const series = j?.response?.series || [];
@@ -1359,32 +1471,55 @@ async function loadCpcDaily(dateFrom, dateTo) {
     {
       label: "Impressões",
       data: series.map((x) => x.impression),
-      borderColor: "#2563eb",
-      tension: 0.25,
+      borderColor: NEO.blue,
+      neoGlowColor: NEO.blue,
+      borderWidth: 2,
+      tension: 0.28,
+      pointRadius: 0,
     },
     {
       label: "Cliques",
       data: series.map((x) => x.clicks),
-      borderColor: "#16a34a",
-      tension: 0.25,
+      borderColor: NEO.up,
+      neoGlowColor: NEO.up,
+      borderWidth: 2,
+      tension: 0.28,
+      pointRadius: 0,
     },
     {
       label: "Gasto",
       data: series.map((x) => x.expense),
-      borderColor: "#dc2626",
-      tension: 0.25,
+      borderColor: NEO.down,
+      neoGlowColor: NEO.down,
+      borderWidth: 2,
+      tension: 0.28,
+      pointRadius: 0,
     },
     {
       label: "GMV Direto",
       data: series.map((x) => x.direct_gmv),
-      borderColor: "#7c3aed",
-      tension: 0.25,
+      borderColor: (context) => {
+        const chart = context.chart;
+        const { ctx, chartArea } = chart;
+        if (!chartArea) return NEO.purple; // primeira renderização pode vir sem chartArea
+        return makeNeoGradient(ctx, chartArea, [
+          [0, NEO.purple],
+          [1, NEO.cyan],
+        ]);
+      },
+      neoGlowColor: NEO.purple,
+      borderWidth: 2,
+      tension: 0.28,
+      pointRadius: 0,
     },
     {
       label: "GMV Broad",
       data: series.map((x) => x.broad_gmv),
-      borderColor: "#0ea5e9",
-      tension: 0.25,
+      borderColor: NEO.cyan,
+      neoGlowColor: NEO.cyan,
+      borderWidth: 2,
+      tension: 0.28,
+      pointRadius: 0,
     },
   ];
 
@@ -1407,8 +1542,8 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
 
   const perf = await apiGet(
     `/shops/active/ads/campaigns/performance/daily?dateFrom=${encodeURIComponent(
-      dateFrom
-    )}&dateTo=${encodeURIComponent(dateTo)}&adType=`
+      dateFrom,
+    )}&dateTo=${encodeURIComponent(dateTo)}&adType=`,
   );
 
   const campaigns = perf?.response?.campaigns || [];
@@ -1425,8 +1560,8 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
     const batch = missing.slice(i, i + 100);
     const settings = await apiGet(
       `/shops/active/ads/campaigns/settings?campaignIds=${encodeURIComponent(
-        batch.join(",")
-      )}&infoTypes=1,2,3,4`
+        batch.join(","),
+      )}&infoTypes=1,2,3,4`,
     );
     const list = settings?.response?.campaign_list || [];
     for (const c of list) cachedCampaignSettings.set(String(c.campaign_id), c);
@@ -1471,17 +1606,17 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
   console.log("CPC rows:", lastCpcCampaignRows.length);
   console.log(
     "CPC status sample:",
-    lastCpcCampaignRows.slice(0, 10).map((x) => x.campaign_status)
+    lastCpcCampaignRows.slice(0, 10).map((x) => x.campaign_status),
   );
   console.log(
     "CPC buckets:",
     Array.from(
       new Set(
         lastCpcCampaignRows.map((x) =>
-          statusBucketFromCampaignStatus(x.campaign_status)
-        )
-      )
-    )
+          statusBucketFromCampaignStatus(x.campaign_status),
+        ),
+      ),
+    ),
   );
   cpcCampaignsMaster = [...lastCpcCampaignRows];
   resetCpcPager();
@@ -1497,7 +1632,7 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
       applyCpcCampaignView();
       setMsg(
         "cpcCampaignMsg",
-        "Filtro limpo automaticamente para exibir campanhas."
+        "Filtro limpo automaticamente para exibir campanhas.",
       );
     }
   }
@@ -1515,7 +1650,7 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
   await ensureCampaignSettingsLoaded(groupIds);
 
   const byId = new Map(
-    cpcCampaignsMaster.map((x) => [String(x.campaign_id), x])
+    cpcCampaignsMaster.map((x) => [String(x.campaign_id), x]),
   );
 
   // ✅ 1) Atualiza campanhas já existentes com dados do SETTINGS (inclui status atual!)
@@ -1572,8 +1707,8 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
   console.log(
     "Active count:",
     cpcCampaignsMaster.filter(
-      (x) => statusBucketFromCampaignStatus(x.campaign_status) === "active"
-    ).length
+      (x) => statusBucketFromCampaignStatus(x.campaign_status) === "active",
+    ).length,
   );
 
   console.log(
@@ -1581,10 +1716,10 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
     Array.from(
       new Set(
         cpcCampaignsMaster.map((x) =>
-          statusBucketFromCampaignStatus(x.campaign_status)
-        )
-      )
-    )
+          statusBucketFromCampaignStatus(x.campaign_status),
+        ),
+      ),
+    ),
   );
 
   console.log(
@@ -1593,8 +1728,8 @@ async function loadCpcCampaigns(dateFrom, dateTo) {
       .slice(0, 10)
       .map(
         (id) =>
-          cachedCampaignSettings.get(String(id))?.common_info?.campaign_status
-      )
+          cachedCampaignSettings.get(String(id))?.common_info?.campaign_status,
+      ),
   );
 }
 
@@ -1609,8 +1744,8 @@ async function ensureCampaignSettingsLoaded(campaignIds) {
     const batch = missing.slice(i, i + 100);
     const settings = await apiGet(
       `/shops/active/ads/campaigns/settings?campaignIds=${encodeURIComponent(
-        batch.join(",")
-      )}&infoTypes=1,2,3,4`
+        batch.join(","),
+      )}&infoTypes=1,2,3,4`,
     );
     const list = settings?.response?.campaign_list || [];
     for (const c of list) cachedCampaignSettings.set(String(c.campaign_id), c);
@@ -1626,7 +1761,7 @@ async function selectCampaign(campaignId) {
 
   setText(
     "cpcCampaignSelected",
-    common.ad_name ? `${common.ad_name} (#${id})` : `#${id}`
+    common.ad_name ? `${common.ad_name} (#${id})` : `#${id}`,
   );
 
   const series = cachedCampaignSeries[id] || [];
@@ -1638,7 +1773,7 @@ async function selectCampaign(campaignId) {
       a.direct_gmv += x.direct_gmv || 0;
       return a;
     },
-    { impression: 0, clicks: 0, expense: 0, direct_gmv: 0 }
+    { impression: 0, clicks: 0, expense: 0, direct_gmv: 0 },
   );
 
   setText("cpcCampImp", fmtInt(totals.impression));
@@ -1651,26 +1786,38 @@ async function selectCampaign(campaignId) {
     {
       label: "Impressões",
       data: series.map((x) => x.impression),
-      borderColor: "#2563eb",
-      tension: 0.25,
+      borderColor: NEO.blue,
+      neoGlowColor: NEO.blue,
+      borderWidth: 2,
+      tension: 0.28,
+      pointRadius: 0,
     },
     {
       label: "Cliques",
       data: series.map((x) => x.clicks),
-      borderColor: "#16a34a",
-      tension: 0.25,
+      borderColor: NEO.up,
+      neoGlowColor: NEO.up,
+      borderWidth: 2,
+      tension: 0.28,
+      pointRadius: 0,
     },
     {
       label: "Gasto",
       data: series.map((x) => x.expense),
-      borderColor: "#dc2626",
-      tension: 0.25,
+      borderColor: NEO.down,
+      neoGlowColor: NEO.down,
+      borderWidth: 2,
+      tension: 0.28,
+      pointRadius: 0,
     },
     {
       label: "GMV Direto",
       data: series.map((x) => x.direct_gmv),
-      borderColor: "#7c3aed",
-      tension: 0.25,
+      borderColor: NEO.purple,
+      neoGlowColor: NEO.purple,
+      borderWidth: 2,
+      tension: 0.28,
+      pointRadius: 0,
     },
   ];
 
@@ -1690,7 +1837,7 @@ async function selectCampaign(campaignId) {
     if (!ready) {
       setMsg(
         "cpcItemsMsg",
-        "Desempenho do produto ainda não disponível (endpoint não configurado ou sem dados). Exibindo itens base."
+        "Desempenho do produto ainda não disponível (endpoint não configurado ou sem dados). Exibindo itens base.",
       );
     }
 
@@ -1698,7 +1845,7 @@ async function selectCampaign(campaignId) {
   } catch (e) {
     setMsg(
       "cpcItemsMsg",
-      e.message || "Falha ao carregar desempenho do produto."
+      e.message || "Falha ao carregar desempenho do produto.",
     );
     renderCpcProductPerformanceTable([]); // mantém tabela consistente
   } finally {
@@ -1750,18 +1897,18 @@ function renderCpcProductPerformanceTable(items) {
         }" onerror="this.style.display='none'">
         <div>
           <div style="font-weight:900">${escHtml(
-            it.title || "Item " + it.item_id
+            it.title || "Item " + it.item_id,
           )}</div>
           <div class="muted">ID: ${escHtml(it.item_id)}${
-      it.product_name ? " • " + escHtml(it.product_name) : ""
-    }${it.status ? " • " + escHtml(it.status) : ""}</div>
+            it.product_name ? " • " + escHtml(it.product_name) : ""
+          }${it.status ? " • " + escHtml(it.status) : ""}</div>
         </div>
       </div>
     `;
 
     // Ação simples: copiar item_id
     const actionHtml = `<button class="btn btn-ghost" data-copy="${escAttr(
-      it.item_id
+      it.item_id,
     )}">Copiar ID</button>`;
 
     tr.innerHTML = `
@@ -1787,10 +1934,10 @@ function renderCpcProductPerformanceTable(items) {
         } catch (_) {
           setMsg(
             "cpcItemsMsg",
-            "Não foi possível copiar (permissão do navegador)."
+            "Não foi possível copiar (permissão do navegador).",
           );
         }
-      }
+      },
     );
 
     tbody.appendChild(tr);

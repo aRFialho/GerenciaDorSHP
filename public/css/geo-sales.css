@@ -1,45 +1,60 @@
-/* ===== Geografia de Vendas (Mapa + Índice) ===== */
+/* ===========================
+   GEO SALES — Neo cockpit (Leaflet + índice)
+   Mantém escopo nos IDs/classes existentes
+=========================== */
 
+/* Mapa wrapper (card glass) */
 #geoSalesMap{
-  border:1px solid rgba(255,255,255,0.10);
-  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.12);
+  background:rgba(0,0,0,0.12);
+  box-shadow:0 10px 40px rgba(0,0,0,0.22);
+  backdrop-filter:blur(10px);
 }
 
-/* Leaflet: melhora visual no tema escuro */
+/* Leaflet container (dark glass) */
 #geoSalesMap .leaflet-container{
   background:rgba(10,10,14,0.55);
   outline:none;
 }
 
+/* Zoom controls */
 #geoSalesMap .leaflet-control-zoom a{
   background:rgba(15,15,20,0.92);
   color:rgba(255,255,255,0.92);
   border:1px solid rgba(255,255,255,0.16);
-  box-shadow:none;
+  box-shadow:0 10px 30px rgba(0,0,0,0.30);
+  backdrop-filter:blur(10px);
+  transition:background var(--t200), border-color var(--t200), transform var(--t200), box-shadow var(--t200);
 }
 #geoSalesMap .leaflet-control-zoom a:hover{
   background:rgba(255,255,255,0.08);
+  border-color:rgba(255,255,255,0.20);
+  transform:translateY(-1px);
+  box-shadow:0 14px 40px rgba(0,0,0,0.38), var(--glow-blue);
 }
 
+/* Attribution */
 #geoSalesMap .leaflet-control-attribution{
   background:rgba(15,15,20,0.70);
   color:rgba(255,255,255,0.70);
   border-radius:10px;
   border:1px solid rgba(255,255,255,0.10);
   padding:4px 8px;
+  backdrop-filter:blur(10px);
 }
 #geoSalesMap .leaflet-control-attribution a{
   color:rgba(255,255,255,0.85);
 }
 
-/* Tooltip/popup */
+/* Tooltip/popup (glass) */
 #geoSalesMap .leaflet-tooltip{
   background:rgba(15,15,20,0.92);
   color:rgba(255,255,255,0.92);
   border:1px solid rgba(255,255,255,0.14);
-  border-radius:10px;
-  padding:6px 10px;
+  border-radius:12px;
+  padding:8px 10px;
   box-shadow:0 18px 40px rgba(0,0,0,0.35);
+  backdrop-filter:blur(12px);
 }
 #geoSalesMap .leaflet-tooltip-top:before,
 #geoSalesMap .leaflet-tooltip-bottom:before,
@@ -51,7 +66,9 @@
   border-right-color:rgba(255,255,255,0.14);
 }
 
-/* Índice (lado direito) */
+/* ===========================
+   Índice (lado direito)
+=========================== */
 .geo-index{
   display:flex;
   flex-direction:column;
@@ -59,23 +76,27 @@
 }
 
 .geo-index-item{
-  border:1px solid rgba(255,255,255,0.10);
-  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.12);
+  background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
   border-radius:12px;
-  padding:10px 10px;
+  padding:10px;
   cursor:pointer;
-  transition:transform 120ms ease,border-color 120ms ease,background 120ms ease;
+  box-shadow:0 10px 32px rgba(0,0,0,0.20);
+  backdrop-filter:blur(10px);
+  transition:transform var(--t200), border-color var(--t260), box-shadow var(--t260), background var(--t200);
 }
 
 .geo-index-item:hover{
   transform:translateY(-1px);
-  border-color:rgba(238,77,45,0.45);
+  border-color:rgba(255,255,255,0.18);
   background:rgba(255,255,255,0.06);
+  box-shadow:0 14px 44px rgba(0,0,0,0.36), var(--glow-blue);
 }
 
 .geo-index-item.is-active{
-  border-color:rgba(238,77,45,0.70);
-  background:rgba(238,77,45,0.14);
+  border-color:rgba(168,85,247,0.55);
+  background:linear-gradient(90deg, rgba(168,85,247,0.18), rgba(34,211,238,0.10));
+  box-shadow:0 14px 44px rgba(0,0,0,0.36), var(--glow-purple);
 }
 
 .geo-index-top{
@@ -86,15 +107,18 @@
 }
 
 .geo-index-name{
-  font-weight:900;
+  font-weight:1000;
   letter-spacing:0.2px;
+  color:rgba(255,255,255,0.92);
 }
 
 .geo-index-count{
-  font-weight:900;
-  color:rgba(255,255,255,0.90);
+  font-weight:1000;
+  color:rgba(255,255,255,0.92);
+  white-space:nowrap;
 }
 
+/* Barra (neo) */
 .geo-index-bar{
   height:8px;
   border-radius:999px;
@@ -103,21 +127,25 @@
   margin-top:8px;
   border:1px solid rgba(255,255,255,0.08);
 }
-
 .geo-index-bar > div{
   height:100%;
   width:0%;
-  background:linear-gradient(135deg,#ff6a00,#ff2e93);
+  background:linear-gradient(90deg, rgba(168,85,247,0.90), rgba(34,211,238,0.85));
   border-radius:999px;
+  box-shadow:0 0 18px rgba(34,211,238,0.20);
+  transition:width 420ms ease;
 }
 
-/* Legenda (abaixo do mapa) */
+/* ===========================
+   Legenda (abaixo do mapa)
+=========================== */
 .geo-legend{
   display:flex;
   align-items:center;
   gap:10px;
   flex-wrap:wrap;
 }
+
 .geo-legend-swatch{
   width:16px;
   height:10px;
@@ -125,40 +153,101 @@
   border:1px solid rgba(255,255,255,0.14);
   background:rgba(255,255,255,0.10);
 }
+
 .geo-legend-label{
   color:rgba(255,255,255,0.70);
   font-size:12px;
-  font-weight:800;
+  font-weight:900;
 }
+
+/* Leaflet custom legend block (se você injeta via JS) */
 .geo-map-legend{
   background:rgba(15,15,20,0.78);
   border:1px solid rgba(255,255,255,0.12);
   border-radius:12px;
-  padding:10px 10px;
+  padding:10px;
   box-shadow:0 18px 40px rgba(0,0,0,0.25);
   backdrop-filter:blur(10px);
-  min-width: 160px;
+  min-width:160px;
 }
+
 .geo-map-legend__title{
-  font-weight:900;
+  font-weight:1000;
   font-size:12px;
   color:rgba(255,255,255,0.92);
   margin-bottom:8px;
+  letter-spacing:0.2px;
 }
+
 .geo-map-legend__item{
   display:flex;
   align-items:center;
   gap:8px;
   margin-top:6px;
 }
+
 .geo-map-legend__swatch{
   width:18px;
   height:10px;
   border-radius:999px;
   border:1px solid rgba(255,255,255,0.16);
 }
+
 .geo-map-legend__label{
   font-size:12px;
   color:rgba(255,255,255,0.78);
-  font-weight:800;
+  font-weight:900;
+}
+/* ===== GEO: Glow cockpit com “respiração” (sutil) ===== */
+#geoSalesMap{position:relative;border-radius:14px;overflow:hidden}
+
+#geoSalesMap:before{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  border-radius:inherit;
+  pointer-events:none;
+  background:linear-gradient(90deg, rgba(168,85,247,0.55), rgba(34,211,238,0.40), rgba(236,72,153,0.30));
+  opacity:0.45;
+  filter:blur(12px);
+  animation:geoGlowPulse 4.8s ease-in-out infinite;
+}
+
+/* Borda em gradiente (precisa) */
+#geoSalesMap:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  pointer-events:none;
+  padding:1px;
+  background:linear-gradient(90deg, rgba(168,85,247,0.55), rgba(34,211,238,0.40));
+
+  /* Safari/WebKit */
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+
+  /* Standard (para o linter e browsers compatíveis) */
+  mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite:exclude;
+
+  opacity:0.35;
+  animation:geoGlowStroke 4.8s ease-in-out infinite;
+}
+
+@keyframes geoGlowPulse{
+  0%{opacity:0.38;filter:blur(12px);transform:scale(1)}
+  50%{opacity:0.62;filter:blur(16px);transform:scale(1.01)}
+  100%{opacity:0.38;filter:blur(12px);transform:scale(1)}
+}
+
+@keyframes geoGlowStroke{
+  0%{opacity:0.28}
+  50%{opacity:0.48}
+  100%{opacity:0.28}
+}
+
+/* Acessibilidade: reduz animações se o usuário pedir */
+@media (prefers-reduced-motion: reduce){
+  #geoSalesMap:before,#geoSalesMap:after{animation:none}
 }
