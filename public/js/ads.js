@@ -400,8 +400,8 @@ function renderLineChart(canvasId, labels, datasets) {
           },
         },
         tooltip: {
-          backgroundColor: NEO.tooltipBg,
-          borderColor: NEO.tooltipBorder,
+          backgroundColor: ADS_NEO.tooltipBg,
+          borderColor: ADS_NEO.tooltipBorder,
           borderWidth: 1,
           titleColor: "rgba(255,255,255,0.92)",
           bodyColor: "rgba(255,255,255,0.90)",
@@ -427,13 +427,13 @@ function renderLineChart(canvasId, labels, datasets) {
 
       scales: {
         x: {
-          ticks: { color: NEO.tick, maxRotation: 0, autoSkip: true },
-          grid: { color: NEO.grid },
+          ticks: { color: ADS_NEO.tick, maxRotation: 0, autoSkip: true },
+          grid: { color: ADS_NEO.grid },
         },
         y: {
           beginAtZero: true,
-          ticks: { color: NEO.tick },
-          grid: { color: NEO.grid },
+          ticks: { color: ADS_NEO.tick },
+          grid: { color: ADS_NEO.grid },
         },
       },
     },
@@ -1466,8 +1466,8 @@ async function loadCpcDaily(dateFrom, dateTo) {
     {
       label: "Impressões",
       data: series.map((x) => x.impression),
-      borderColor: NEO.blue,
-      neoGlowColor: NEO.blue,
+      borderColor: ADS_NEO.blue,
+      neoGlowColor: ADS_NEO.blue,
       borderWidth: 2,
       tension: 0.28,
       pointRadius: 0,
@@ -1475,8 +1475,8 @@ async function loadCpcDaily(dateFrom, dateTo) {
     {
       label: "Cliques",
       data: series.map((x) => x.clicks),
-      borderColor: NEO.up,
-      neoGlowColor: NEO.up,
+      borderColor: ADS_NEO.up,
+      neoGlowColor: ADS_NEO.up,
       borderWidth: 2,
       tension: 0.28,
       pointRadius: 0,
@@ -1484,8 +1484,8 @@ async function loadCpcDaily(dateFrom, dateTo) {
     {
       label: "Gasto",
       data: series.map((x) => x.expense),
-      borderColor: NEO.down,
-      neoGlowColor: NEO.down,
+      borderColor: ADS_NEO.down,
+      neoGlowColor: ADS_NEO.down,
       borderWidth: 2,
       tension: 0.28,
       pointRadius: 0,
@@ -1496,13 +1496,13 @@ async function loadCpcDaily(dateFrom, dateTo) {
       borderColor: (context) => {
         const chart = context.chart;
         const { ctx, chartArea } = chart;
-        if (!chartArea) return NEO.purple; // primeira renderização pode vir sem chartArea
+        if (!chartArea) return ADS_NEO.purple; // primeira renderização pode vir sem chartArea
         return makeNeoGradient(ctx, chartArea, [
-          [0, NEO.purple],
-          [1, NEO.cyan],
+          [0, ADS_NEO.purple],
+          [1, ADS_NEO.cyan],
         ]);
       },
-      neoGlowColor: NEO.purple,
+      neoGlowColor: ADS_NEO.purple,
       borderWidth: 2,
       tension: 0.28,
       pointRadius: 0,
@@ -1510,8 +1510,8 @@ async function loadCpcDaily(dateFrom, dateTo) {
     {
       label: "GMV Broad",
       data: series.map((x) => x.broad_gmv),
-      borderColor: NEO.cyan,
-      neoGlowColor: NEO.cyan,
+      borderColor: ADS_NEO.cyan,
+      neoGlowColor: ADS_NEO.cyan,
       borderWidth: 2,
       tension: 0.28,
       pointRadius: 0,
@@ -1781,8 +1781,8 @@ async function selectCampaign(campaignId) {
     {
       label: "Impressões",
       data: series.map((x) => x.impression),
-      borderColor: NEO.blue,
-      neoGlowColor: NEO.blue,
+      borderColor: ADS_NEO.blue,
+      neoGlowColor: ADS_NEO.blue,
       borderWidth: 2,
       tension: 0.28,
       pointRadius: 0,
@@ -1790,8 +1790,8 @@ async function selectCampaign(campaignId) {
     {
       label: "Cliques",
       data: series.map((x) => x.clicks),
-      borderColor: NEO.up,
-      neoGlowColor: NEO.up,
+      borderColor: ADS_NEO.up,
+      neoGlowColor: ADS_NEO.up,
       borderWidth: 2,
       tension: 0.28,
       pointRadius: 0,
@@ -1799,8 +1799,8 @@ async function selectCampaign(campaignId) {
     {
       label: "Gasto",
       data: series.map((x) => x.expense),
-      borderColor: NEO.down,
-      neoGlowColor: NEO.down,
+      borderColor: ADS_NEO.down,
+      neoGlowColor: ADS_NEO.down,
       borderWidth: 2,
       tension: 0.28,
       pointRadius: 0,
@@ -1808,8 +1808,8 @@ async function selectCampaign(campaignId) {
     {
       label: "GMV Direto",
       data: series.map((x) => x.direct_gmv),
-      borderColor: NEO.purple,
-      neoGlowColor: NEO.purple,
+      borderColor: ADS_NEO.purple,
+      neoGlowColor: ADS_NEO.purple,
       borderWidth: 2,
       tension: 0.28,
       pointRadius: 0,
