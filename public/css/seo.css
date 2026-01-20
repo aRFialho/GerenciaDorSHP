@@ -1,0 +1,198 @@
+/* ===========================
+   SEO — Neo cockpit (glass/dark)
+   Scoped to #tab-seo
+=========================== */
+
+#tab-seo{
+  --seo-bg: var(--card);
+  --seo-bg2: var(--card-strong);
+  --seo-border: var(--border);
+  --seo-text: var(--text);
+  --seo-muted: var(--muted);
+}
+
+#tab-seo .muted{color:var(--seo-muted)}
+
+/* Grid geral */
+#tab-seo .seo-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+@media (max-width:1100px){
+  #tab-seo .seo-grid{grid-template-columns:1fr}
+}
+
+/* Card base */
+#tab-seo .seo-card{
+  border:1px solid rgba(255,255,255,0.10);
+  background:linear-gradient(180deg,var(--seo-bg),rgba(255,255,255,0.02));
+  border-radius:14px;
+  overflow:hidden;
+  backdrop-filter:blur(10px);
+  box-shadow:0 10px 40px rgba(0,0,0,0.22);
+  transition:transform var(--t200), box-shadow var(--t260), border-color var(--t260);
+}
+#tab-seo .seo-card:hover{
+  transform:translateY(-1px);
+  border-color:rgba(255,255,255,0.16);
+  box-shadow:0 14px 52px rgba(0,0,0,0.38), var(--glow-blue);
+}
+
+/* Cabeçalho */
+#tab-seo .seo-card__head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  padding:12px;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  background:rgba(0,0,0,0.14);
+}
+
+#tab-seo .seo-card__title{
+  font-weight:1000;
+  font-size:13px;
+  color:rgba(255,255,255,0.92);
+  letter-spacing:-0.1px;
+}
+
+#tab-seo .seo-card__right{
+  font-size:12px;
+  font-weight:900;
+  color:rgba(255,255,255,0.65);
+  white-space:nowrap;
+}
+
+/* Lista */
+#tab-seo .seo-list{
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+/* Linha (row) */
+#tab-seo .seo-row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+  padding:10px;
+  border:1px solid rgba(255,255,255,0.08);
+  background:rgba(0,0,0,0.12);
+  border-radius:12px;
+  transition:transform var(--t200), border-color var(--t200), background var(--t200), box-shadow var(--t200);
+}
+
+#tab-seo .seo-row:hover{
+  transform:translateY(-1px);
+  border-color:rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.06);
+  box-shadow:0 12px 32px rgba(0,0,0,0.26);
+}
+
+#tab-seo .seo-row__left{min-width:0}
+
+#tab-seo .seo-row__term{
+  font-weight:1000;
+  font-size:13px;
+  line-height:1.2;
+  color:rgba(255,255,255,0.92);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  line-clamp:2;
+}
+
+#tab-seo .seo-row__sub{
+  font-size:12px;
+  color:rgba(255,255,255,0.65);
+  margin-top:4px;
+}
+
+#tab-seo .seo-row__right{
+  flex:0 0 auto;
+  text-align:right;
+  white-space:nowrap;
+  font-weight:1000;
+  color:rgba(255,255,255,0.90);
+}
+
+/* Barra de intensidade */
+#tab-seo .seo-bar{
+  height:8px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.08);
+  overflow:hidden;
+  margin-top:6px;
+}
+
+#tab-seo .seo-bar>div{
+  height:100%;
+  width:0%;
+  border-radius:999px;
+  background:linear-gradient(90deg, rgba(168,85,247,0.90), rgba(34,211,238,0.85));
+  box-shadow:0 0 18px rgba(34,211,238,0.18);
+  transition:width 420ms ease;
+}
+
+/* Sugestões (Autocomplete) – fica bonito mesmo como lista simples */
+#tab-seo #seoSuggestList .seo-row{
+  cursor:pointer;
+}
+#tab-seo #seoSuggestList .seo-row:active{
+  transform:translateY(0px);
+}
+
+/* Pequena “tag” quando você quiser usar (opcional no HTML gerado pelo JS) */
+#tab-seo .seo-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.06);
+  color:rgba(255,255,255,0.90);
+  padding:8px 12px;
+  border-radius:999px;
+  font-weight:1000;
+  font-size:12px;
+  cursor:pointer;
+  transition:transform var(--t200), box-shadow var(--t200), border-color var(--t200), background var(--t200);
+}
+#tab-seo .seo-chip:hover{
+  transform:translateY(-1px);
+  border-color:rgba(34,211,238,0.30);
+  box-shadow:var(--glow-blue);
+}
+#tab-seo .seo-chip:active{transform:translateY(0px)}
+
+/* Variações de chip (se você usar no JS) */
+#tab-seo .seo-chip--top{
+  border-color:rgba(59,130,246,0.28);
+  background:rgba(59,130,246,0.10);
+}
+#tab-seo .seo-chip--rising{
+  border-color:rgba(236,72,153,0.28);
+  background:rgba(236,72,153,0.10);
+}
+#tab-seo .seo-chip-dot{
+  width:8px;height:8px;border-radius:999px;background:currentColor;opacity:0.85;
+}
+
+/* Mensagens */
+#tab-seo #seoMsg{
+  color:rgba(255,255,255,0.70);
+  margin-bottom:10px;
+}
+
+/* Acessibilidade */
+@media (prefers-reduced-motion: reduce){
+  #tab-seo .seo-card,
+  #tab-seo .seo-row,
+  #tab-seo .seo-bar>div,
+  #tab-seo .seo-chip{transition:none}
+}

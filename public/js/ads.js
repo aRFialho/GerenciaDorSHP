@@ -380,11 +380,6 @@ function renderLineChart(canvasId, labels, datasets) {
   if (!canvas) return null;
 
   const ctx = canvas.getContext("2d");
-  function makeNeoGradient(ctx, chartArea, stops) {
-    const g = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
-    for (const [p, c] of stops) g.addColorStop(p, c);
-    return g;
-  }
   return new Chart(ctx, {
     type: "line",
     data: { labels, datasets },
