@@ -146,7 +146,12 @@ async function loadSeoKeywords() {
     const data = await apiGet(
       `/seo/keywords?q=${encodeURIComponent(q)}&period=${encodeURIComponent(period)}`,
     );
-
+    if (msg) {
+      msg.textContent =
+        data?.trends?.ok === false
+          ? "Trends indisponível no momento (bloqueio/consent). Exibindo sugestões do Google."
+          : "";
+    }
     // TOP
     renderSeoList(
       "seoTopList",

@@ -1,5 +1,12 @@
 const googleTrends = require("google-trends-api");
 
+function safeJsonParse(name, raw) {
+  const t = String(raw || "").trim();
+  if (!t) throw new Error(`${name}_empty_response`);
+  if (t.startsWith("<")) throw new Error(`${name}_returned_html_blocked`);
+  return JSON.parse(t);
+}
+
 function clamp(n, a, b) {
   const x = Number(n);
   if (!Number.isFinite(x)) return a;
@@ -112,13 +119,55 @@ async function keywords(req, res) {
     const cached = cacheGet(key);
     if (cached) return res.json(cached);
 
-    // 1) Related queries (top + rising)
-    const relatedRaw = await googleTrends.relatedQueries({
-      keyword: q,
-      geo,
-      timeframe,
-    });
-    const related = JSON.parse(relatedRaw);
+    // 3) Sugestões (Autocomplete) — sempre tenta garantir algo útil
+    const sugKey = `suggest:v1:${q.toLowerCase()}`;
+    let sug = cacheGet(sugKey);
+    if (!sug) {
+      const url =
+        "https://suggestqueries.google.com/complete/search" +
+        `?client=firefox&hl=pt-BR&gl=BR&q=${encodeURIComponent(q)}`;
+
+      const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+      const data = r.ok ? await r.json() : null;
+      const items = Array.isArray(data?.[1]) ? data[1].slice(0, 20) : [];
+      sug = { query: q, items };
+      cacheSet(sugKey, sug, 60 * 60 * 1000); // 1h
+    }
+
+    // Trends: best-effort (pode falhar por bloqueio/consent/captcha)
+    let trendsOk = true;
+    let trendsError = null;
+
+    let related = null;
+    try {
+      const relatedRaw = await googleTrends.relatedQueries({
+        keyword: q,
+        geo,
+        timeframe,
+        hl: "pt-BR",
+        timezone: 180, // Brasil (minutos). Se preferir, pode remover.
+      });
+      related = safeJsonParse("relatedQueries", relatedRaw);
+    } catch (e) {
+      trendsOk = false;
+      trendsError = String(e?.message || e);
+    }
+
+    let byRegion = null;
+    try {
+      const byRegionRaw = await googleTrends.interestByRegion({
+        keyword: q,
+        geo,
+        timeframe,
+        resolution: "REGION",
+        hl: "pt-BR",
+        timezone: 180,
+      });
+      byRegion = safeJsonParse("interestByRegion", byRegionRaw);
+    } catch (e) {
+      trendsOk = false;
+      trendsError = trendsError || String(e?.message || e);
+    }
 
     const top =
       related?.default?.rankedList?.[0]?.rankedKeyword?.map((x) => ({
@@ -137,60 +186,36 @@ async function keywords(req, res) {
               : Number(x.value || 0),
       })) || [];
 
-    // 2) Interest by region (UF) — índice 0..100
-    const byRegionRaw = await googleTrends.interestByRegion({
-      keyword: q,
-      geo,
-      timeframe,
-      resolution: "REGION", // sub-regiões
-    });
-    const byRegion = JSON.parse(byRegionRaw);
-
-    // tenta mapear nomes -> UF; se já vier UF, passa direto
     const ufItems =
       byRegion?.default?.geoMapData
         ?.map((x) => {
           const name = String(x?.geoName || "").trim();
-          const code = String(x?.geoCode || "").trim(); // às vezes vem "BR-SP"
+          const code = String(x?.geoCode || "").trim();
           let uf = null;
 
-          // se vier geoCode BR-XX
           const m = code.match(/BR-([A-Z]{2})$/);
           if (m) uf = m[1];
-
-          // se não, tenta pelo nome
           if (!uf) uf = UF_MAP.get(norm(name)) || null;
 
           const val = Array.isArray(x?.value)
             ? Number(x.value[0] || 0)
             : Number(x?.value || 0);
-          if (!uf) return null;
 
+          if (!uf) return null;
           return { uf, interest: clamp(val, 0, 100) };
         })
         .filter(Boolean) || [];
 
     ufItems.sort((a, b) => b.interest - a.interest);
 
-    // 3) Sugestões (Autocomplete) — pra completar a lista
-    const sugKey = `suggest:v1:${q.toLowerCase()}`;
-    let sug = cacheGet(sugKey);
-    if (!sug) {
-      // chama direto se não tiver cache ainda
-      const url =
-        "https://suggestqueries.google.com/complete/search" +
-        `?client=firefox&hl=pt-BR&gl=BR&q=${encodeURIComponent(q)}`;
-      const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-      const data = r.ok ? await r.json() : null;
-      const items = Array.isArray(data?.[1]) ? data[1].slice(0, 20) : [];
-      sug = { query: q, items };
-      cacheSet(sugKey, sug, 60 * 60 * 1000);
-    }
-
     const out = {
       query: q,
       period,
       timeframe,
+      trends: {
+        ok: trendsOk,
+        error: trendsOk ? null : trendsError,
+      },
       related: {
         top: top.slice(0, 20),
         rising: rising.slice(0, 20),
