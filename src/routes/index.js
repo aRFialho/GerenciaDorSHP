@@ -9,11 +9,13 @@ const debugRoutes = require("./debug.routes");
 const adminRoutes = require("./admin.routes");
 const { sessionAuth } = require("../middlewares/sessionAuth");
 const adsRoutes = require("./ads.routes");
+
 const router = express.Router();
 
 if (process.env.ENABLE_DEBUG_ROUTES === "true") {
   router.use(debugRoutes);
 }
+router.use(require("./seo"));
 
 // Pages
 router.use(sessionRoutes);
