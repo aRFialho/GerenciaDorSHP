@@ -299,3 +299,22 @@
   #tab-ads .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   #tab-ads .kpi-grid-sm{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+/* ===== Fix: chart de campanha não estoura a página ===== */
+#tab-ads #chartCpcCampaign{
+  display:block;
+  width:100% !important;
+  height:180px !important;
+  max-height:180px !important;
+}
+
+#tab-ads #chartCpcDaily{
+  display:block;
+  width:100% !important;
+  height:220px !important;
+  max-height:220px !important;
+}
+
+/* Evita flex/grid “esticar” filhos demais em layouts split */
+#tab-ads .section-card__body{
+  min-height:0;
+}

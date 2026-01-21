@@ -20,42 +20,54 @@ let cpcFilterTimer = null;
 let cpcStatusBucket = "active"; // padrão Shopee: Em andamento
 let lastCpcProductPerfRows = [];
 
-function cssVar(name, fallback) {
-  const v = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
-  return v || fallback;
-}
+(function initNeoThemeOnce() {
+  if (window.NEO_THEME) return;
 
-const NEO = {
-  purple: cssVar("--purple", "#A855F7"),
-  blue: cssVar("--blue", "#3B82F6"),
-  cyan: cssVar("--cyan", "#22D3EE"),
-  up: cssVar("--up", "#22C55E"),
-  down: cssVar("--down", "#FF5A6A"),
-  tick: "rgba(255,255,255,0.70)",
-  grid: "rgba(255,255,255,0.10)",
-  tooltipBg: "rgba(15,15,20,0.92)",
-  tooltipBorder: "rgba(255,255,255,0.14)",
-};
+  function cssVar(name, fallback) {
+    const v = getComputedStyle(document.documentElement)
+      .getPropertyValue(name)
+      .trim();
+    return v || fallback;
+  }
 
-const neoGlowPlugin = {
-  id: "neoGlow",
-  beforeDatasetDraw(chart, args) {
-    const ds = chart.data.datasets?.[args.index];
-    if (!ds || !ds.neoGlowColor) return;
+  window.NEO_THEME = {
+    purple: cssVar("--purple", "#A855F7"),
+    blue: cssVar("--blue", "#3B82F6"),
+    cyan: cssVar("--cyan", "#22D3EE"),
+    up: cssVar("--up", "#22C55E"),
+    down: cssVar("--down", "#FF5A6A"),
+    tick: "rgba(255,255,255,0.70)",
+    grid: "rgba(255,255,255,0.10)",
+    tooltipBg: "rgba(15,15,20,0.92)",
+    tooltipBorder: "rgba(255,255,255,0.14)",
+  };
+})();
 
-    const ctx = chart.ctx;
-    ctx.save();
-    ctx.shadowBlur = ds.neoGlowBlur ?? 18;
-    ctx.shadowColor = ds.neoGlowColor;
-  },
-  afterDatasetDraw(chart, args) {
-    const ds = chart.data.datasets?.[args.index];
-    if (!ds || !ds.neoGlowColor) return;
-    chart.ctx.restore();
-  },
-};
+const NEO = window.NEO_THEME;
+
+(function registerNeoGlowOnce() {
+  if (!window.Chart || typeof Chart.register !== "function") return;
+  if (window.__NEO_GLOW_REGISTERED__) return;
+
+  Chart.register({
+    id: "neoGlow",
+    beforeDatasetDraw(chart, args) {
+      const ds = chart.data.datasets?.[args.index];
+      if (!ds || !ds.neoGlowColor) return;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.shadowBlur = ds.neoGlowBlur ?? 18;
+      ctx.shadowColor = ds.neoGlowColor;
+    },
+    afterDatasetDraw(chart, args) {
+      const ds = chart.data.datasets?.[args.index];
+      if (!ds || !ds.neoGlowColor) return;
+      chart.ctx.restore();
+    },
+  });
+
+  window.__NEO_GLOW_REGISTERED__ = true;
+})();
 
 if (window.Chart && typeof Chart.register === "function") {
   Chart.register(neoGlowPlugin);

@@ -316,25 +316,6 @@ async function ensureShopSelected() {
   }
 }
 
-function adsCssVar(name, fallback) {
-  const v = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
-  return v || fallback;
-}
-
-const ADS_NEO = {
-  purple: adsCssVar("--purple", "#A855F7"),
-  blue: adsCssVar("--blue", "#3B82F6"),
-  cyan: adsCssVar("--cyan", "#22D3EE"),
-  up: adsCssVar("--up", "#22C55E"),
-  down: adsCssVar("--down", "#FF5A6A"),
-  tick: "rgba(255,255,255,0.70)",
-  grid: "rgba(255,255,255,0.10)",
-  tooltipBg: "rgba(15,15,20,0.92)",
-  tooltipBorder: "rgba(255,255,255,0.14)",
-};
-
 // ---------------- Dashboard (NOVO) ----------------
 
 let DASH_MODE = "month"; // "month" | "today"
@@ -342,9 +323,6 @@ let DASH_POLL = null;
 
 // Reaproveita seu DASH_CHART global existente
 // let DASH_CHART = null;
-
-const CHART_TICK_COLOR = "rgba(255,255,255,0.70)";
-const CHART_GRID_COLOR = "rgba(255,255,255,0.08)";
 
 function fmtBRL(v) {
   const n = Number(v || 0);
@@ -434,6 +412,24 @@ async function loadTopSellersMonth() {
   }
 }
 
+const DASH_NEO = window.NEO_THEME || {
+  purple: "#A855F7",
+  blue: "#3B82F6",
+  cyan: "#22D3EE",
+  up: "#22C55E",
+  down: "#FF5A6A",
+  tick: "rgba(255,255,255,0.70)",
+  grid: "rgba(255,255,255,0.10)",
+  tooltipBg: "rgba(15,15,20,0.92)",
+  tooltipBorder: "rgba(255,255,255,0.14)",
+};
+
+function makeNeoGradient(ctx, chartArea, stops) {
+  const g = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+  for (const [p, c] of stops) g.addColorStop(p, c);
+  return g;
+}
+
 function renderMonthChart({
   dailyBars,
   avgPerDayCents,
@@ -477,22 +473,30 @@ function renderMonthChart({
         {
           label: "Acumulado",
           data: cum,
-          borderColor: "rgba(255, 106, 0, 0.95)",
-          backgroundColor: "rgba(255, 106, 0, 0.10)",
-          fill: false,
+          borderColor: (c) => {
+            const { chart } = c;
+            if (!chart.chartArea) return DASH_NEO.purple;
+            return makeNeoGradient(chart.ctx, chart.chartArea, [
+              [0, DASH_NEO.purple],
+              [1, DASH_NEO.cyan],
+            ]);
+          },
+          neoGlowColor: DASH_NEO.purple,
+          borderWidth: 2,
           tension: 0.25,
           pointRadius: 0,
-          borderWidth: 2,
+          fill: false,
         },
         {
           label: "Projeção",
           data: projection,
-          borderColor: "rgba(59, 130, 246, 0.90)",
-          fill: false,
-          tension: 0.25,
-          pointRadius: 0,
+          borderColor: DASH_NEO.blue,
+          neoGlowColor: DASH_NEO.blue,
           borderDash: [6, 6],
           borderWidth: 2,
+          tension: 0.25,
+          pointRadius: 0,
+          fill: false,
         },
         {
           label: "Hoje",
@@ -500,7 +504,7 @@ function renderMonthChart({
           data: todayPoint,
           pointRadius: 5,
           pointHoverRadius: 6,
-          pointBackgroundColor: "rgba(255, 55, 55, 1)",
+          pointBackgroundColor: DASH_NEO.down,
           pointBorderColor: "rgba(255,255,255,0.85)",
           pointBorderWidth: 1,
         },
@@ -511,9 +515,13 @@ function renderMonthChart({
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { display: true, labels: { color: CHART_TICK_COLOR } },
+        legend: { display: true, labels: { color: DASH_NEO.tick } },
         tooltip: {
-          enabled: true,
+          backgroundColor: DASH_NEO.tooltipBg,
+          borderColor: DASH_NEO.tooltipBorder,
+          borderWidth: 1,
+          titleColor: "rgba(255,255,255,0.92)",
+          bodyColor: "rgba(255,255,255,0.90)",
           callbacks: {
             title: (items) =>
               items?.[0]?.label ? `Dia ${items[0].label}` : "",
@@ -525,13 +533,13 @@ function renderMonthChart({
       scales: {
         x: {
           grid: { display: false },
-          ticks: { display: true, color: CHART_TICK_COLOR, maxTicksLimit: 10 },
+          ticks: { display: true, color: DASH_NEO.tick, maxTicksLimit: 10 },
         },
         y: {
-          grid: { color: CHART_GRID_COLOR },
+          grid: { color: DASH_NEO.grid },
           ticks: {
             display: true,
-            color: CHART_TICK_COLOR,
+            color: DASH_NEO.tick,
             callback: (v) => fmtBRLCompact(v),
           },
         },
@@ -603,12 +611,19 @@ function renderMonthRatioChart({
         {
           label: "Progresso",
           data: ratioPct,
-          borderColor: "rgba(59, 130, 246, 0.92)",
-          backgroundColor: "rgba(59, 130, 246, 0.12)",
-          fill: false,
+          borderColor: (c) => {
+            const { chart } = c;
+            if (!chart.chartArea) return DASH_NEO.blue;
+            return makeNeoGradient(chart.ctx, chart.chartArea, [
+              [0, DASH_NEO.blue],
+              [1, DASH_NEO.cyan],
+            ]);
+          },
+          neoGlowColor: DASH_NEO.cyan,
+          borderWidth: 2,
           tension: 0.25,
           pointRadius: 0,
-          borderWidth: 2,
+          fill: false,
         },
         {
           label: "Meta",
@@ -625,7 +640,7 @@ function renderMonthRatioChart({
           data: todayPoint,
           pointRadius: 5,
           pointHoverRadius: 6,
-          pointBackgroundColor: "rgba(255, 55, 55, 1)",
+          pointBackgroundColor: DASH_NEO.down,
           pointBorderColor: "rgba(255,255,255,0.85)",
           pointBorderWidth: 1,
         },
@@ -636,23 +651,33 @@ function renderMonthRatioChart({
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { display: true, labels: { color: CHART_TICK_COLOR } },
+        legend: { display: true, labels: { color: DASH_NEO.tick } },
         tooltip: {
-          /* mantém o que você já fez */
+          backgroundColor: DASH_NEO.tooltipBg,
+          borderColor: DASH_NEO.tooltipBorder,
+          borderWidth: 1,
+          titleColor: "rgba(255,255,255,0.92)",
+          bodyColor: "rgba(255,255,255,0.90)",
+          callbacks: {
+            title: (items) =>
+              items?.[0]?.label ? `Dia ${items[0].label}` : "",
+            label: (ctx) =>
+              `${ctx.dataset?.label || "—"}: ${Number(ctx.parsed?.y || 0).toFixed(1)}%`,
+          },
         },
       },
       scales: {
         x: {
           grid: { display: false },
-          ticks: { display: true, color: CHART_TICK_COLOR, maxTicksLimit: 10 },
+          ticks: { display: true, color: DASH_NEO.tick, maxTicksLimit: 10 },
         },
         y: {
           min: 0,
           max: 100,
-          grid: { color: CHART_GRID_COLOR },
+          grid: { color: DASH_NEO.grid },
           ticks: {
             display: true,
-            color: CHART_TICK_COLOR,
+            color: DASH_NEO.tick,
             callback: (v) => `${v}%`,
           },
         },
@@ -697,8 +722,8 @@ function renderTodayChartCompare({
         {
           label: "Hoje",
           data: today,
-          backgroundColor: "rgba(255, 46, 147, 0.45)",
-          borderColor: "rgba(255, 46, 147, 0.85)",
+          backgroundColor: "rgba(168,85,247,0.28)",
+          borderColor: "rgba(168,85,247,0.65)",
           borderWidth: 1,
           order: 2,
         },
@@ -706,8 +731,16 @@ function renderTodayChartCompare({
           label: "Ontem",
           type: "line",
           data: yesterday,
-          borderColor: "rgba(148, 163, 184, 0.75)",
-          backgroundColor: "rgba(148, 163, 184, 0.10)",
+          borderColor: (c) => {
+            const { chart } = c;
+            if (!chart.chartArea) return DASH_NEO.cyan;
+            return makeNeoGradient(chart.ctx, chart.chartArea, [
+              [0, DASH_NEO.cyan],
+              [1, DASH_NEO.blue],
+            ]);
+          },
+          neoGlowColor: DASH_NEO.cyan,
+          backgroundColor: "rgba(34,211,238,0.08)",
           pointRadius: 0,
           tension: 0.25,
           borderWidth: 2,
@@ -719,7 +752,7 @@ function renderTodayChartCompare({
           data: [{ x: labels[h], y: pointY }],
           pointRadius: 5,
           pointHoverRadius: 6,
-          pointBackgroundColor: "rgba(255, 55, 55, 1)",
+          pointBackgroundColor: DASH_NEO.down,
           pointBorderColor: "rgba(255,255,255,0.85)",
           pointBorderWidth: 1,
           order: 0,
@@ -731,9 +764,13 @@ function renderTodayChartCompare({
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { display: true, labels: { color: CHART_TICK_COLOR } },
+        legend: { display: true, labels: { color: DASH_NEO.tick } },
         tooltip: {
-          enabled: true,
+          backgroundColor: DASH_NEO.tooltipBg,
+          borderColor: DASH_NEO.tooltipBorder,
+          borderWidth: 1,
+          titleColor: "rgba(255,255,255,0.92)",
+          bodyColor: "rgba(255,255,255,0.90)",
           callbacks: {
             title: (items) => (items?.[0]?.label ? `${items[0].label}:00` : ""),
             label: (ctx) =>
@@ -741,20 +778,20 @@ function renderTodayChartCompare({
           },
           filter: (ctx) => {
             const lbl = String(ctx.dataset?.label || "");
-            return lbl === "Hoje" || lbl === "Ontem"; // deixa “Agora” fora do tooltip (opcional)
+            return lbl === "Hoje" || lbl === "Ontem";
           },
         },
       },
       scales: {
         x: {
           grid: { display: false },
-          ticks: { display: true, color: CHART_TICK_COLOR, maxTicksLimit: 12 },
+          ticks: { display: true, color: DASH_NEO.tick, maxTicksLimit: 12 },
         },
         y: {
-          grid: { color: CHART_GRID_COLOR },
+          grid: { color: DASH_NEO.grid },
           ticks: {
             display: true,
-            color: CHART_TICK_COLOR,
+            color: DASH_NEO.tick,
             callback: (v) => fmtBRLCompact(v),
           },
         },
