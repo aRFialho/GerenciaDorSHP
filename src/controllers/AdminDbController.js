@@ -164,35 +164,41 @@ const AdminDbController = {
       });
     }
 
-    await prisma.$transaction(async (tx) => {
-      // 1) DELETE (ordem inversa)
-      for (const m of [...models].reverse()) {
-        const delegate = tx[m];
-        if (!delegate?.deleteMany)
-          throw new Error(`deleteMany indisponível: ${m}`);
-        await delegate.deleteMany();
-      }
+    await prisma.$transaction(
+      async (tx) => {
+        // 1) DELETE (ordem inversa)
+        for (const m of [...models].reverse()) {
+          const delegate = tx[m];
+          if (!delegate?.deleteMany)
+            throw new Error(`deleteMany indisponível: ${m}`);
+          await delegate.deleteMany();
+        }
 
-      // 2) INSERT (ordem direta)
-      for (const m of models) {
-        const delegate = tx[m];
-        if (!delegate?.createMany)
-          throw new Error(`createMany indisponível: ${m}`);
+        // 2) INSERT (ordem direta)
+        for (const m of models) {
+          const delegate = tx[m];
+          if (!delegate?.createMany)
+            throw new Error(`createMany indisponível: ${m}`);
 
-        const rowsRaw = Array.isArray(data[m]) ? data[m] : [];
-        if (!rowsRaw.length) continue;
+          const rowsRaw = Array.isArray(data[m]) ? data[m] : [];
+          if (!rowsRaw.length) continue;
 
-        const rows = reviveDates(reviveBigInts(m, rowsRaw));
+          const rows = reviveDates(reviveBigInts(m, rowsRaw));
 
-        await delegate.createMany({
-          data: rows,
-          skipDuplicates: false,
-        });
-      }
+          await delegate.createMany({
+            data: rows,
+            skipDuplicates: false,
+          });
+        }
 
-      // 3) Ajusta sequences do Postgres
-      await resetSequencesPostgres(tx);
-    });
+        // 3) Ajusta sequences do Postgres
+        await resetSequencesPostgres(tx);
+      },
+      {
+        maxWait: 20000, // tempo máx. esperando conexão
+        timeout: 180000, // 3 min (ajuste conforme tamanho do DB)
+      },
+    );
 
     return res.status(200).json({ ok: true });
   },
