@@ -2833,27 +2833,33 @@ function renderAdminDbTools() {
 }
 async function adminDownloadDbBackup() {
   const msg = document.getElementById("adminDbMsg");
-  if (msg) msg.textContent = "Gerando backup...";
+  const btn = document.getElementById("btnAdminDbBackup");
+  try {
+    if (btn) btn.disabled = true;
+    if (msg) msg.textContent = "Gerando backup...";
 
-  const r = await fetch("/admin/db/backup", { credentials: "include" });
-  if (!r.ok) {
-    const t = await r.text();
-    if (msg) msg.textContent = `Erro: ${t || r.status}`;
-    return;
+    const r = await fetch("/admin/db/backup", { credentials: "include" });
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      if (msg) msg.textContent = `Erro: ${t || `HTTP ${r.status}`}`;
+      return;
+    }
+
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `db-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+    if (msg) msg.textContent = "";
+  } finally {
+    if (btn) btn.disabled = false;
   }
-
-  const blob = await r.blob();
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `db-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-
-  URL.revokeObjectURL(url);
-  if (msg) msg.textContent = "";
 }
 
 async function adminRestoreDbBackup() {
@@ -2889,13 +2895,14 @@ async function adminRestoreDbBackup() {
 
       const fd = new FormData();
       fd.append("file", file);
-
+      const restoreBtn = document.getElementById("btnAdminDbRestore");
+      if (restoreBtn) restoreBtn.disabled = true;
       const r = await fetch("/admin/db/restore", {
         method: "POST",
         credentials: "include",
         body: fd,
       });
-
+      if (restoreBtn) restoreBtn.disabled = false;
       const text = await r.text();
       if (!r.ok) {
         if (msg) msg.textContent = `Erro: ${text || r.status}`;

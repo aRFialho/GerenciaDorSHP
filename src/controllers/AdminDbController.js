@@ -1,11 +1,5 @@
 const multer = require("multer");
-
-// ✅ Ajuste este import para o seu projeto:
-// - Se você já tem um singleton PrismaClient (recomendado), importe ele aqui.
-// Ex.: const prisma = require("../config/prisma");
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
-
+const prisma = require("../config/db");
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 80 * 1024 * 1024 }, // 80MB
@@ -38,7 +32,7 @@ const BIGINT_FIELDS = {
 };
 
 function assertAdmin(req) {
-  const role = String(req?.user?.role || req?.session?.user?.role || "");
+  const role = String(req?.auth?.user?.role || req?.auth?.role || "");
   return role === "ADMIN" || role === "SUPER_ADMIN";
 }
 
@@ -183,9 +177,9 @@ const AdminDbController = {
           throw new Error(`createMany indisponível: ${m}`);
 
         const rowsRaw = Array.isArray(data[m]) ? data[m] : [];
-        const rows = reviveBigInts(m, rowsRaw);
+        if (!rowsRaw.length) continue;
 
-        if (!rows.length) continue;
+        const rows = reviveDates(reviveBigInts(m, rowsRaw));
 
         await delegate.createMany({
           data: rows,
@@ -200,5 +194,29 @@ const AdminDbController = {
     return res.status(200).json({ ok: true });
   },
 };
+
+const DATE_KEYS = new Set([
+  "createdAt",
+  "updatedAt",
+  "expiresAt",
+  "shipByDate",
+  "shopeeCreateTime",
+  "shopeeUpdateTime",
+  "accessTokenExpiresAt",
+  "refreshTokenExpiresAt",
+  "detectedAt",
+  "resolvedAt",
+]);
+
+function reviveDates(rows) {
+  return (Array.isArray(rows) ? rows : []).map((r) => {
+    const o = { ...r };
+    for (const k of Object.keys(o)) {
+      if (!DATE_KEYS.has(k)) continue;
+      if (typeof o[k] === "string" && o[k]) o[k] = new Date(o[k]);
+    }
+    return o;
+  });
+}
 
 module.exports = AdminDbController;

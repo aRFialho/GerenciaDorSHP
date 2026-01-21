@@ -2,28 +2,29 @@ const express = require("express");
 const prisma = require("../config/db");
 const bcrypt = require("bcrypt");
 const { requireAuth, requireRole } = require("../middlewares/sessionAuth");
-
-const sessionAuth = require("../middlewares/sessionAuth");
-const requireAdmin = require("../middlewares/requireAdmin");
 const AdminDbController = require("../controllers/AdminDbController");
-
-router.get("/db/backup", sessionAuth, requireAdmin, AdminDbController.backup);
-router.post(
-  "/db/restore",
-  sessionAuth,
-  requireAdmin,
-  AdminDbController.uploadMiddleware,
-  AdminDbController.restore,
-);
-router.post(
-  "/db/restore",
-  sessionAuth,
-  AdminDbController.uploadMiddleware,
-  AdminDbController.restore,
-);
 
 const router = express.Router();
 router.use(requireAuth);
+
+// ✅ DB backup/restore (mesmo padrão do resto)
+router.get(
+  "/admin/db/backup",
+  requireRole("ADMIN", "SUPER_ADMIN"),
+  AdminDbController.backup,
+);
+
+router.post(
+  "/admin/db/restore",
+  requireRole("ADMIN", "SUPER_ADMIN"),
+  AdminDbController.uploadMiddleware,
+  AdminDbController.restore,
+);
+
+// ---------------------------
+// daqui pra baixo: suas rotas existentes
+// (mantenha como já está)
+// ---------------------------
 
 // Admin da conta (ADMIN e SUPER_ADMIN)
 router.get(
