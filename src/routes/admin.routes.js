@@ -2,7 +2,6 @@ const express = require("express");
 const prisma = require("../config/db");
 const bcrypt = require("bcrypt");
 const { requireAuth, requireRole } = require("../middlewares/sessionAuth");
-const express = require("express");
 
 const sessionAuth = require("../middlewares/sessionAuth");
 const requireAdmin = require("../middlewares/requireAdmin");

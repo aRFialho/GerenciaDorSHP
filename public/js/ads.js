@@ -69,10 +69,6 @@ const NEO = window.NEO_THEME;
   window.__NEO_GLOW_REGISTERED__ = true;
 })();
 
-if (window.Chart && typeof Chart.register === "function") {
-  Chart.register(neoGlowPlugin);
-}
-
 function fmtMoneyBR(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
