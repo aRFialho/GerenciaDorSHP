@@ -18,7 +18,6 @@ const MODEL_ORDER = [
   "orderAddressSnapshot",
   "orderAddressChangeAlert",
   "orderItem",
-  "session",
   "adsCampaignGroup",
   "adsCampaignGroupCampaign",
 ];
@@ -39,12 +38,16 @@ function assertAdmin(req) {
 /* ---------- BigInt-safe JSON ---------- */
 function serializeForJson(value) {
   if (typeof value === "bigint") return value.toString();
+  if (value instanceof Date) return value.toISOString();
+
   if (Array.isArray(value)) return value.map(serializeForJson);
+
   if (value && typeof value === "object") {
     const out = {};
     for (const [k, v] of Object.entries(value)) out[k] = serializeForJson(v);
     return out;
   }
+
   return value;
 }
 
@@ -211,10 +214,24 @@ const DATE_KEYS = new Set([
 function reviveDates(rows) {
   return (Array.isArray(rows) ? rows : []).map((r) => {
     const o = { ...r };
+
     for (const k of Object.keys(o)) {
       if (!DATE_KEYS.has(k)) continue;
-      if (typeof o[k] === "string" && o[k]) o[k] = new Date(o[k]);
+
+      const v = o[k];
+
+      // backup antigo bugado: Date virou {}
+      if (v && typeof v === "object" && Object.keys(v).length === 0) {
+        delete o[k]; // deixa Prisma/default cuidar (quando houver default)
+        continue;
+      }
+
+      if (typeof v === "string" && v) {
+        const d = new Date(v);
+        if (!Number.isNaN(d.getTime())) o[k] = d;
+      }
     }
+
     return o;
   });
 }
