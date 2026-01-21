@@ -609,3 +609,66 @@ body:after{
 }
 .orders-alerts-item:hover{background:rgba(255,255,255,0.06)}
 .orders-alerts-empty{padding:12px;color:var(--muted)}
+/* ===== Admin DB Backup UI ===== */
+.admin-db .section-actions{align-items:center}
+
+.admin-db__grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+
+@media (max-width: 980px){
+  .admin-db__grid{grid-template-columns:1fr}
+}
+
+.admin-db__panel{
+  border:1px solid rgba(255,255,255,0.10);
+  background:rgba(0,0,0,0.14);
+  border-radius:14px;
+  padding:12px;
+}
+
+.admin-db__panel-title{
+  font-weight:1000;
+  color:rgba(255,255,255,0.92);
+  letter-spacing:0.1px;
+}
+
+.admin-db__panel-sub{margin-top:6px;font-size:12px;line-height:1.35}
+
+.admin-db__actions{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.admin-db__actions--stack{align-items:stretch}
+.admin-db__file{min-width:260px}
+
+.admin-db__hint{margin-top:10px;font-size:12px;opacity:0.85;line-height:1.35}
+
+.admin-db__panel--danger{
+  background:linear-gradient(180deg, rgba(255,90,106,0.10), rgba(0,0,0,0.14));
+}
+
+.admin-db__danger-note{
+  margin-top:10px;
+  padding:10px;
+  border-radius:12px;
+  border:1px solid rgba(255,90,106,0.30);
+  background:rgba(255,90,106,0.10);
+  color:rgba(255,230,230,0.95);
+  line-height:1.35;
+  font-size:12px;
+}
+
+.admin-db__restore-btn{
+  border-color:rgba(255,90,106,0.30);
+}
+
+.admin-db__restore-btn:hover{
+  box-shadow:0 0 0 4px rgba(255,90,106,0.10);
+  border-color:rgba(255,90,106,0.38);
+}
+
+.admin-db__msg{margin-top:10px;min-height:18px}
+.admin-db__panel{min-width:0}
+.admin-db__file{min-width:0;width:100%}
+.admin-db__actions--stack{flex-direction:column}
+.admin-root .section-card{margin-bottom:12px}

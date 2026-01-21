@@ -318,3 +318,6 @@
 #tab-ads .section-card__body{
   min-height:0;
 }
+/* Evita coluna do split esticar pela altura da outra (causa “chart gigante”) */
+#tab-ads .split{align-items:start}
+#tab-ads .split > .section-card{align-self:start}

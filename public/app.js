@@ -517,6 +517,7 @@ function renderMonthChart({
       plugins: {
         legend: { display: true, labels: { color: DASH_NEO.tick } },
         tooltip: {
+          displayColors: true,
           backgroundColor: DASH_NEO.tooltipBg,
           borderColor: DASH_NEO.tooltipBorder,
           borderWidth: 1,
@@ -653,6 +654,7 @@ function renderMonthRatioChart({
       plugins: {
         legend: { display: true, labels: { color: DASH_NEO.tick } },
         tooltip: {
+          displayColors: true,
           backgroundColor: DASH_NEO.tooltipBg,
           borderColor: DASH_NEO.tooltipBorder,
           borderWidth: 1,
@@ -766,6 +768,7 @@ function renderTodayChartCompare({
       plugins: {
         legend: { display: true, labels: { color: DASH_NEO.tick } },
         tooltip: {
+          displayColors: true,
           backgroundColor: DASH_NEO.tooltipBg,
           borderColor: DASH_NEO.tooltipBorder,
           borderWidth: 1,
@@ -2625,8 +2628,13 @@ async function loadAdmin() {
       </div>
     `;
 
-    root.innerHTML = formHtml + listHtml;
-
+    root.innerHTML = formHtml + renderAdminDbTools() + listHtml;
+    document
+      .getElementById("btnAdminDbBackup")
+      ?.addEventListener("click", adminDownloadDbBackup);
+    document
+      .getElementById("btnAdminDbRestore")
+      ?.addEventListener("click", adminRestoreDbBackup);
     // Create user
     const btnCreate = document.getElementById("admin-create-user");
     const msg = document.getElementById("admin-create-msg");
@@ -2687,6 +2695,7 @@ async function loadAdmin() {
         }
       });
     });
+
     $all("[data-edit-user]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const userId = Number(btn.getAttribute("data-edit-user"));
@@ -2767,6 +2776,136 @@ async function loadAdmin() {
       e.message,
     )}</div>`;
   }
+}
+function renderAdminDbTools() {
+  return `
+    <div class="section-card admin-db">
+      <div class="section-card__header">
+        <div>
+          <div class="section-title">Backups do banco</div>
+          <div class="muted">Exportar/Restaurar o DB inteiro em JSON (uso emergencial).</div>
+        </div>
+        <div class="section-actions">
+          <span class="badge badge--yellow">⚠️ Emergência</span>
+        </div>
+      </div>
+
+      <div class="section-card__body">
+        <div class="admin-db__grid">
+          <!-- Download -->
+          <div class="admin-db__panel">
+            <div class="admin-db__panel-title">Backup (download)</div>
+            <div class="muted admin-db__panel-sub">
+              Baixa um arquivo JSON com os dados atuais do banco.
+            </div>
+
+            <div class="admin-db__actions">
+              <button id="btnAdminDbBackup" class="btn btn-primary">Baixar backup</button>
+            </div>
+
+            <div class="muted admin-db__hint">
+              Dica: guarde em local seguro. O arquivo pode conter dados sensíveis.
+            </div>
+          </div>
+
+          <!-- Restore -->
+          <div class="admin-db__panel admin-db__panel--danger">
+            <div class="admin-db__panel-title">Restore (upload)</div>
+            <div class="muted admin-db__panel-sub">
+              Substitui o banco atual pelo conteúdo do JSON.
+            </div>
+
+            <div class="admin-db__danger-note">
+              <strong>ATENÇÃO:</strong> use apenas em caso de perda do DB. Depois, o <strong>sync normal</strong> volta a prevalecer e pode sobrescrever.
+            </div>
+
+            <div class="admin-db__actions admin-db__actions--stack">
+              <input id="adminDbRestoreFile" class="input admin-db__file" type="file" accept="application/json" />
+              <button id="btnAdminDbRestore" class="btn btn-ghost admin-db__restore-btn">Restaurar backup</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="adminDbMsg" class="muted admin-db__msg"></div>
+      </div>
+    </div>
+  `;
+}
+async function adminDownloadDbBackup() {
+  const msg = document.getElementById("adminDbMsg");
+  if (msg) msg.textContent = "Gerando backup...";
+
+  const r = await fetch("/admin/db/backup", { credentials: "include" });
+  if (!r.ok) {
+    const t = await r.text();
+    if (msg) msg.textContent = `Erro: ${t || r.status}`;
+    return;
+  }
+
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `db-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  URL.revokeObjectURL(url);
+  if (msg) msg.textContent = "";
+}
+
+async function adminRestoreDbBackup() {
+  const msg = document.getElementById("adminDbMsg");
+  const input = document.getElementById("adminDbRestoreFile");
+  const file = input?.files?.[0];
+
+  if (!file) {
+    if (msg) msg.textContent = "Selecione um arquivo .json primeiro.";
+    return;
+  }
+
+  // confirmação forte (pra evitar clique acidental)
+  openModal(
+    "Confirmar restauração",
+    `<div class="muted">Isso vai substituir o banco atual pelo conteúdo do backup.</div>
+     <div class="muted" style="margin-top:10px;">Use apenas em caso de perda do DB. O sync normal depois irá sobrescrever/atualizar com dados reais.</div>
+     <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+       <button id="btnConfirmRestore" class="btn btn-primary">Confirmar restore</button>
+       <button id="btnCancelRestore" class="btn btn-ghost">Cancelar</button>
+     </div>`,
+  );
+
+  document
+    .getElementById("btnCancelRestore")
+    ?.addEventListener("click", closeModal);
+
+  document
+    .getElementById("btnConfirmRestore")
+    ?.addEventListener("click", async () => {
+      closeModal();
+      if (msg) msg.textContent = "Restaurando backup...";
+
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const r = await fetch("/admin/db/restore", {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
+
+      const text = await r.text();
+      if (!r.ok) {
+        if (msg) msg.textContent = `Erro: ${text || r.status}`;
+        return;
+      }
+
+      if (msg)
+        msg.textContent =
+          "Backup restaurado. Recarregue as abas se necessário.";
+    });
 }
 
 async function apiPatch(path, body) {

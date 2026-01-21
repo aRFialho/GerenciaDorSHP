@@ -2,6 +2,26 @@ const express = require("express");
 const prisma = require("../config/db");
 const bcrypt = require("bcrypt");
 const { requireAuth, requireRole } = require("../middlewares/sessionAuth");
+const express = require("express");
+
+const sessionAuth = require("../middlewares/sessionAuth");
+const requireAdmin = require("../middlewares/requireAdmin");
+const AdminDbController = require("../controllers/AdminDbController");
+
+router.get("/db/backup", sessionAuth, requireAdmin, AdminDbController.backup);
+router.post(
+  "/db/restore",
+  sessionAuth,
+  requireAdmin,
+  AdminDbController.uploadMiddleware,
+  AdminDbController.restore,
+);
+router.post(
+  "/db/restore",
+  sessionAuth,
+  AdminDbController.uploadMiddleware,
+  AdminDbController.restore,
+);
 
 const router = express.Router();
 router.use(requireAuth);
@@ -27,7 +47,7 @@ router.get(
     } catch (e) {
       next(e);
     }
-  }
+  },
 );
 
 router.post(
@@ -82,7 +102,7 @@ router.post(
     } catch (e) {
       next(e);
     }
-  }
+  },
 );
 
 // Admin global (somente SUPER_ADMIN)
@@ -99,7 +119,7 @@ router.get(
     } catch (e) {
       next(e);
     }
-  }
+  },
 );
 
 router.patch(
@@ -145,7 +165,7 @@ router.patch(
     } catch (e) {
       next(e);
     }
-  }
+  },
 );
 
 router.patch(
@@ -225,7 +245,7 @@ router.patch(
     } catch (e) {
       next(e);
     }
-  }
+  },
 );
 
 router.delete(
@@ -265,7 +285,7 @@ router.delete(
     } catch (e) {
       next(e);
     }
-  }
+  },
 );
 
 module.exports = router;
