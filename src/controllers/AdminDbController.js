@@ -94,7 +94,14 @@ async function resetSequencesPostgres(tx) {
     );
   }
 }
-
+async function createManyBatched(delegate, rows, batchSize = 1000) {
+  for (let i = 0; i < rows.length; i += batchSize) {
+    await delegate.createMany({
+      data: rows.slice(i, i + batchSize),
+      skipDuplicates: false,
+    });
+  }
+}
 const AdminDbController = {
   uploadMiddleware: upload.single("file"),
 
@@ -166,13 +173,25 @@ const AdminDbController = {
 
     await prisma.$transaction(
       async (tx) => {
-        // 1) DELETE (ordem inversa)
-        for (const m of [...models].reverse()) {
-          const delegate = tx[m];
-          if (!delegate?.deleteMany)
-            throw new Error(`deleteMany indisponível: ${m}`);
-          await delegate.deleteMany();
-        }
+        // 1) TRUNCATE (Postgres) — rápido e já reseta sequences
+        await tx.$executeRawUnsafe(`
+  TRUNCATE TABLE
+    "AdsCampaignGroupCampaign",
+    "AdsCampaignGroup",
+    "OrderItem",
+    "OrderAddressChangeAlert",
+    "OrderAddressSnapshot",
+    "OrderGeoAddress",
+    "Order",
+    "ProductModel",
+    "ProductImage",
+    "Product",
+    "OAuthToken",
+    "Shop",
+    "User",
+    "Account"
+  RESTART IDENTITY CASCADE;
+`);
 
         // 2) INSERT (ordem direta)
         for (const m of models) {
@@ -185,18 +204,14 @@ const AdminDbController = {
 
           const rows = reviveDates(reviveBigInts(m, rowsRaw));
 
-          await delegate.createMany({
-            data: rows,
-            skipDuplicates: false,
-          });
+          await createManyBatched(delegate, rows, 1000);
         }
-
-        // 3) Ajusta sequences do Postgres
+        // 3) Ajusta sequences do Postgres (necessário após inserts com id explícito)
         await resetSequencesPostgres(tx);
       },
       {
         maxWait: 20000, // tempo máx. esperando conexão
-        timeout: 180000, // 3 min (ajuste conforme tamanho do DB)
+        timeout: 600000, // 10 min (ajuste conforme tamanho do DB)
       },
     );
 
