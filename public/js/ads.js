@@ -43,7 +43,12 @@ let lastCpcProductPerfRows = [];
   };
 })();
 
+// Tema Neo (fonte única)
 const NEO = window.NEO_THEME;
+
+// ✅ alias de compat (seu código usa ADS_NEO em vários pontos)
+window.ADS_NEO = window.NEO_THEME;
+const ADS_NEO = window.ADS_NEO;
 
 (function registerNeoGlowOnce() {
   if (!window.Chart || typeof Chart.register !== "function") return;
