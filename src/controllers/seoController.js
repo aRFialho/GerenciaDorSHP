@@ -349,33 +349,8 @@ async function refProducts(req, res) {
 }
 
 async function shopeeRecommendedKeywords(req, res) {
-  const itemIdRaw = String(req.query.itemId || "").trim();
-  if (!itemIdRaw) return res.status(400).json({ error: "itemId_required" });
-
-  let q = String(req.query.q || "").trim();
-
-  // ✅ fallback: se não tem keyword, usa o título do produto
-  if (!q) {
-    let itemIdBig = null;
-    try {
-      itemIdBig = BigInt(itemIdRaw);
-    } catch (_) {}
-
-    if (itemIdBig) {
-      const p = await prisma.product.findFirst({
-        where: { shopId: shop.id, itemId: itemIdBig },
-        select: { title: true },
-      });
-
-      // usa o título como base (ou parte dele)
-      q = String(p?.title || "").trim();
-    }
-
-    // opcional: limita pra não mandar string gigante
-    if (q.length > 80) q = q.slice(0, 80);
-  }
   try {
-    const shop = await resolveShop(req, req.params.shopId);
+    const shop = await resolveShop(req, req.params.shopId); // ✅ precisa existir ANTES de qualquer uso
 
     const itemId = String(req.query.itemId || "").trim();
     if (!itemId) return res.status(400).json({ error: "itemId_required" });
@@ -383,30 +358,20 @@ async function shopeeRecommendedKeywords(req, res) {
     const q = String(req.query.q || "").trim();
 
     const raw = await callAdsWithAutoRefresh({
-      shop,
+      shop, // ✅ passa shop explicitamente
       call: (accessToken) =>
         ShopeeAdsService.get_recommended_keyword_list({
           accessToken,
-          shopId: shop.shopId,
+          shopId: shop.shopId, // ✅ agora shop existe
           itemId,
           inputKeyword: q || undefined,
         }),
     });
-    if (req.query.debug === "1") {
-      return res.json(raw);
-    }
-    if (raw?.error && String(raw.error).trim() !== "") {
-      return res.status(502).json({
-        error: raw.error,
-        message: raw.message || "Shopee Ads retornou erro.",
-        request_id: raw.request_id,
-      });
-    }
+
+    // ✅ campo correto da Shopee
     const list = Array.isArray(raw?.response?.suggested_keyword_list)
       ? raw.response.suggested_keyword_list
-      : Array.isArray(raw?.response?.suggested_keywords)
-        ? raw.response.suggested_keywords
-        : [];
+      : [];
 
     const normalized = list
       .map((x) => ({
@@ -455,13 +420,11 @@ async function shopeeRecommendedKeywords(req, res) {
       },
     });
   } catch (e) {
-    const data = getShopeeErrData(e);
-    const status = e?.response?.status || e?.statusCode || 500;
-
-    return res.status(status).json({
-      error: "seo_shopee_recommended_failed",
-      message: String(e?.message || e),
-      details: data,
+    return res.status(500).json({
+      error: {
+        message: "Erro interno do servidor",
+        details: String(e?.message || e),
+      },
     });
   }
 }
