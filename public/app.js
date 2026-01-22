@@ -164,139 +164,96 @@ async function loadSeoKeywords() {
   const period = String(document.getElementById("seoPeriod")?.value || "30d");
   const msg = document.getElementById("seoMsg");
 
-  if (!q) {
+  const ref = getSeoRefProduct();
+
+  // ✅ Sem palavra: só bloqueia se não houver produto referência
+  if (!q && !ref) {
     if (msg) msg.textContent = "Digite uma palavra para buscar.";
     return;
   }
 
-  if (msg) msg.textContent = "Carregando…";
+  if (msg) msg.textContent = q ? "Carregando…" : ""; // se for só produto ref, não precisa msg
 
-  try {
-    const data = await apiGet(
-      `/seo/keywords?q=${encodeURIComponent(q)}&period=${encodeURIComponent(period)}`,
-    );
-    if (msg) {
-      msg.textContent =
-        data?.trends?.ok === false
-          ? "Trends indisponível no momento (bloqueio/consent). Exibindo sugestões do Google."
-          : "";
-    }
-    // TOP
-    renderSeoList(
-      "seoTopList",
-      (data?.related?.top || []).map((x) => ({
-        term: x.term,
-        score: Number(x.score || 0),
-        sub: "Trends • Top",
-      })),
-      {
-        rightLabelFn: (r) => String(r.score || 0),
-        barPctFn: (r) => (Number(r.score || 0) / 100) * 100,
-      },
-    );
-
-    // RISING
-    renderSeoList(
-      "seoRisingList",
-      (data?.related?.rising || []).map((x) => ({
-        term: x.term,
-        growthPct: x.growthPct,
-        sub: "Trends • Rising",
-      })),
-      {
-        rightLabelFn: (r) =>
-          r.growthPct == null
-            ? "—"
-            : Number(r.growthPct) >= 9999
-              ? "Breakout"
-              : `${r.growthPct}%`,
-      },
-    );
-
-    // UF
-    renderSeoList(
-      "seoUfList",
-      (data?.byUf || []).map((x) => ({
-        uf: x.uf,
-        interest: Number(x.interest || 0),
-        sub: "BR • UF",
-      })),
-      {
-        rightLabelFn: (r) => `${r.interest}`,
-        barPctFn: (r) => (Number(r.interest || 0) / 100) * 100,
-      },
-    );
-
-    // SUGGEST
-    renderSeoList(
-      "seoSuggestList",
-      (data?.suggestions || []).map((t) => ({ text: t, sub: "Autocomplete" })),
-      { rightLabelFn: () => "" },
-    );
-
-    if (msg) msg.textContent = "";
-  } catch (e) {
-    if (msg) msg.textContent = `Erro: ${String(e?.message || e)}`;
-  }
-  // Shopee (opcional): só roda se tiver produto referência selecionado
-  const ref = getSeoRefProduct();
-  if (!ref) {
-    // se quiser: remove o card do DOM
-    document.getElementById("seoShopeeCard")?.remove();
-  } else {
-    ensureSeoShopeeCard();
-    setText("seoShopeeMeta", `Ref #${ref.itemId}`);
-    setText("seoShopeeMsg", "Carregando recomendações Shopee...");
-
+  // 1) Trends/Suggest: só quando tem keyword
+  if (q) {
     try {
-      const sh = await apiGet(
-        `/shops/${SHOP_PATH_PLACEHOLDER}/seo/shopee-recommended-keywords?itemId=${encodeURIComponent(ref.itemId)}&q=${encodeURIComponent(q)}`,
+      const data = await apiGet(
+        `/seo/keywords?q=${encodeURIComponent(q)}&period=${encodeURIComponent(period)}`,
       );
 
-      const byVol = sh?.response?.rankings?.by_volume || [];
-      const byQual = sh?.response?.rankings?.by_quality || [];
-      const rankVol = sh?.response?.rankings?.rank_by_volume;
-      const rankQual = sh?.response?.rankings?.rank_by_quality;
-
-      const maxVol = Math.max(
-        1,
-        ...byVol.map((x) => Number(x.search_volume || 0)),
-      );
-
-      setText(
-        "seoShopeeMsg",
-        `Colocação de "${q}": volume ${rankVol ? "#" + rankVol : "—"} • qualidade ${rankQual ? "#" + rankQual : "—"}`,
-      );
+      if (msg) {
+        msg.textContent =
+          data?.trends?.ok === false
+            ? "Trends indisponível no momento (bloqueio/consent). Exibindo sugestões do Google."
+            : "";
+      }
 
       renderSeoList(
-        "seoShopeeVolList",
-        byVol.slice(0, 20).map((x) => ({
-          term: x.keyword,
-          sub: `Vol: ${Number(x.search_volume || 0).toLocaleString("pt-BR")} • QS: ${x.quality_score ?? "—"} • Bid: ${x.suggested_bid != null ? fmtBRL(x.suggested_bid) : "—"}`,
-          vol: Number(x.search_volume || 0),
+        "seoTopList",
+        (data?.related?.top || []).map((x) => ({
+          term: x.term,
+          score: Number(x.score || 0),
+          sub: "Trends • Top",
         })),
         {
-          rightLabelFn: () => "",
-          barPctFn: (r) => (Number(r.vol || 0) / maxVol) * 100,
+          rightLabelFn: (r) => String(r.score || 0),
+          barPctFn: (r) => (Number(r.score || 0) / 100) * 100,
         },
       );
 
       renderSeoList(
-        "seoShopeeQualList",
-        byQual.slice(0, 20).map((x) => ({
-          term: x.keyword,
-          sub: `QS: ${x.quality_score ?? "—"} • Vol: ${Number(x.search_volume || 0).toLocaleString("pt-BR")} • Bid: ${x.suggested_bid != null ? fmtBRL(x.suggested_bid) : "—"}`,
-          qs: Number(x.quality_score || 0),
+        "seoRisingList",
+        (data?.related?.rising || []).map((x) => ({
+          term: x.term,
+          growthPct: x.growthPct,
+          sub: "Trends • Rising",
         })),
-        { rightLabelFn: () => "" },
+        {
+          rightLabelFn: (r) =>
+            r.growthPct == null
+              ? "—"
+              : Number(r.growthPct) >= 9999
+                ? "Breakout"
+                : `${r.growthPct}%`,
+        },
       );
+
+      renderSeoList(
+        "seoUfList",
+        (data?.byUf || []).map((x) => ({
+          uf: x.uf,
+          interest: Number(x.interest || 0),
+          sub: "BR • UF",
+        })),
+        {
+          rightLabelFn: (r) => `${r.interest}`,
+          barPctFn: (r) => (Number(r.interest || 0) / 100) * 100,
+        },
+      );
+
+      renderSeoList(
+        "seoSuggestList",
+        (data?.suggestions || []).map((t) => ({
+          text: t,
+          sub: "Autocomplete",
+        })),
+        {
+          rightLabelFn: () => "",
+        },
+      );
+
+      if (msg && data?.trends?.ok !== false) msg.textContent = "";
     } catch (e) {
-      setText("seoShopeeMsg", `Erro Shopee: ${String(e?.message || e)}`);
-      const a = document.getElementById("seoShopeeVolList");
-      const b = document.getElementById("seoShopeeQualList");
-      if (a) a.innerHTML = `<div class="muted">Sem dados.</div>`;
-      if (b) b.innerHTML = `<div class="muted">Sem dados.</div>`;
+      if (msg) msg.textContent = `Erro: ${String(e?.message || e)}`;
     }
+  }
+
+  // 2) Shopee: quando tem produto referência (com ou sem keyword)
+  if (ref) {
+    await loadSeoShopeeRecommendations({ ref, q });
+  } else {
+    // se não tiver ref, pode remover o card ou deixar vazio:
+    document.getElementById("seoShopeeCard")?.remove();
   }
 }
 
@@ -476,6 +433,9 @@ function renderSeoRefResults(items) {
       setSeoRefProduct(it);
       closeModal();
       renderSeoRefPill();
+
+      // ✅ busca imediatamente as recomendadas do item (sem keyword)
+      loadSeoShopeeRecommendations({ ref: getSeoRefProduct(), q: "" });
     });
   });
 }
@@ -511,6 +471,74 @@ function ensureSeoShopeeCard() {
 
   // coloca o card como primeiro da grid
   grid.insertBefore(card, grid.firstChild);
+}
+
+async function loadSeoShopeeRecommendations({ ref, q }) {
+  ensureSeoShopeeCard();
+
+  if (!ref?.itemId) {
+    clearSeoShopeeCard();
+    return;
+  }
+
+  setText("seoShopeeMeta", `Ref #${ref.itemId}`);
+  setText("seoShopeeMsg", "Carregando recomendações Shopee...");
+
+  try {
+    const sh = await apiGet(
+      `/shops/${SHOP_PATH_PLACEHOLDER}/seo/shopee-recommended-keywords?itemId=${encodeURIComponent(ref.itemId)}&q=${encodeURIComponent(q || "")}`,
+    );
+
+    // ✅ Shopee pode devolver error/message mesmo com 200
+    if (sh?.error && String(sh.error).trim() !== "") {
+      throw new Error(`${sh.error}${sh?.message ? `: ${sh.message}` : ""}`);
+    }
+
+    const byVol = sh?.response?.rankings?.by_volume || [];
+    const byQual = sh?.response?.rankings?.by_quality || [];
+    const rankVol = sh?.response?.rankings?.rank_by_volume;
+    const rankQual = sh?.response?.rankings?.rank_by_quality;
+
+    const maxVol = Math.max(
+      1,
+      ...byVol.map((x) => Number(x.search_volume || 0)),
+    );
+
+    // Mensagem varia conforme tem keyword ou não
+    if (q) {
+      setText(
+        "seoShopeeMsg",
+        `Colocação de "${q}": volume ${rankVol ? "#" + rankVol : "—"} • qualidade ${rankQual ? "#" + rankQual : "—"}`,
+      );
+    } else {
+      setText("seoShopeeMsg", "Recomendadas para o produto referência.");
+    }
+
+    renderSeoList(
+      "seoShopeeVolList",
+      byVol.slice(0, 20).map((x) => ({
+        term: x.keyword,
+        sub: `Vol: ${Number(x.search_volume || 0).toLocaleString("pt-BR")} • QS: ${x.quality_score ?? "—"} • Bid: ${x.suggested_bid != null ? fmtBRL(x.suggested_bid) : "—"}`,
+        vol: Number(x.search_volume || 0),
+      })),
+      {
+        rightLabelFn: () => "",
+        barPctFn: (r) => (Number(r.vol || 0) / maxVol) * 100,
+      },
+    );
+
+    renderSeoList(
+      "seoShopeeQualList",
+      byQual.slice(0, 20).map((x) => ({
+        term: x.keyword,
+        sub: `QS: ${x.quality_score ?? "—"} • Vol: ${Number(x.search_volume || 0).toLocaleString("pt-BR")} • Bid: ${x.suggested_bid != null ? fmtBRL(x.suggested_bid) : "—"}`,
+      })),
+      { rightLabelFn: () => "" },
+    );
+  } catch (e) {
+    setText("seoShopeeMsg", `Erro Shopee: ${String(e?.message || e)}`);
+    clearSeoShopeeCard();
+  }
 }
 
 function clearSeoShopeeCard() {

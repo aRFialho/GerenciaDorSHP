@@ -196,3 +196,8 @@
   #tab-seo .seo-bar>div,
   #tab-seo .seo-chip{transition:none}
 }
+/* SEO: produto referência */
+.seo-ref-pill .badge { display:flex; align-items:center; gap:8px; }
+.seo-ref-result { cursor:pointer; transition: transform .08s ease; }
+.seo-ref-result:hover { transform: translateY(-1px); }
+.seo-ref-thumb { width:44px; height:44px; border-radius:10px; object-fit:cover; }

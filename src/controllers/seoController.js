@@ -367,7 +367,13 @@ async function shopeeRecommendedKeywords(req, res) {
           inputKeyword: q || undefined,
         }),
     });
-
+    if (raw?.error && String(raw.error).trim() !== "") {
+      return res.status(502).json({
+        error: raw.error,
+        message: raw.message || "Shopee Ads retornou erro.",
+        request_id: raw.request_id,
+      });
+    }
     const list = Array.isArray(raw?.response?.suggested_keywords)
       ? raw.response.suggested_keywords
       : [];
