@@ -266,14 +266,19 @@ async function refreshAndReloadAccessToken({ dbShopId, shopeeShopId }) {
 }
 
 async function compare(req, res) {
+  // ✅ declara fora do try para o catch conseguir acessar
+  let terms = [];
+  let period = "30d";
+  let timeframe = null;
+  let key = null;
+
   try {
     const rawTerms = String(req.query.terms || "").trim();
-    const period = String(req.query.period || "30d");
+    period = String(req.query.period || "30d");
 
     if (!rawTerms) return res.status(400).json({ error: "terms_required" });
 
-    // aceita "a,b,c" ou "a | b | c"
-    const terms = rawTerms
+    terms = rawTerms
       .split(/[,\|]/g)
       .map((s) => String(s || "").trim())
       .filter(Boolean)
@@ -283,15 +288,15 @@ async function compare(req, res) {
       return res.status(400).json({ error: "min_2_terms_required" });
     }
 
-    const timeframe = timeframeFromPeriod(period);
+    timeframe = timeframeFromPeriod(period);
     const geo = "BR";
 
-    const key = `cmp:v1:${terms.join("|").toLowerCase()}:${period}`;
+    key = `cmp:v1:${terms.join("|").toLowerCase()}:${period}`;
     const cached = cacheGet(key);
     if (cached) return res.json(cached);
 
     const raw = await googleTrends.interestOverTime({
-      keyword: terms, // <= suporta array (comparação)
+      keyword: terms,
       geo,
       timeframe,
       hl: "pt-BR",
@@ -304,7 +309,7 @@ async function compare(req, res) {
     const series = terms.map((t, idx) => ({
       term: t,
       points: timeline.map((row) => ({
-        time: Number(row?.time || 0) * 1000, // ms
+        time: Number(row?.time || 0) * 1000,
         value: Number(row?.value?.[idx] ?? 0),
       })),
     }));
@@ -331,13 +336,12 @@ async function compare(req, res) {
 
     cacheSet(key, out, 15 * 60 * 1000);
     res.set("Cache-Control", "no-store");
-    res.json(out);
+    return res.json(out);
   } catch (e) {
     const msg = String(e?.message || e);
 
     const blocked =
       msg.includes("returned_html_blocked") ||
-      msg.startsWith("interestOverTime_returned_html_blocked") ||
       msg.includes("captcha") ||
       msg.includes("consent") ||
       msg.includes("429");
@@ -352,7 +356,8 @@ async function compare(req, res) {
         summary: {},
         message: "Google Trends indisponível no momento (bloqueio/consent).",
       };
-      cacheSet(key, out, 10 * 60 * 1000); // 10 min
+
+      if (key) cacheSet(key, out, 10 * 60 * 1000);
       res.set("Cache-Control", "no-store");
       return res.json(out);
     }

@@ -126,8 +126,14 @@ async function runSeoCompare() {
       if (msg)
         msg.textContent =
           data?.message || "Google Trends indisponível no momento.";
-      if (SEO_GOOGLE_CMP_CHART) SEO_GOOGLE_CMP_CHART.destroy();
-      if (SEO_GOOGLE_CMP_BARS) SEO_GOOGLE_CMP_BARS.destroy();
+      if (SEO_GOOGLE_CMP_CHART) {
+        SEO_GOOGLE_CMP_CHART.destroy();
+        SEO_GOOGLE_CMP_CHART = null;
+      }
+      if (SEO_GOOGLE_CMP_BARS) {
+        SEO_GOOGLE_CMP_BARS.destroy();
+        SEO_GOOGLE_CMP_BARS = null;
+      }
       const b = document.getElementById("seoCmpWinner");
       if (b) {
         b.className = "badge badge--gray";
@@ -139,6 +145,19 @@ async function runSeoCompare() {
     const series = data?.series || [];
     if (!terms.length || !series.length) {
       if (msg) msg.textContent = "Sem dados para comparar.";
+      if (SEO_GOOGLE_CMP_CHART) {
+        SEO_GOOGLE_CMP_CHART.destroy();
+        SEO_GOOGLE_CMP_CHART = null;
+      }
+      if (SEO_GOOGLE_CMP_BARS) {
+        SEO_GOOGLE_CMP_BARS.destroy();
+        SEO_GOOGLE_CMP_BARS = null;
+      }
+      const b = document.getElementById("seoCmpWinner");
+      if (b) {
+        b.className = "badge badge--gray";
+        b.textContent = "—";
+      }
       return;
     }
 
@@ -197,12 +216,6 @@ async function runSeoCompare() {
       winnerEl.textContent = winner
         ? `Top: ${winner.term} (${winner.score})`
         : "—";
-    }
-
-    if (msg) {
-      msg.textContent = ranked.length
-        ? `Maior relevância média no período: "${ranked[0].term}" (média ${ranked[0].avg}).`
-        : "";
     }
     // --- gráfico 2: barras avg e max ---
     const labels2 = terms.map((t) => wrapChartLabel(t, 16));
