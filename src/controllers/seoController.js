@@ -402,9 +402,11 @@ async function shopeeRecommendedKeywords(req, res) {
         request_id: raw.request_id,
       });
     }
-    const list = Array.isArray(raw?.response?.suggested_keywords)
-      ? raw.response.suggested_keywords
-      : [];
+    const list = Array.isArray(raw?.response?.suggested_keyword_list)
+      ? raw.response.suggested_keyword_list
+      : Array.isArray(raw?.response?.suggested_keywords)
+        ? raw.response.suggested_keywords
+        : [];
 
     const normalized = list
       .map((x) => ({

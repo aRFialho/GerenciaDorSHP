@@ -537,7 +537,10 @@ async function loadSeoShopeeRecommendations({ ref, q }) {
     );
   } catch (e) {
     setText("seoShopeeMsg", `Erro Shopee: ${String(e?.message || e)}`);
-    clearSeoShopeeCard();
+    const a = document.getElementById("seoShopeeVolList");
+    const b = document.getElementById("seoShopeeQualList");
+    if (a) a.innerHTML = `<div class="muted">Sem dados.</div>`;
+    if (b) b.innerHTML = `<div class="muted">Sem dados.</div>`;
   }
 }
 
