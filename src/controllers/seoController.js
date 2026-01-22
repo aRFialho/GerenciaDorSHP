@@ -21,6 +21,13 @@ function timeframeFromPeriod(period) {
   return "today 1-m";
 }
 
+function ttlForPeriod(period) {
+  if (period === "7d") return 60 * 60 * 1000; // 1h
+  if (period === "30d") return 6 * 60 * 60 * 1000; // 6h
+  if (period === "90d") return 24 * 60 * 60 * 1000; // 24h
+  return 6 * 60 * 60 * 1000; // default 6h
+}
+
 // cache in-memory simples (MVP)
 const CACHE = new Map(); // key -> { exp, data }
 function cacheGet(key) {
@@ -35,7 +42,55 @@ function cacheGet(key) {
 function cacheSet(key, data, ttlMs) {
   CACHE.set(key, { exp: Date.now() + ttlMs, data });
 }
+// --- Trends hardening: lock + breaker + rate limit ---
 
+let TRENDS_LOCK = Promise.resolve();
+
+async function withTrendsLock(fn) {
+  const prev = TRENDS_LOCK;
+  let release;
+  TRENDS_LOCK = new Promise((r) => (release = r));
+  await prev;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
+const RL = new Map(); // key -> { resetAt, count }
+function rateLimit(key, max, windowMs) {
+  const now = Date.now();
+  const it = RL.get(key);
+  if (!it || now > it.resetAt) {
+    RL.set(key, { resetAt: now + windowMs, count: 1 });
+    return true;
+  }
+  if (it.count >= max) return false;
+  it.count += 1;
+  return true;
+}
+
+function isTrendsBlockedError(msg) {
+  const s = String(msg || "").toLowerCase();
+  return (
+    s.includes("returned_html_blocked") ||
+    s.includes("captcha") ||
+    s.includes("consent") ||
+    s.includes("429") ||
+    s.includes("too many requests")
+  );
+}
+
+function blockKey(name, geo, timeframe) {
+  return `trends_block:v1:${name}:${geo}:${timeframe || "na"}`;
+}
+
+function nextBlockMs(prevMs) {
+  if (!prevMs) return 10 * 60 * 1000; // 10 min
+  if (prevMs < 30 * 60 * 1000) return 30 * 60 * 1000; // 30 min
+  return 60 * 60 * 1000; // 60 min
+}
 // UF map (Trends pode devolver nomes por extenso dependendo do retorno)
 const UF_MAP = new Map([
   ["acre", "AC"],
@@ -107,6 +162,16 @@ async function suggest(req, res) {
 }
 
 async function keywords(req, res) {
+  const ip =
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "na";
+
+  if (!rateLimit(`kw:${ip}`, 20, 60 * 1000)) {
+    return res.status(429).json({
+      error: "rate_limited",
+      message: "Aguarde um pouco e tente novamente.",
+    });
+  }
+
   try {
     const q = String(req.query.q || "").trim();
     const period = String(req.query.period || "30d");
@@ -115,11 +180,14 @@ async function keywords(req, res) {
     const timeframe = timeframeFromPeriod(period);
     const geo = "BR";
 
+    const bKey = blockKey("keywords", geo, timeframe);
+    const blockedPayload = cacheGet(bKey);
+
     const key = `kw:v1:${q.toLowerCase()}:${period}`;
     const cached = cacheGet(key);
     if (cached) return res.json(cached);
 
-    // 3) Sugestões (Autocomplete) — sempre tenta garantir algo útil
+    // Sugestões (Autocomplete) — sempre tenta garantir algo útil
     const sugKey = `suggest:v1:${q.toLowerCase()}`;
     let sug = cacheGet(sugKey);
     if (!sug) {
@@ -134,39 +202,75 @@ async function keywords(req, res) {
       cacheSet(sugKey, sug, 60 * 60 * 1000); // 1h
     }
 
-    // Trends: best-effort (pode falhar por bloqueio/consent/captcha)
+    // Trends: best-effort
     let trendsOk = true;
     let trendsError = null;
 
     let related = null;
-    try {
-      const relatedRaw = await googleTrends.relatedQueries({
-        keyword: q,
-        geo,
-        timeframe,
-        hl: "pt-BR",
-        timezone: 180, // Brasil (minutos). Se preferir, pode remover.
-      });
-      related = safeJsonParse("relatedQueries", relatedRaw);
-    } catch (e) {
-      trendsOk = false;
-      trendsError = String(e?.message || e);
-    }
-
     let byRegion = null;
-    try {
-      const byRegionRaw = await googleTrends.interestByRegion({
-        keyword: q,
-        geo,
-        timeframe,
-        resolution: "REGION",
-        hl: "pt-BR",
-        timezone: 180,
-      });
-      byRegion = safeJsonParse("interestByRegion", byRegionRaw);
-    } catch (e) {
+
+    // se já está bloqueado (breaker), não chama Trends
+    if (blockedPayload) {
       trendsOk = false;
-      trendsError = trendsError || String(e?.message || e);
+      trendsError = "trends_blocked_cached";
+    } else {
+      let blockedNow = false;
+
+      // 1) relatedQueries
+      try {
+        const relatedRaw = await withTrendsLock(() =>
+          googleTrends.relatedQueries({
+            keyword: q,
+            geo,
+            timeframe,
+            hl: "pt-BR",
+            timezone: 180,
+          }),
+        );
+        related = safeJsonParse("relatedQueries", relatedRaw);
+      } catch (e) {
+        trendsOk = false;
+        trendsError = String(e?.message || e);
+
+        if (isTrendsBlockedError(trendsError)) {
+          blockedNow = true;
+          const prev = cacheGet(bKey);
+          const prevMs = prev?._blockMs || 0;
+          const ms = nextBlockMs(prevMs);
+          cacheSet(bKey, { _blockMs: ms, _blockedUntil: Date.now() + ms }, ms);
+        }
+      }
+
+      // 2) interestByRegion (só tenta se não bloqueou no passo anterior)
+      if (!blockedNow) {
+        try {
+          const byRegionRaw = await withTrendsLock(() =>
+            googleTrends.interestByRegion({
+              keyword: q,
+              geo,
+              timeframe,
+              resolution: "REGION",
+              hl: "pt-BR",
+              timezone: 180,
+            }),
+          );
+          byRegion = safeJsonParse("interestByRegion", byRegionRaw);
+        } catch (e) {
+          trendsOk = false;
+          trendsError = trendsError || String(e?.message || e);
+
+          if (isTrendsBlockedError(trendsError)) {
+            const prev = cacheGet(bKey);
+            const prevMs = prev?._blockMs || 0;
+            const ms = nextBlockMs(prevMs);
+            cacheSet(
+              bKey,
+              { _blockMs: ms, _blockedUntil: Date.now() + ms },
+              ms,
+            );
+          }
+        }
+      }
     }
 
     const top =
@@ -224,13 +328,15 @@ async function keywords(req, res) {
       byUf: ufItems,
     };
 
-    cacheSet(key, out, 15 * 60 * 1000); // 15min
+    // cache mais agressivo ajuda MUITO a evitar bloqueio
+    cacheSet(key, out, ttlForPeriod(period));
     res.set("Cache-Control", "no-store");
-    res.json(out);
+    return res.json(out);
   } catch (e) {
-    res
-      .status(500)
-      .json({ error: "seo_keywords_failed", message: String(e?.message || e) });
+    return res.status(500).json({
+      error: "seo_keywords_failed",
+      message: String(e?.message || e),
+    });
   }
 }
 
@@ -294,14 +400,30 @@ async function compare(req, res) {
     key = `cmp:v1:${terms.join("|").toLowerCase()}:${period}`;
     const cached = cacheGet(key);
     if (cached) return res.json(cached);
-
-    const raw = await googleTrends.interestOverTime({
-      keyword: terms,
-      geo,
-      timeframe,
-      hl: "pt-BR",
-      timezone: 180,
-    });
+    const bKey = blockKey("compare", geo, timeframe);
+    const blockedPayload = cacheGet(bKey);
+    if (blockedPayload) {
+      const out = {
+        terms,
+        period,
+        timeframe,
+        trends: { ok: false, error: "trends_blocked_cached" },
+        series: [],
+        summary: {},
+        message: "Google Trends indisponível no momento (bloqueio/consent).",
+      };
+      cacheSet(key, out, 10 * 60 * 1000);
+      return res.json(out);
+    }
+    const raw = await withTrendsLock(() =>
+      googleTrends.interestOverTime({
+        keyword: terms,
+        geo,
+        timeframe,
+        hl: "pt-BR",
+        timezone: 180,
+      }),
+    );
 
     const parsed = safeJsonParse("interestOverTime", raw);
     const timeline = parsed?.default?.timelineData || [];
@@ -334,7 +456,7 @@ async function compare(req, res) {
       summary,
     };
 
-    cacheSet(key, out, 15 * 60 * 1000);
+    cacheSet(key, out, ttlForPeriod(period));
     res.set("Cache-Control", "no-store");
     return res.json(out);
   } catch (e) {
@@ -346,7 +468,7 @@ async function compare(req, res) {
       msg.includes("consent") ||
       msg.includes("429");
 
-    if (blocked) {
+    if (isTrendsBlockedError(msg)) {
       const out = {
         terms,
         period,
@@ -357,7 +479,16 @@ async function compare(req, res) {
         message: "Google Trends indisponível no momento (bloqueio/consent).",
       };
 
-      if (key) cacheSet(key, out, 10 * 60 * 1000);
+      // seta o breaker
+      const bKey = blockKey("compare", "BR", timeframe);
+      const prev = cacheGet(bKey);
+      const prevMs = prev?._blockMs || 0;
+      const ms = nextBlockMs(prevMs);
+      cacheSet(bKey, { _blockMs: ms, _blockedUntil: Date.now() + ms }, ms);
+
+      // cacheia o resultado "blocked" (TTL dinâmico)
+      if (key) cacheSet(key, out, ttlBlocked(period));
+
       res.set("Cache-Control", "no-store");
       return res.json(out);
     }
@@ -389,6 +520,13 @@ async function callAdsWithAutoRefresh({ shop, call }) {
     if (!newToken) throw e;
     return await call(newToken);
   }
+}
+
+function ttlBlocked(period) {
+  if (period === "7d") return 10 * 60 * 1000;
+  if (period === "30d") return 20 * 60 * 1000;
+  if (period === "90d") return 30 * 60 * 1000;
+  return 20 * 60 * 1000;
 }
 
 function safeBigInt(q) {
