@@ -349,6 +349,31 @@ async function refProducts(req, res) {
 }
 
 async function shopeeRecommendedKeywords(req, res) {
+  const itemIdRaw = String(req.query.itemId || "").trim();
+  if (!itemIdRaw) return res.status(400).json({ error: "itemId_required" });
+
+  let q = String(req.query.q || "").trim();
+
+  // ✅ fallback: se não tem keyword, usa o título do produto
+  if (!q) {
+    let itemIdBig = null;
+    try {
+      itemIdBig = BigInt(itemIdRaw);
+    } catch (_) {}
+
+    if (itemIdBig) {
+      const p = await prisma.product.findFirst({
+        where: { shopId: shop.id, itemId: itemIdBig },
+        select: { title: true },
+      });
+
+      // usa o título como base (ou parte dele)
+      q = String(p?.title || "").trim();
+    }
+
+    // opcional: limita pra não mandar string gigante
+    if (q.length > 80) q = q.slice(0, 80);
+  }
   try {
     const shop = await resolveShop(req, req.params.shopId);
 
@@ -367,6 +392,9 @@ async function shopeeRecommendedKeywords(req, res) {
           inputKeyword: q || undefined,
         }),
     });
+    if (req.query.debug === "1") {
+      return res.json(raw);
+    }
     if (raw?.error && String(raw.error).trim() !== "") {
       return res.status(502).json({
         error: raw.error,
