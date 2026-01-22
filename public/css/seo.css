@@ -201,3 +201,46 @@
 .seo-ref-result { cursor:pointer; transition: transform .08s ease; }
 .seo-ref-result:hover { transform: translateY(-1px); }
 .seo-ref-thumb { width:44px; height:44px; border-radius:10px; object-fit:cover; }
+.seo-view-head{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.seo-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width: 900px){.seo-choice-grid{grid-template-columns:1fr}}
+
+.seo-choice-card{
+  border:1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  border-radius:16px;
+  padding:18px;
+  text-align:left;
+  cursor:pointer;
+  transition: transform .08s ease, border-color .08s ease, background .08s ease;
+}
+.seo-choice-card:hover{
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+}
+
+.seo-choice-card img{
+  width:100%;
+  height:160px;        /* ✅ mesmo tamanho pros dois */
+  object-fit: contain; /* mantém logo bonita sem cortar */
+  border-radius:12px;
+  background: rgba(0,0,0,0.12);
+  padding:10px;
+}
+
+.seo-choice-title{font-weight:900;font-size:18px;margin-top:12px}
+.seo-choice-sub{margin-top:6px}
+/* --- ShopeeTrends: badges de status --- */
+.badge--ok{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);color:rgba(195,255,220,.95)}
+.badge--warn{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.35);color:rgba(255,235,190,.95)}
+.badge--danger{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35);color:rgba(255,205,205,.95)}
+
+/* --- listas: não estourar a tela --- */
+.seo-list{max-height:340px;overflow:auto;padding-right:6px}
+
+/* scrollbar discreta (webkit) */
+.seo-list::-webkit-scrollbar{width:10px}
+.seo-list::-webkit-scrollbar-track{background:rgba(255,255,255,0.04);border-radius:999px}
+.seo-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.16);border-radius:999px}
+.seo-list::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.22)}

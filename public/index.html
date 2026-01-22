@@ -1132,87 +1132,156 @@
           <div class="page-title">
             <h2>Palavras‑chave & SEO</h2>
             <div class="page-subtitle muted">
-              Ideias + relevância (Trends) + interesse por UF (0–100).
+              Google Trends e ShopeeTrends separados.
             </div>
           </div>
 
-          <div class="section-card">
-            <div class="section-card__header">
-              <div>
-                <div class="section-title">Buscar</div>
-                <div class="muted">
-                  Digite uma palavra e veja relacionadas + ranking por UF.
-                </div>
-              </div>
-
-              <div
-                class="section-actions"
-                style="
-                  display: flex;
-                  gap: 10px;
-                  flex-wrap: wrap;
-                  align-items: flex-end;
-                "
+          <!-- VIEW: HOME (seleção) -->
+          <div id="seoHome" class="seo-view">
+            <div class="seo-choice-grid">
+              <button
+                id="btnSeoOpenGoogle"
+                class="seo-choice-card"
+                type="button"
               >
-                <div class="field">
-                  <label class="muted" for="seoQ">Palavra</label>
-                  <input
-                    id="seoQ"
-                    class="input"
-                    placeholder="Ex.: tênis feminino"
-                  />
+                <img
+                  src="https://res.cloudinary.com/dhqxp3tuo/image/upload/v1769087587/imagem_2026-01-22_100752828_hglga2.png"
+                  alt="Google Trends"
+                />
+                <div class="seo-choice-title">Google Trends</div>
+                <div class="seo-choice-sub muted">
+                  Relacionadas, Rising, UF e Autocomplete
                 </div>
-                <div class="field">
-                  <label class="muted" for="seoPeriod">Período</label>
-                  <select id="seoPeriod" class="select">
-                    <option value="7d">7d</option>
-                    <option value="30d" selected>30d</option>
-                    <option value="90d">90d</option>
-                  </select>
+              </button>
+
+              <button
+                id="btnSeoOpenShopee"
+                class="seo-choice-card"
+                type="button"
+              >
+                <img
+                  src="https://res.cloudinary.com/dhqxp3tuo/image/upload/v1769087664/imagem_2026-01-22_100911200_lmgd7m.png"
+                  alt="ShopeeTrends"
+                />
+                <div class="seo-choice-title">ShopeeTrends</div>
+                <div class="seo-choice-sub muted">
+                  Keywords recomendadas + competitividade + gráficos
                 </div>
-                <button id="btnSeoSearch" class="btn btn-primary">
-                  Buscar
-                </button>
-              </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- VIEW: GOOGLE -->
+          <div id="seoGoogleView" class="seo-view" style="display: none">
+            <div class="seo-view-head">
+              <button
+                id="btnSeoBackFromGoogle"
+                class="btn btn-ghost"
+                type="button"
+              >
+                ← Voltar
+              </button>
+              <div class="muted">Google Trends</div>
             </div>
 
-            <div class="section-card__body">
-              <div id="seoMsg" class="muted"></div>
-
-              <div class="seo-grid">
-                <div class="seo-card">
-                  <div class="seo-card__head">
-                    <div class="seo-card__title">Relacionadas (Top)</div>
-                    <div class="seo-card__right muted">Relevância</div>
+            <!-- Seu card atual de "Buscar" -->
+            <div class="section-card">
+              <div class="section-card__header">
+                <div>
+                  <div class="section-title">Buscar</div>
+                  <div class="muted">
+                    Digite uma palavra e veja relacionadas + ranking por UF.
                   </div>
-                  <div id="seoTopList" class="seo-list"></div>
                 </div>
 
-                <div class="seo-card">
-                  <div class="seo-card__head">
-                    <div class="seo-card__title">Relacionadas (Rising)</div>
-                    <div class="seo-card__right muted">Crescimento</div>
+                <div
+                  class="section-actions"
+                  style="
+                    display: flex;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                    align-items: flex-end;
+                  "
+                >
+                  <div class="field">
+                    <label class="muted" for="seoQ">Palavra</label>
+                    <input
+                      id="seoQ"
+                      class="input"
+                      placeholder="Ex.: tênis feminino"
+                    />
                   </div>
-                  <div id="seoRisingList" class="seo-list"></div>
+                  <div class="field">
+                    <label class="muted" for="seoPeriod">Período</label>
+                    <select id="seoPeriod" class="select">
+                      <option value="7d">7d</option>
+                      <option value="30d" selected>30d</option>
+                      <option value="90d">90d</option>
+                    </select>
+                  </div>
+                  <button id="btnSeoSearch" class="btn btn-primary">
+                    Buscar
+                  </button>
                 </div>
+              </div>
 
-                <div class="seo-card">
-                  <div class="seo-card__head">
-                    <div class="seo-card__title">Interesse por UF</div>
-                    <div class="seo-card__right muted">Índice 0–100</div>
-                  </div>
-                  <div id="seoUfList" class="seo-list"></div>
-                </div>
+              <div class="section-card__body">
+                <div id="seoMsg" class="muted"></div>
 
-                <div class="seo-card">
-                  <div class="seo-card__head">
-                    <div class="seo-card__title">Sugestões (Autocomplete)</div>
-                    <div class="seo-card__right muted">Ideias</div>
+                <div class="seo-grid">
+                  <div class="seo-card">
+                    <div class="seo-card__head">
+                      <div class="seo-card__title">Relacionadas (Top)</div>
+                      <div class="seo-card__right muted">Relevância</div>
+                    </div>
+                    <div id="seoTopList" class="seo-list"></div>
                   </div>
-                  <div id="seoSuggestList" class="seo-list"></div>
+
+                  <div class="seo-card">
+                    <div class="seo-card__head">
+                      <div class="seo-card__title">Relacionadas (Rising)</div>
+                      <div class="seo-card__right muted">Crescimento</div>
+                    </div>
+                    <div id="seoRisingList" class="seo-list"></div>
+                  </div>
+
+                  <div class="seo-card">
+                    <div class="seo-card__head">
+                      <div class="seo-card__title">Interesse por UF</div>
+                      <div class="seo-card__right muted">Índice 0–100</div>
+                    </div>
+                    <div id="seoUfList" class="seo-list"></div>
+                  </div>
+
+                  <div class="seo-card">
+                    <div class="seo-card__head">
+                      <div class="seo-card__title">
+                        Sugestões (Autocomplete)
+                      </div>
+                      <div class="seo-card__right muted">Ideias</div>
+                    </div>
+                    <div id="seoSuggestList" class="seo-list"></div>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- VIEW: SHOPEE -->
+          <div id="seoShopeeView" class="seo-view" style="display: none">
+            <div class="seo-view-head">
+              <button
+                id="btnSeoBackFromShopee"
+                class="btn btn-ghost"
+                type="button"
+              >
+                ← Voltar
+              </button>
+              <div class="muted">ShopeeTrends</div>
+            </div>
+
+            <!-- Aqui fica seu bloco Shopee (vamos renderizar via JS) -->
+            <div id="seoShopeeRoot"></div>
           </div>
         </section>
       </main>

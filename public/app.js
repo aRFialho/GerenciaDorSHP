@@ -118,7 +118,7 @@ function initTabs() {
       if (tab === "admin") loadAdmin();
       if (tab === "geo-sales") loadGeoSales();
       if (tab === "dashboard") loadDashboard();
-      if (tab === "seo") loadSeoKeywords();
+      if (tab === "seo") openSeoHome();
     });
   });
 }
@@ -164,109 +164,223 @@ async function loadSeoKeywords() {
   const period = String(document.getElementById("seoPeriod")?.value || "30d");
   const msg = document.getElementById("seoMsg");
 
-  const ref = getSeoRefProduct();
-
-  // ✅ Sem palavra: só bloqueia se não houver produto referência
-  if (!q && !ref) {
+  if (!q) {
     if (msg) msg.textContent = "Digite uma palavra para buscar.";
     return;
   }
 
-  if (msg) msg.textContent = q ? "Carregando…" : ""; // se for só produto ref, não precisa msg
+  if (msg) msg.textContent = "Carregando…";
 
-  // 1) Trends/Suggest: só quando tem keyword
-  if (q) {
-    try {
-      const data = await apiGet(
-        `/seo/keywords?q=${encodeURIComponent(q)}&period=${encodeURIComponent(period)}`,
-      );
+  try {
+    const data = await apiGet(
+      `/seo/keywords?q=${encodeURIComponent(q)}&period=${encodeURIComponent(period)}`,
+    );
 
-      if (msg) {
-        msg.textContent =
-          data?.trends?.ok === false
-            ? "Trends indisponível no momento (bloqueio/consent). Exibindo sugestões do Google."
-            : "";
-      }
-
-      renderSeoList(
-        "seoTopList",
-        (data?.related?.top || []).map((x) => ({
-          term: x.term,
-          score: Number(x.score || 0),
-          sub: "Trends • Top",
-        })),
-        {
-          rightLabelFn: (r) => String(r.score || 0),
-          barPctFn: (r) => (Number(r.score || 0) / 100) * 100,
-        },
-      );
-
-      renderSeoList(
-        "seoRisingList",
-        (data?.related?.rising || []).map((x) => ({
-          term: x.term,
-          growthPct: x.growthPct,
-          sub: "Trends • Rising",
-        })),
-        {
-          rightLabelFn: (r) =>
-            r.growthPct == null
-              ? "—"
-              : Number(r.growthPct) >= 9999
-                ? "Breakout"
-                : `${r.growthPct}%`,
-        },
-      );
-
-      renderSeoList(
-        "seoUfList",
-        (data?.byUf || []).map((x) => ({
-          uf: x.uf,
-          interest: Number(x.interest || 0),
-          sub: "BR • UF",
-        })),
-        {
-          rightLabelFn: (r) => `${r.interest}`,
-          barPctFn: (r) => (Number(r.interest || 0) / 100) * 100,
-        },
-      );
-
-      renderSeoList(
-        "seoSuggestList",
-        (data?.suggestions || []).map((t) => ({
-          text: t,
-          sub: "Autocomplete",
-        })),
-        {
-          rightLabelFn: () => "",
-        },
-      );
-
-      if (msg && data?.trends?.ok !== false) msg.textContent = "";
-    } catch (e) {
-      if (msg) msg.textContent = `Erro: ${String(e?.message || e)}`;
+    if (msg) {
+      msg.textContent =
+        data?.trends?.ok === false
+          ? "Trends indisponível no momento (bloqueio/consent). Exibindo sugestões do Google."
+          : "";
     }
-  }
 
-  // 2) Shopee: quando tem produto referência (com ou sem keyword)
-  if (ref) {
-    await loadSeoShopeeRecommendations({ ref, q });
-  } else {
-    // se não tiver ref, pode remover o card ou deixar vazio:
-    document.getElementById("seoShopeeCard")?.remove();
+    renderSeoList(
+      "seoTopList",
+      (data?.related?.top || []).map((x) => ({
+        term: x.term,
+        score: Number(x.score || 0),
+        sub: "Trends • Top",
+      })),
+      {
+        rightLabelFn: (r) => String(r.score || 0),
+        barPctFn: (r) => (Number(r.score || 0) / 100) * 100,
+      },
+    );
+
+    renderSeoList(
+      "seoRisingList",
+      (data?.related?.rising || []).map((x) => ({
+        term: x.term,
+        growthPct: x.growthPct,
+        sub: "Trends • Rising",
+      })),
+      {
+        rightLabelFn: (r) =>
+          r.growthPct == null
+            ? "—"
+            : Number(r.growthPct) >= 9999
+              ? "Breakout"
+              : `${r.growthPct}%`,
+      },
+    );
+
+    renderSeoList(
+      "seoUfList",
+      (data?.byUf || []).map((x) => ({
+        uf: x.uf,
+        interest: Number(x.interest || 0),
+        sub: "BR • UF",
+      })),
+      {
+        rightLabelFn: (r) => `${r.interest}`,
+        barPctFn: (r) => (Number(r.interest || 0) / 100) * 100,
+      },
+    );
+
+    renderSeoList(
+      "seoSuggestList",
+      (data?.suggestions || []).map((t) => ({
+        text: t,
+        sub: "Autocomplete",
+      })),
+      {
+        rightLabelFn: () => "",
+      },
+    );
+
+    if (msg && data?.trends?.ok !== false) msg.textContent = "";
+  } catch (e) {
+    if (msg) msg.textContent = `Erro: ${String(e?.message || e)}`;
   }
 }
 
+function showSeoView(view) {
+  const home = document.getElementById("seoHome");
+  const g = document.getElementById("seoGoogleView");
+  const s = document.getElementById("seoShopeeView");
+
+  if (home) home.style.display = view === "home" ? "" : "none";
+  if (g) g.style.display = view === "google" ? "" : "none";
+  if (s) s.style.display = view === "shopee" ? "" : "none";
+}
+
+function openSeoHome() {
+  showSeoView("home");
+}
+
+function openSeoGoogle() {
+  showSeoView("google");
+}
+
+function openSeoShopee() {
+  showSeoView("shopee");
+  ensureShopeeTrendsUi(); // cria UI dentro de seoShopeeRoot (abaixo)
+  // opcional: se já tiver produto ref, carregar automático
+  const ref = getSeoRefProduct();
+  if (ref?.itemId) loadSeoShopeeRecommendations({ ref, q: "" });
+}
+
 function initSeo() {
+  document
+    .getElementById("btnSeoOpenGoogle")
+    ?.addEventListener("click", openSeoGoogle);
+  document
+    .getElementById("btnSeoOpenShopee")
+    ?.addEventListener("click", openSeoShopee);
+
+  document
+    .getElementById("btnSeoBackFromGoogle")
+    ?.addEventListener("click", openSeoHome);
+  document
+    .getElementById("btnSeoBackFromShopee")
+    ?.addEventListener("click", openSeoHome);
+
+  // Google (continua igual)
   document
     .getElementById("btnSeoSearch")
     ?.addEventListener("click", loadSeoKeywords);
   document.getElementById("seoQ")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") loadSeoKeywords();
   });
-
-  ensureSeoRefUiOnce();
 }
+
+function ensureShopeeTrendsUi() {
+  const root = document.getElementById("seoShopeeRoot");
+  if (!root) return;
+  if (document.getElementById("seoShopeeMeta")) return; // já criado
+
+  root.innerHTML = `
+  <div class="section-card">
+    <div class="section-card__header">
+      <div>
+        <div class="section-title">ShopeeTrends <span id="seoShopeeCompet" class="badge badge--gray" style="margin-left:8px">—</span></div>
+        <div class="muted" id="seoShopeeMeta">—</div>
+      </div>
+
+      <div class="section-actions" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="field">
+          <label class="muted" for="seoShopeeQ">Palavra (opcional)</label>
+          <input id="seoShopeeQ" class="input" placeholder="Ex.: poltrona" />
+        </div>
+        <button id="btnSeoShopeeSearch" class="btn btn-primary" type="button">Buscar</button>
+
+        <button id="btnSeoPickRefProduct" class="btn btn-ghost" type="button">Produto referência</button>
+        <div id="seoRefPill" class="muted"></div>
+      </div>
+    </div>
+
+    <div class="section-card__body">
+      <div id="seoShopeeMsg" class="muted" style="margin-bottom:10px"></div>
+
+      <div class="section-grid" style="grid-template-columns:1fr 1fr;gap:12px">
+        <div class="section-card" style="margin:0">
+          <div class="section-card__header"><div class="section-title">Top 10 por volume</div></div>
+          <div class="section-card__body"><canvas id="seoBidChart" height="140"></canvas></div>
+        </div>
+
+        <div class="section-card" style="margin:0">
+          <div class="section-card__header"><div class="section-title">Volume × Qualidade</div></div>
+          <div class="section-card__body"><canvas id="seoScatterChart" height="140"></canvas></div>
+        </div>
+      </div>
+
+      <div class="seo-grid" style="margin-top:12px">
+        <div class="seo-card">
+          <div class="seo-card__head">
+            <div class="seo-card__title">Top por volume</div>
+            <div class="seo-card__right muted">Vol/QS/Bid</div>
+          </div>
+          <div id="seoShopeeVolList" class="seo-list"></div>
+        </div>
+
+        <div class="seo-card">
+          <div class="seo-card__head">
+            <div class="seo-card__title">Top por qualidade</div>
+            <div class="seo-card__right muted">QS/Vol/Bid</div>
+          </div>
+          <div id="seoShopeeQualList" class="seo-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+`;
+
+  document
+    .getElementById("btnSeoPickRefProduct")
+    ?.addEventListener("click", openSeoRefPicker);
+
+  document
+    .getElementById("btnSeoShopeeSearch")
+    ?.addEventListener("click", () => {
+      const ref = getSeoRefProduct();
+      const q = String(
+        document.getElementById("seoShopeeQ")?.value || "",
+      ).trim();
+      loadSeoShopeeRecommendations({ ref, q });
+    });
+
+  document.getElementById("seoShopeeQ")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      const ref = getSeoRefProduct();
+      const q = String(
+        document.getElementById("seoShopeeQ")?.value || "",
+      ).trim();
+      loadSeoShopeeRecommendations({ ref, q });
+    }
+  });
+
+  renderSeoRefPill();
+}
+
 /* ---------------- Modal ---------------- */
 function openModal(title, html) {
   $("#modal-title").textContent = title;
@@ -301,33 +415,6 @@ function escapeHtml(s) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
-function ensureSeoRefUiOnce() {
-  const btnSearch = document.getElementById("btnSeoSearch");
-  if (!btnSearch) return;
-
-  const actions = btnSearch.closest(".section-actions");
-  if (!actions) return;
-
-  if (document.getElementById("btnSeoPickRefProduct")) return;
-
-  const wrap = document.createElement("div");
-  wrap.style.display = "flex";
-  wrap.style.gap = "10px";
-  wrap.style.flexWrap = "wrap";
-  wrap.style.alignItems = "flex-end";
-
-  wrap.innerHTML = `
-    <button id="btnSeoPickRefProduct" class="btn btn-ghost" type="button">Produto referência</button>
-    <div id="seoRefPill" class="muted"></div>
-  `;
-
-  actions.appendChild(wrap);
-
-  document
-    .getElementById("btnSeoPickRefProduct")
-    ?.addEventListener("click", () => openSeoRefPicker());
-  renderSeoRefPill();
-}
 
 function renderSeoRefPill() {
   const pill = document.getElementById("seoRefPill");
@@ -350,8 +437,6 @@ function renderSeoRefPill() {
   document.getElementById("btnSeoRefClear")?.addEventListener("click", () => {
     setSeoRefProduct(null);
     renderSeoRefPill();
-    ensureSeoShopeeCard(); // mantém card, mas limpa mensagem
-    clearSeoShopeeCard();
   });
 }
 
@@ -435,53 +520,34 @@ function renderSeoRefResults(items) {
       renderSeoRefPill();
 
       // ✅ busca imediatamente as recomendadas do item (sem keyword)
-      loadSeoShopeeRecommendations({ ref: getSeoRefProduct(), q: "" });
+      const qNow = String(
+        document.getElementById("seoShopeeQ")?.value || "",
+      ).trim();
+      loadSeoShopeeRecommendations({ ref: getSeoRefProduct(), q: qNow });
     });
   });
 }
 
-function ensureSeoShopeeCard() {
-  if (document.getElementById("seoShopeeVolList")) return;
-
-  const grid = document.querySelector("#tab-seo .seo-grid");
-  if (!grid) return;
-
-  const card = document.createElement("div");
-  card.className = "seo-card";
-  card.id = "seoShopeeCard";
-  card.innerHTML = `
-    <div class="seo-card__head">
-      <div class="seo-card__title">Shopee (produto referência)</div>
-      <div class="seo-card__right muted" id="seoShopeeMeta">—</div>
-    </div>
-
-    <div id="seoShopeeMsg" class="muted" style="margin:8px 0;"></div>
-
-    <div style="display:grid; grid-template-columns:1fr; gap:10px;">
-      <div>
-        <div class="muted" style="margin-bottom:6px;">Top por volume (30d)</div>
-        <div id="seoShopeeVolList" class="seo-list"></div>
-      </div>
-      <div>
-        <div class="muted" style="margin-bottom:6px;">Top por qualidade</div>
-        <div id="seoShopeeQualList" class="seo-list"></div>
-      </div>
-    </div>
-  `;
-
-  // coloca o card como primeiro da grid
-  grid.insertBefore(card, grid.firstChild);
-}
+let SEO_CHART_VOL = null;
+let SEO_CHART_SCATTER = null;
 
 async function loadSeoShopeeRecommendations({ ref, q }) {
-  ensureSeoShopeeCard();
+  ensureShopeeTrendsUi(); // ✅ sempre garante o UI certo (Shopee view)
 
   if (!ref?.itemId) {
-    clearSeoShopeeCard();
+    setText("seoShopeeMeta", "Selecione um produto referência.");
+    setText("seoShopeeMsg", "");
+    const a = document.getElementById("seoShopeeVolList");
+    const b = document.getElementById("seoShopeeQualList");
+    if (a) a.innerHTML = `<div class="muted">Sem dados.</div>`;
+    if (b) b.innerHTML = `<div class="muted">Sem dados.</div>`;
     return;
   }
 
-  setText("seoShopeeMeta", `Ref #${ref.itemId}`);
+  setText(
+    "seoShopeeMeta",
+    `Ref #${ref.itemId}${ref.title ? " • " + ref.title : ""}`,
+  );
   setText("seoShopeeMsg", "Carregando recomendações Shopee...");
 
   try {
@@ -503,8 +569,35 @@ async function loadSeoShopeeRecommendations({ ref, q }) {
       1,
       ...byVol.map((x) => Number(x.search_volume || 0)),
     );
+    const all = sh?.response?.suggested_keywords || [];
+    const bids = all
+      .map((x) => Number(x.suggested_bid))
+      .filter(Number.isFinite);
+    const vols = all
+      .map((x) => Number(x.search_volume))
+      .filter(Number.isFinite);
+    const qss = all.map((x) => Number(x.quality_score)).filter(Number.isFinite);
 
-    // Mensagem varia conforme tem keyword ou não
+    const bidMed = median(bids);
+    const topVol = vols.length ? Math.max(...vols) : null;
+    const avgQS = qss.length
+      ? qss.reduce((a, b) => a + b, 0) / qss.length
+      : null;
+
+    const tBid = tierBid(bidMed);
+    const demand = tierDemand(topVol);
+
+    const compEl = document.getElementById("seoShopeeCompet");
+    if (compEl) {
+      compEl.className = `badge ${tBid.cls || "badge--gray"}`;
+      compEl.textContent =
+        bidMed == null
+          ? "—"
+          : `CPC: ${tBid.label} • ${fmtBRL(bidMed)} • Demanda: ${demand}`;
+    }
+
+    renderShopeeCharts(all);
+
     if (q) {
       setText(
         "seoShopeeMsg",
@@ -544,13 +637,194 @@ async function loadSeoShopeeRecommendations({ ref, q }) {
   }
 }
 
-function clearSeoShopeeCard() {
-  setText("seoShopeeMeta", "—");
-  setText("seoShopeeMsg", "");
-  const a = document.getElementById("seoShopeeVolList");
-  const b = document.getElementById("seoShopeeQualList");
-  if (a) a.innerHTML = `<div class="muted">Sem dados.</div>`;
-  if (b) b.innerHTML = `<div class="muted">Sem dados.</div>`;
+function median(nums) {
+  const a = nums.filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
+  if (!a.length) return null;
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+function tierBid(bid) {
+  if (bid == null) return { label: "—", cls: "badge--gray" };
+  if (bid <= 2) return { label: "Baixa", cls: "badge--ok" };
+  if (bid <= 4) return { label: "Média", cls: "badge--warn" };
+  if (bid <= 8) return { label: "Alta", cls: "badge--warn" };
+  return { label: "Muito alta", cls: "badge--danger" };
+}
+
+function tierDemand(topVol) {
+  if (topVol == null) return "—";
+  if (topVol < 5000) return "Baixa";
+  if (topVol < 50000) return "Média";
+  if (topVol < 200000) return "Alta";
+  return "Muito alta";
+}
+
+function wrapChartLabel(text, maxLen = 14) {
+  const s = String(text || "").trim();
+  if (!s) return "—";
+
+  // quebra por espaços, mas também suporta palavras longas
+  const words = s.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = "";
+
+  for (const w of words) {
+    if (!line) {
+      // palavra muito grande sozinha
+      if (w.length > maxLen) {
+        lines.push(w.slice(0, maxLen - 1) + "…");
+      } else {
+        line = w;
+      }
+      continue;
+    }
+
+    if ((line + " " + w).length <= maxLen) {
+      line += " " + w;
+    } else {
+      lines.push(line);
+      line = w.length > maxLen ? w.slice(0, maxLen - 1) + "…" : w;
+    }
+  }
+
+  if (line) lines.push(line);
+
+  // limite de linhas pra não estourar layout
+  if (lines.length > 3) {
+    return [
+      ...lines.slice(0, 2),
+      lines
+        .slice(2)
+        .join(" ")
+        .slice(0, maxLen - 1) + "…",
+    ];
+  }
+
+  return lines;
+}
+
+function renderShopeeCharts(all) {
+  // 1) Top 10 por volume (barra)
+  const top = [...all]
+    .sort((a, b) => Number(b.search_volume || 0) - Number(a.search_volume || 0))
+    .slice(0, 10);
+
+  const labels = top.map((x) => wrapChartLabel(x.keyword, 16));
+  const dataVol = top.map((x) => Number(x.search_volume || 0));
+
+  const ctxVol = document.getElementById("seoBidChart")?.getContext("2d");
+  if (ctxVol) {
+    if (SEO_CHART_VOL) SEO_CHART_VOL.destroy();
+    SEO_CHART_VOL = new Chart(ctxVol, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Volume de busca",
+            data: dataVol,
+            backgroundColor: "rgba(255, 255, 255, 0.18)",
+            borderColor: "rgba(255, 255, 255, 0.30)",
+            borderWidth: 1,
+            borderRadius: 8,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) =>
+                `${Number(ctx.raw || 0).toLocaleString("pt-BR")} buscas`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: "rgba(255,255,255,0.75)",
+              maxRotation: 0,
+              minRotation: 0,
+            },
+            grid: { display: false },
+          },
+          y: {
+            ticks: { color: "rgba(255,255,255,0.75)" },
+            grid: { color: "rgba(255,255,255,0.08)" },
+          },
+        },
+      },
+    });
+  }
+
+  // 2) Bubble: X=QS, Y=Volume, raio ~ log(volume)
+  const points = all
+    .map((x) => {
+      const qs = Number(x.quality_score);
+      const vol = Number(x.search_volume);
+      if (!Number.isFinite(qs) || !Number.isFinite(vol)) return null;
+      const r = Math.max(3, Math.min(14, Math.log10(vol + 10) * 4));
+      return { x: qs, y: vol, r, _label: x.keyword };
+    })
+    .filter(Boolean);
+
+  const ctxSc = document.getElementById("seoScatterChart")?.getContext("2d");
+  if (ctxSc) {
+    if (SEO_CHART_SCATTER) SEO_CHART_SCATTER.destroy();
+    SEO_CHART_SCATTER = new Chart(ctxSc, {
+      type: "bubble",
+      data: {
+        datasets: [
+          {
+            label: "Keywords",
+            data: points,
+            backgroundColor: "rgba(255, 120, 0, 0.25)",
+            borderColor: "rgba(255, 120, 0, 0.45)",
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) =>
+                items?.[0]?.raw?._label ? String(items[0].raw._label) : "",
+              label: (item) => {
+                const p = item.raw;
+                return `QS: ${p.x} • Volume: ${Number(p.y).toLocaleString("pt-BR")}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "Quality Score",
+              color: "rgba(255,255,255,0.75)",
+            },
+            ticks: { color: "rgba(255,255,255,0.75)" },
+            grid: { color: "rgba(255,255,255,0.08)" },
+          },
+          y: {
+            title: {
+              display: true,
+              text: "Volume",
+              color: "rgba(255,255,255,0.75)",
+            },
+            ticks: { color: "rgba(255,255,255,0.75)" },
+            grid: { color: "rgba(255,255,255,0.08)" },
+          },
+        },
+      },
+    });
+  }
 }
 
 function fmtBRL(v) {
