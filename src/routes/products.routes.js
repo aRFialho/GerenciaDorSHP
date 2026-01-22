@@ -5,10 +5,23 @@ const uploadImages = require("../middlewares/uploadImages");
 const { requireAuth } = require("../middlewares/sessionAuth");
 const router = express.Router();
 router.use(requireAuth);
-
+router.param("shopId", (req, res, next, shopId) => {
+  const s = String(shopId || "").trim();
+  if (!/^\d+$/.test(s)) {
+    return res.status(404).json({ error: "not_found" }); // ou 400 shopId_invalid
+  }
+  next();
+});
+router.param("itemId", (req, res, next, itemId) => {
+  const s = String(itemId || "").trim();
+  if (!/^\d+$/.test(s)) {
+    return res.status(404).json({ error: "not_found" });
+  }
+  next();
+});
 router.get(
   "/shops/:shopId/products/performance",
-  ProductsController.performance
+  ProductsController.performance,
 );
 router.get("/shops/:shopId/products", ProductsController.list);
 router.get("/shops/:shopId/products/:itemId", ProductsController.detail);
@@ -16,33 +29,33 @@ router.post("/shops/:shopId/products/sync", ProductSyncController.sync);
 
 router.get(
   "/shops/:shopId/products/:itemId/full",
-  ProductsController.fullDetail
+  ProductsController.fullDetail,
 );
 // CRUD
 router.patch("/shops/:shopId/products/:itemId", ProductsController.updateItem);
 router.patch(
   "/shops/:shopId/products/:itemId/price",
-  ProductsController.updatePrice
+  ProductsController.updatePrice,
 );
 router.patch(
   "/shops/:shopId/products/:itemId/stock",
-  ProductsController.updateStock
+  ProductsController.updateStock,
 );
 
 // Imagens
 router.post(
   "/shops/:shopId/products/:itemId/images",
   uploadImages,
-  ProductsController.uploadAndApplyImages
+  ProductsController.uploadAndApplyImages,
 );
 router.post(
   "/shops/:shopId/products/:itemId/images/add",
   uploadImages,
-  ProductsController.addImages
+  ProductsController.addImages,
 );
 router.post(
   "/shops/:shopId/products/:itemId/images/remove",
-  ProductsController.removeImages
+  ProductsController.removeImages,
 );
 
 module.exports = router;
