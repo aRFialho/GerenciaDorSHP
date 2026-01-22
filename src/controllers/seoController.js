@@ -333,10 +333,31 @@ async function compare(req, res) {
     res.set("Cache-Control", "no-store");
     res.json(out);
   } catch (e) {
-    res.status(500).json({
-      error: "seo_compare_failed",
-      message: String(e?.message || e),
-    });
+    const msg = String(e?.message || e);
+
+    const blocked =
+      msg.includes("returned_html_blocked") ||
+      msg.startsWith("interestOverTime_returned_html_blocked") ||
+      msg.includes("captcha") ||
+      msg.includes("consent") ||
+      msg.includes("429");
+
+    if (blocked) {
+      const out = {
+        terms,
+        period,
+        timeframe,
+        trends: { ok: false, error: msg },
+        series: [],
+        summary: {},
+        message: "Google Trends indisponível no momento (bloqueio/consent).",
+      };
+      cacheSet(key, out, 10 * 60 * 1000); // 10 min
+      res.set("Cache-Control", "no-store");
+      return res.json(out);
+    }
+
+    return res.status(500).json({ error: "seo_compare_failed", message: msg });
   }
 }
 

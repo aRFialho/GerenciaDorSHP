@@ -122,7 +122,19 @@ async function runSeoCompare() {
     const data = await apiGet(
       `/seo/compare?terms=${encodeURIComponent(termsRaw)}&period=${encodeURIComponent(period)}`,
     );
-
+    if (data?.trends?.ok === false) {
+      if (msg)
+        msg.textContent =
+          data?.message || "Google Trends indisponível no momento.";
+      if (SEO_GOOGLE_CMP_CHART) SEO_GOOGLE_CMP_CHART.destroy();
+      if (SEO_GOOGLE_CMP_BARS) SEO_GOOGLE_CMP_BARS.destroy();
+      const b = document.getElementById("seoCmpWinner");
+      if (b) {
+        b.className = "badge badge--gray";
+        b.textContent = "Indisponível";
+      }
+      return;
+    }
     const terms = data?.terms || [];
     const series = data?.series || [];
     if (!terms.length || !series.length) {
