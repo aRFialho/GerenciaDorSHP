@@ -14,6 +14,8 @@ let ORDERS_TOTAL = 0;
 let DASH_CHART_MONTH = null;
 let DASH_CHART_TODAY = null;
 let DASH_CHART_MONTH_RATIO = null;
+let SEO_GOOGLE_CMP_CHART = null;
+let SEO_GOOGLE_CMP_BARS = null;
 
 // Para Opção A: manter rotas /shops/:shopId/... mas backend ignora.
 // Usamos um placeholder fixo só para completar a URL.
@@ -91,6 +93,190 @@ async function apiPost(path, body) {
   const text = await r.text();
   if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
   return text ? JSON.parse(text) : null;
+}
+
+function initSeoGoogleCompare() {
+  document
+    .getElementById("btnSeoCmp")
+    ?.addEventListener("click", runSeoCompare);
+  document.getElementById("seoCmpTerms")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runSeoCompare();
+  });
+}
+
+async function runSeoCompare() {
+  const termsRaw = String(
+    document.getElementById("seoCmpTerms")?.value || "",
+  ).trim();
+  const period = String(document.getElementById("seoPeriod")?.value || "30d"); // reaproveita período do Google
+  const msg = document.getElementById("seoCmpMsg");
+
+  if (!termsRaw) {
+    if (msg) msg.textContent = "Digite 2 a 4 palavras separadas por vírgula.";
+    return;
+  }
+
+  if (msg) msg.textContent = "Carregando comparação…";
+
+  try {
+    const data = await apiGet(
+      `/seo/compare?terms=${encodeURIComponent(termsRaw)}&period=${encodeURIComponent(period)}`,
+    );
+
+    const terms = data?.terms || [];
+    const series = data?.series || [];
+    if (!terms.length || !series.length) {
+      if (msg) msg.textContent = "Sem dados para comparar.";
+      return;
+    }
+
+    // labels = datas (usa a 1ª série como referência)
+    const points0 = series[0]?.points || [];
+    const labels = points0.map((p) => {
+      const d = new Date(Number(p.time || 0));
+      return d.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      });
+    });
+
+    const palette = ["#60a5fa", "#f97316", "#34d399", "#f472b6"];
+
+    const datasets = series.map((s, i) => ({
+      label: s.term,
+      data: (s.points || []).map((p) => Number(p.value || 0)),
+      borderColor: palette[i % palette.length],
+      backgroundColor: palette[i % palette.length] + "33",
+      tension: 0.25,
+      pointRadius: 0,
+      borderWidth: 2,
+      fill: false,
+    }));
+
+    // mensagem-resumo: quem tem maior média (mais “relevante” no período)
+    const summary = data?.summary || {};
+
+    // pesos do score (ajuste aqui)
+    const W_AVG = 0.7;
+    const W_MAX = 0.3;
+
+    const scored = terms
+      .map((t) => {
+        const avg = Number(summary?.[t]?.avg ?? 0);
+        const max = Number(summary?.[t]?.max ?? 0);
+        const score = Math.round((W_AVG * avg + W_MAX * max) * 10) / 10; // 0–100
+        return { term: t, avg, max, score };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const winner = scored[0] || null;
+
+    // Mensagem-resumo
+    if (msg) {
+      msg.textContent = winner
+        ? `Melhor score no período: "${winner.term}" (score ${winner.score} = ${W_AVG}×avg + ${W_MAX}×max).`
+        : "Sem dados para comparar.";
+    }
+
+    // Badge do vencedor
+    const winnerEl = document.getElementById("seoCmpWinner");
+    if (winnerEl) {
+      winnerEl.className = "badge badge--top";
+      winnerEl.textContent = winner
+        ? `Top: ${winner.term} (${winner.score})`
+        : "—";
+    }
+
+    if (msg) {
+      msg.textContent = ranked.length
+        ? `Maior relevância média no período: "${ranked[0].term}" (média ${ranked[0].avg}).`
+        : "";
+    }
+    // --- gráfico 2: barras avg e max ---
+    const labels2 = terms.map((t) => wrapChartLabel(t, 16));
+    const avgData = terms.map((t) => Number(summary?.[t]?.avg ?? 0));
+    const maxData = terms.map((t) => Number(summary?.[t]?.max ?? 0));
+
+    const ctx2 = document.getElementById("seoCmpBars")?.getContext("2d");
+    if (ctx2) {
+      if (SEO_GOOGLE_CMP_BARS) SEO_GOOGLE_CMP_BARS.destroy();
+
+      SEO_GOOGLE_CMP_BARS = new Chart(ctx2, {
+        type: "bar",
+        data: {
+          labels: labels2,
+          datasets: [
+            {
+              label: "Média (avg)",
+              data: avgData,
+              backgroundColor: "rgba(96,165,250,0.22)",
+              borderColor: "rgba(96,165,250,0.45)",
+              borderWidth: 1,
+              borderRadius: 8,
+            },
+            {
+              label: "Pico (max)",
+              data: maxData,
+              backgroundColor: "rgba(249,115,22,0.22)",
+              borderColor: "rgba(249,115,22,0.45)",
+              borderWidth: 1,
+              borderRadius: 8,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { labels: { color: "rgba(255,255,255,0.75)" } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) =>
+                  `${ctx.dataset.label}: ${Number(ctx.raw || 0).toFixed(1)}`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: "rgba(255,255,255,0.75)", maxRotation: 0 },
+              grid: { display: false },
+            },
+            y: {
+              ticks: { color: "rgba(255,255,255,0.75)" },
+              grid: { color: "rgba(255,255,255,0.08)" },
+              suggestedMin: 0,
+              suggestedMax: 100,
+            },
+          },
+        },
+      });
+    }
+    const ctx = document.getElementById("seoCmpChart")?.getContext("2d");
+    if (!ctx) return;
+
+    if (SEO_GOOGLE_CMP_CHART) SEO_GOOGLE_CMP_CHART.destroy();
+    SEO_GOOGLE_CMP_CHART = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: "rgba(255,255,255,0.75)" } } },
+        scales: {
+          x: {
+            ticks: { color: "rgba(255,255,255,0.75)", maxRotation: 0 },
+            grid: { display: false },
+          },
+          y: {
+            ticks: { color: "rgba(255,255,255,0.75)" },
+            grid: { color: "rgba(255,255,255,0.08)" },
+            suggestedMin: 0,
+            suggestedMax: 100,
+          },
+        },
+      },
+    });
+  } catch (e) {
+    if (msg) msg.textContent = `Erro: ${String(e?.message || e)}`;
+  }
 }
 
 /* ---------------- Tabs ---------------- */
@@ -291,6 +477,7 @@ function initSeo() {
   document.getElementById("seoQ")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") loadSeoKeywords();
   });
+  initSeoGoogleCompare();
 }
 
 function ensureShopeeTrendsUi() {

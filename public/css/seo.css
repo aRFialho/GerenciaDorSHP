@@ -211,6 +211,7 @@
   border-radius:16px;
   padding:18px;
   text-align:left;
+  -webkit-text-fill-color: aqua;
   cursor:pointer;
   transition: transform .08s ease, border-color .08s ease, background .08s ease;
 }

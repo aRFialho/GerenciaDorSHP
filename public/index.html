@@ -1160,7 +1160,7 @@
                 type="button"
               >
                 <img
-                  src="https://res.cloudinary.com/dhqxp3tuo/image/upload/v1769087664/imagem_2026-01-22_100911200_lmgd7m.png"
+                  src="https://res.cloudinary.com/dhqxp3tuo/image/upload/v1769089969/imagem_2026-01-22_104734732_gcwwzz.png"
                   alt="ShopeeTrends"
                 />
                 <div class="seo-choice-title">ShopeeTrends</div>
@@ -1224,7 +1224,60 @@
                   </button>
                 </div>
               </div>
+              <div class="section-card" style="margin-top: 12px">
+                <div class="section-card__header">
+                  <div>
+                    <div class="section-title">Comparar palavras (até 4)</div>
+                    <div class="section-title">
+                      Comparar palavras (até 4)
+                      <span
+                        id="seoCmpWinner"
+                        class="badge badge--gray"
+                        style="margin-left: 8px"
+                        >—</span
+                      >
+                    </div>
+                  </div>
 
+                  <div
+                    class="section-actions"
+                    style="
+                      display: flex;
+                      gap: 10px;
+                      flex-wrap: wrap;
+                      align-items: flex-end;
+                    "
+                  >
+                    <div class="field">
+                      <label class="muted" for="seoCmpTerms">Palavras</label>
+                      <input
+                        id="seoCmpTerms"
+                        class="input"
+                        placeholder="Ex.: poltrona, sofá, namoradeira, linho"
+                        style="min-width: 360px"
+                      />
+                    </div>
+                    <button
+                      id="btnSeoCmp"
+                      class="btn btn-primary"
+                      type="button"
+                    >
+                      Comparar
+                    </button>
+                  </div>
+                </div>
+
+                <div class="section-card__body">
+                  <div
+                    id="seoCmpMsg"
+                    class="muted"
+                    style="margin-bottom: 10px"
+                  ></div>
+                  <canvas id="seoCmpChart" height="140"></canvas>
+                  <div style="margin-top: 12px"></div>
+                  <canvas id="seoCmpBars" height="130"></canvas>
+                </div>
+              </div>
               <div class="section-card__body">
                 <div id="seoMsg" class="muted"></div>
 

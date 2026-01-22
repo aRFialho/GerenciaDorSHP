@@ -265,6 +265,81 @@ async function refreshAndReloadAccessToken({ dbShopId, shopeeShopId }) {
   return refreshed?.accessToken || null;
 }
 
+async function compare(req, res) {
+  try {
+    const rawTerms = String(req.query.terms || "").trim();
+    const period = String(req.query.period || "30d");
+
+    if (!rawTerms) return res.status(400).json({ error: "terms_required" });
+
+    // aceita "a,b,c" ou "a | b | c"
+    const terms = rawTerms
+      .split(/[,\|]/g)
+      .map((s) => String(s || "").trim())
+      .filter(Boolean)
+      .slice(0, 4);
+
+    if (terms.length < 2) {
+      return res.status(400).json({ error: "min_2_terms_required" });
+    }
+
+    const timeframe = timeframeFromPeriod(period);
+    const geo = "BR";
+
+    const key = `cmp:v1:${terms.join("|").toLowerCase()}:${period}`;
+    const cached = cacheGet(key);
+    if (cached) return res.json(cached);
+
+    const raw = await googleTrends.interestOverTime({
+      keyword: terms, // <= suporta array (comparação)
+      geo,
+      timeframe,
+      hl: "pt-BR",
+      timezone: 180,
+    });
+
+    const parsed = safeJsonParse("interestOverTime", raw);
+    const timeline = parsed?.default?.timelineData || [];
+
+    const series = terms.map((t, idx) => ({
+      term: t,
+      points: timeline.map((row) => ({
+        time: Number(row?.time || 0) * 1000, // ms
+        value: Number(row?.value?.[idx] ?? 0),
+      })),
+    }));
+
+    const summary = {};
+    for (const s of series) {
+      const vals = s.points.map((p) => p.value);
+      const avg = vals.length
+        ? vals.reduce((a, b) => a + b, 0) / vals.length
+        : 0;
+      const max = vals.length ? Math.max(...vals) : 0;
+      const last = vals.length ? vals[vals.length - 1] : 0;
+      summary[s.term] = { avg: Math.round(avg * 10) / 10, max, last };
+    }
+
+    const out = {
+      terms,
+      period,
+      timeframe,
+      trends: { ok: true, error: null },
+      series,
+      summary,
+    };
+
+    cacheSet(key, out, 15 * 60 * 1000);
+    res.set("Cache-Control", "no-store");
+    res.json(out);
+  } catch (e) {
+    res.status(500).json({
+      error: "seo_compare_failed",
+      message: String(e?.message || e),
+    });
+  }
+}
+
 async function callAdsWithAutoRefresh({ shop, call }) {
   const tokenRow = await getDbTokenRow(shop.id);
   const token = tokenRow?.accessToken || null;
@@ -429,4 +504,10 @@ async function shopeeRecommendedKeywords(req, res) {
   }
 }
 
-module.exports = { suggest, keywords, refProducts, shopeeRecommendedKeywords };
+module.exports = {
+  suggest,
+  keywords,
+  compare,
+  refProducts,
+  shopeeRecommendedKeywords,
+};
