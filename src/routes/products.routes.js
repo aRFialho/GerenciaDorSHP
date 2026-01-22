@@ -4,6 +4,8 @@ const ProductSyncController = require("../controllers/ProductSyncController");
 const uploadImages = require("../middlewares/uploadImages");
 const { requireAuth } = require("../middlewares/sessionAuth");
 const router = express.Router();
+const { resolveShop } = require("../utils/resolveShop");
+
 router.use(requireAuth);
 router.param("shopId", (req, res, next, shopId) => {
   const s = String(shopId || "").trim();
@@ -12,6 +14,37 @@ router.param("shopId", (req, res, next, shopId) => {
   }
   next();
 });
+
+router.get("/shops/active/products/performance", async (req, res, next) => {
+  try {
+    const shop = await resolveShop(req, "active"); // { id, shopId }
+    req.params.shopId = String(shop.id);
+    return ProductsController.performance(req, res, next);
+  } catch (e) {
+    return next(e);
+  }
+});
+
+router.get("/shops/active/products", async (req, res, next) => {
+  try {
+    const shop = await resolveShop(req, "active");
+    req.params.shopId = String(shop.id);
+    return ProductsController.list(req, res, next);
+  } catch (e) {
+    return next(e);
+  }
+});
+
+router.post("/shops/active/products/sync", async (req, res, next) => {
+  try {
+    const shop = await resolveShop(req, "active");
+    req.params.shopId = String(shop.id);
+    return ProductSyncController.sync(req, res, next);
+  } catch (e) {
+    return next(e);
+  }
+});
+
 router.param("itemId", (req, res, next, itemId) => {
   const s = String(itemId || "").trim();
   if (!/^\d+$/.test(s)) {
