@@ -45,6 +45,35 @@ function setText(id, text) {
   if (el) el.textContent = String(text ?? "");
 }
 
+const SEO_REF_KEY = "seo_ref_product";
+
+function getSeoRefProduct() {
+  try {
+    const raw = localStorage.getItem(SEO_REF_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj?.itemId) return null;
+    return obj;
+  } catch {
+    return null;
+  }
+}
+
+function setSeoRefProduct(p) {
+  if (!p) {
+    localStorage.removeItem(SEO_REF_KEY);
+    return;
+  }
+  localStorage.setItem(
+    SEO_REF_KEY,
+    JSON.stringify({
+      itemId: String(p.itemId),
+      title: p.title || null,
+      imageUrl: p.imageUrl || null,
+    }),
+  );
+}
+
 async function apiGet(path) {
   const r = await fetch(path, { credentials: "include" });
   const text = await r.text();
@@ -209,6 +238,66 @@ async function loadSeoKeywords() {
   } catch (e) {
     if (msg) msg.textContent = `Erro: ${String(e?.message || e)}`;
   }
+  // Shopee (opcional): só roda se tiver produto referência selecionado
+  const ref = getSeoRefProduct();
+  if (!ref) {
+    // se quiser: remove o card do DOM
+    document.getElementById("seoShopeeCard")?.remove();
+  } else {
+    ensureSeoShopeeCard();
+    setText("seoShopeeMeta", `Ref #${ref.itemId}`);
+    setText("seoShopeeMsg", "Carregando recomendações Shopee...");
+
+    try {
+      const sh = await apiGet(
+        `/shops/${SHOP_PATH_PLACEHOLDER}/seo/shopee-recommended-keywords?itemId=${encodeURIComponent(ref.itemId)}&q=${encodeURIComponent(q)}`,
+      );
+
+      const byVol = sh?.response?.rankings?.by_volume || [];
+      const byQual = sh?.response?.rankings?.by_quality || [];
+      const rankVol = sh?.response?.rankings?.rank_by_volume;
+      const rankQual = sh?.response?.rankings?.rank_by_quality;
+
+      const maxVol = Math.max(
+        1,
+        ...byVol.map((x) => Number(x.search_volume || 0)),
+      );
+
+      setText(
+        "seoShopeeMsg",
+        `Colocação de "${q}": volume ${rankVol ? "#" + rankVol : "—"} • qualidade ${rankQual ? "#" + rankQual : "—"}`,
+      );
+
+      renderSeoList(
+        "seoShopeeVolList",
+        byVol.slice(0, 20).map((x) => ({
+          term: x.keyword,
+          sub: `Vol: ${Number(x.search_volume || 0).toLocaleString("pt-BR")} • QS: ${x.quality_score ?? "—"} • Bid: ${x.suggested_bid != null ? fmtBRL(x.suggested_bid) : "—"}`,
+          vol: Number(x.search_volume || 0),
+        })),
+        {
+          rightLabelFn: () => "",
+          barPctFn: (r) => (Number(r.vol || 0) / maxVol) * 100,
+        },
+      );
+
+      renderSeoList(
+        "seoShopeeQualList",
+        byQual.slice(0, 20).map((x) => ({
+          term: x.keyword,
+          sub: `QS: ${x.quality_score ?? "—"} • Vol: ${Number(x.search_volume || 0).toLocaleString("pt-BR")} • Bid: ${x.suggested_bid != null ? fmtBRL(x.suggested_bid) : "—"}`,
+          qs: Number(x.quality_score || 0),
+        })),
+        { rightLabelFn: () => "" },
+      );
+    } catch (e) {
+      setText("seoShopeeMsg", `Erro Shopee: ${String(e?.message || e)}`);
+      const a = document.getElementById("seoShopeeVolList");
+      const b = document.getElementById("seoShopeeQualList");
+      if (a) a.innerHTML = `<div class="muted">Sem dados.</div>`;
+      if (b) b.innerHTML = `<div class="muted">Sem dados.</div>`;
+    }
+  }
 }
 
 function initSeo() {
@@ -218,6 +307,8 @@ function initSeo() {
   document.getElementById("seoQ")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") loadSeoKeywords();
   });
+
+  ensureSeoRefUiOnce();
 }
 /* ---------------- Modal ---------------- */
 function openModal(title, html) {
@@ -252,6 +343,189 @@ function escapeHtml(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+function ensureSeoRefUiOnce() {
+  const btnSearch = document.getElementById("btnSeoSearch");
+  if (!btnSearch) return;
+
+  const actions = btnSearch.closest(".section-actions");
+  if (!actions) return;
+
+  if (document.getElementById("btnSeoPickRefProduct")) return;
+
+  const wrap = document.createElement("div");
+  wrap.style.display = "flex";
+  wrap.style.gap = "10px";
+  wrap.style.flexWrap = "wrap";
+  wrap.style.alignItems = "flex-end";
+
+  wrap.innerHTML = `
+    <button id="btnSeoPickRefProduct" class="btn btn-ghost" type="button">Produto referência</button>
+    <div id="seoRefPill" class="muted"></div>
+  `;
+
+  actions.appendChild(wrap);
+
+  document
+    .getElementById("btnSeoPickRefProduct")
+    ?.addEventListener("click", () => openSeoRefPicker());
+  renderSeoRefPill();
+}
+
+function renderSeoRefPill() {
+  const pill = document.getElementById("seoRefPill");
+  if (!pill) return;
+
+  const ref = getSeoRefProduct();
+  if (!ref) {
+    pill.innerHTML = `<span class="badge badge--gray">Ref: nenhum</span>`;
+    return;
+  }
+
+  const title = escapeHtml(ref.title || "Item " + ref.itemId);
+  pill.innerHTML = `
+    <span class="badge badge--top">
+      Ref: ${title} (#${escapeHtml(ref.itemId)})
+      <button id="btnSeoRefClear" class="btn btn-ghost" type="button" style="margin-left:8px; padding:6px 10px">Limpar</button>
+    </span>
+  `;
+
+  document.getElementById("btnSeoRefClear")?.addEventListener("click", () => {
+    setSeoRefProduct(null);
+    renderSeoRefPill();
+    ensureSeoShopeeCard(); // mantém card, mas limpa mensagem
+    clearSeoShopeeCard();
+  });
+}
+
+function openSeoRefPicker() {
+  openModal(
+    "Selecionar produto referência",
+    `
+      <div class="muted">Busque por nome ou <b>item_id</b> do produto.</div>
+      <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+        <input id="seoRefSearch" class="input" placeholder="Ex: tênis / 23393415543" style="min-width:260px" />
+        <button id="btnSeoRefDoSearch" class="btn btn-primary" type="button">Buscar</button>
+      </div>
+      <div id="seoRefMsg" class="muted" style="margin-top:10px;"></div>
+      <div id="seoRefResults" style="margin-top:10px;"></div>
+    `,
+  );
+
+  const run = async () => {
+    const q = String(
+      document.getElementById("seoRefSearch")?.value || "",
+    ).trim();
+    setText("seoRefMsg", "Carregando produtos...");
+    try {
+      const data = await apiGet(
+        `/shops/${SHOP_PATH_PLACEHOLDER}/seo/ref-products?q=${encodeURIComponent(q)}&limit=30`,
+      );
+
+      const items = data?.response?.items || [];
+      renderSeoRefResults(items);
+      setText("seoRefMsg", items.length ? "" : "Nenhum produto encontrado.");
+    } catch (e) {
+      setText("seoRefMsg", `Erro: ${String(e?.message || e)}`);
+      renderSeoRefResults([]);
+    }
+  };
+
+  document.getElementById("btnSeoRefDoSearch")?.addEventListener("click", run);
+  document.getElementById("seoRefSearch")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") run();
+  });
+
+  run();
+}
+
+function renderSeoRefResults(items) {
+  const box = document.getElementById("seoRefResults");
+  if (!box) return;
+
+  const safe = Array.isArray(items) ? items : [];
+
+  box.innerHTML =
+    safe
+      .map((it) => {
+        const title = escapeHtml(it.title || "Item " + it.itemId);
+        const img = it.imageUrl
+          ? `<img src="${escapeHtml(it.imageUrl)}" style="width:44px;height:44px;border-radius:10px;object-fit:cover" onerror="this.style.display='none'">`
+          : `<div style="width:44px;height:44px;border-radius:10px;background:rgba(255,255,255,0.06)"></div>`;
+
+        return `
+          <div class="section-card" data-seo-ref-item="${escapeHtml(String(it.itemId))}" style="margin:10px 0; cursor:pointer;">
+            <div class="section-card__body" style="display:flex; gap:12px; align-items:center;">
+              ${img}
+              <div style="min-width:0;">
+                <div style="font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${title}</div>
+                <div class="muted">item_id: ${escapeHtml(String(it.itemId))}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join("") || `<div class="muted">Sem resultados.</div>`;
+
+  box.querySelectorAll("[data-seo-ref-item]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const itemId = el.getAttribute("data-seo-ref-item");
+      const it = safe.find((x) => String(x.itemId) === String(itemId));
+      if (!it) return;
+
+      setSeoRefProduct(it);
+      closeModal();
+      renderSeoRefPill();
+    });
+  });
+}
+
+function ensureSeoShopeeCard() {
+  if (document.getElementById("seoShopeeVolList")) return;
+
+  const grid = document.querySelector("#tab-seo .seo-grid");
+  if (!grid) return;
+
+  const card = document.createElement("div");
+  card.className = "seo-card";
+  card.id = "seoShopeeCard";
+  card.innerHTML = `
+    <div class="seo-card__head">
+      <div class="seo-card__title">Shopee (produto referência)</div>
+      <div class="seo-card__right muted" id="seoShopeeMeta">—</div>
+    </div>
+
+    <div id="seoShopeeMsg" class="muted" style="margin:8px 0;"></div>
+
+    <div style="display:grid; grid-template-columns:1fr; gap:10px;">
+      <div>
+        <div class="muted" style="margin-bottom:6px;">Top por volume (30d)</div>
+        <div id="seoShopeeVolList" class="seo-list"></div>
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:6px;">Top por qualidade</div>
+        <div id="seoShopeeQualList" class="seo-list"></div>
+      </div>
+    </div>
+  `;
+
+  // coloca o card como primeiro da grid
+  grid.insertBefore(card, grid.firstChild);
+}
+
+function clearSeoShopeeCard() {
+  setText("seoShopeeMeta", "—");
+  setText("seoShopeeMsg", "");
+  const a = document.getElementById("seoShopeeVolList");
+  const b = document.getElementById("seoShopeeQualList");
+  if (a) a.innerHTML = `<div class="muted">Sem dados.</div>`;
+  if (b) b.innerHTML = `<div class="muted">Sem dados.</div>`;
+}
+
+function fmtBRL(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 /* ---------------- Auth + Shop Select ---------------- */

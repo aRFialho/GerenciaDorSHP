@@ -197,7 +197,7 @@ async function get_cpc_item_performance({ accessToken, shopId, payload }) {
 
   if (!path) {
     const err = new Error(
-      "CPC item performance path não configurado (CPC_ITEM_PERFORMANCE_PATH / SHOPEE_ADS_CPC_ITEM_PERFORMANCE_PATH)."
+      "CPC item performance path não configurado (CPC_ITEM_PERFORMANCE_PATH / SHOPEE_ADS_CPC_ITEM_PERFORMANCE_PATH).",
     );
     err.statusCode = 500;
     throw err;
@@ -211,6 +211,23 @@ async function get_cpc_item_performance({ accessToken, shopId, payload }) {
   });
 }
 
+async function get_recommended_keyword_list({
+  accessToken,
+  shopId,
+  itemId,
+  inputKeyword,
+}) {
+  return shopeeAdsGet({
+    path: "/api/v2/ads/get_recommended_keyword_list",
+    accessToken,
+    shopId,
+    query: {
+      item_id: String(itemId), // evita problemas de Number
+      ...(inputKeyword ? { input_keyword: String(inputKeyword) } : {}),
+    },
+  });
+}
+
 module.exports = {
   get_total_balance,
   get_all_cpc_ads_daily_performance,
@@ -218,4 +235,5 @@ module.exports = {
   get_product_campaign_daily_performance,
   get_product_level_campaign_setting_info,
   get_cpc_item_performance,
+  get_recommended_keyword_list,
 };

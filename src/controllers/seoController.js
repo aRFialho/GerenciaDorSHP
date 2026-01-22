@@ -234,4 +234,200 @@ async function keywords(req, res) {
   }
 }
 
-module.exports = { suggest, keywords };
+const prisma = require("../config/db");
+const ShopeeAdsService = require("../services/ShopeeAdsService");
+const { resolveShop } = require("../utils/resolveShop");
+const AuthService = require("../services/ShopeeAuthService"); // mesmo usado no AdsController
+
+async function getDbTokenRow(dbShopId) {
+  return prisma.oAuthToken.findUnique({
+    where: { shopId: Number(dbShopId) },
+    select: {
+      accessToken: true,
+      accessTokenExpiresAt: true,
+    },
+  });
+}
+
+function getShopeeErrData(e) {
+  return e?.response?.data || e?.shopee || null;
+}
+
+function isInvalidAccessToken(e) {
+  const data = getShopeeErrData(e);
+  const err = String(data?.error || "").toLowerCase();
+  return err === "invalid_acceess_token" || err === "invalid_access_token";
+}
+
+async function refreshAndReloadAccessToken({ dbShopId, shopeeShopId }) {
+  await AuthService.refreshAccessToken({ shopId: String(shopeeShopId) });
+  const refreshed = await getDbTokenRow(dbShopId);
+  return refreshed?.accessToken || null;
+}
+
+async function callAdsWithAutoRefresh({ shop, call }) {
+  const tokenRow = await getDbTokenRow(shop.id);
+  const token = tokenRow?.accessToken || null;
+
+  if (!token) {
+    const err = new Error("Loja sem access_token. Conecte a loja novamente.");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  try {
+    return await call(token);
+  } catch (e) {
+    if (!isInvalidAccessToken(e)) throw e;
+
+    const newToken = await refreshAndReloadAccessToken({
+      dbShopId: shop.id,
+      shopeeShopId: shop.shopId,
+    });
+
+    if (!newToken) throw e;
+    return await call(newToken);
+  }
+}
+
+function safeBigInt(q) {
+  try {
+    if (!q) return null;
+    const s = String(q).trim();
+    if (!/^\d+$/.test(s)) return null;
+    return BigInt(s);
+  } catch {
+    return null;
+  }
+}
+
+async function refProducts(req, res) {
+  try {
+    const shop = await resolveShop(req, req.params.shopId);
+
+    const q = String(req.query.q || "").trim();
+    const limit = Math.max(1, Math.min(50, Number(req.query.limit || 30)));
+
+    const qId = safeBigInt(q);
+
+    const where = {
+      shopId: shop.id,
+      ...(qId
+        ? { itemId: qId }
+        : q
+          ? { title: { contains: q, mode: "insensitive" } }
+          : {}),
+    };
+
+    const rows = await prisma.product.findMany({
+      where,
+      orderBy: [{ updatedAt: "desc" }],
+      take: limit,
+      select: {
+        itemId: true,
+        title: true,
+        images: { select: { url: true }, take: 1 },
+      },
+    });
+
+    return res.json({
+      response: {
+        items: rows.map((p) => ({
+          itemId: String(p.itemId),
+          title: p.title || null,
+          imageUrl: p.images?.[0]?.url || null,
+        })),
+      },
+    });
+  } catch (e) {
+    const status = e?.statusCode || 500;
+    return res.status(status).json({
+      error: "seo_ref_products_failed",
+      message: String(e?.message || e),
+    });
+  }
+}
+
+async function shopeeRecommendedKeywords(req, res) {
+  try {
+    const shop = await resolveShop(req, req.params.shopId);
+
+    const itemId = String(req.query.itemId || "").trim();
+    if (!itemId) return res.status(400).json({ error: "itemId_required" });
+
+    const q = String(req.query.q || "").trim();
+
+    const raw = await callAdsWithAutoRefresh({
+      shop,
+      call: (accessToken) =>
+        ShopeeAdsService.get_recommended_keyword_list({
+          accessToken,
+          shopId: shop.shopId,
+          itemId,
+          inputKeyword: q || undefined,
+        }),
+    });
+
+    const list = Array.isArray(raw?.response?.suggested_keywords)
+      ? raw.response.suggested_keywords
+      : [];
+
+    const normalized = list
+      .map((x) => ({
+        keyword: String(x?.keyword || "").trim(),
+        quality_score:
+          x?.quality_score != null ? Number(x.quality_score) : null,
+        search_volume:
+          x?.search_volume != null ? Number(x.search_volume) : null,
+        suggested_bid:
+          x?.suggested_bid != null ? Number(x.suggested_bid) : null,
+      }))
+      .filter((x) => x.keyword);
+
+    const byVolume = [...normalized].sort(
+      (a, b) => (b.search_volume || 0) - (a.search_volume || 0),
+    );
+    const byQuality = [...normalized].sort(
+      (a, b) => (b.quality_score || 0) - (a.quality_score || 0),
+    );
+
+    const qNorm = q.toLowerCase();
+    const findRank = (arr) => {
+      const idx = arr.findIndex((x) => x.keyword.toLowerCase() === qNorm);
+      return idx >= 0 ? idx + 1 : null;
+    };
+
+    const match =
+      normalized.find((x) => x.keyword.toLowerCase() === qNorm) || null;
+
+    return res.json({
+      request_id: raw?.request_id,
+      warning: raw?.warning,
+      error: raw?.error || "",
+      message: raw?.message,
+      response: {
+        item_id: String(raw?.response?.item_id ?? itemId),
+        input_keyword: raw?.response?.input_keyword ?? q,
+        suggested_keywords: normalized,
+        rankings: {
+          by_volume: byVolume,
+          by_quality: byQuality,
+          match,
+          rank_by_volume: q ? findRank(byVolume) : null,
+          rank_by_quality: q ? findRank(byQuality) : null,
+        },
+      },
+    });
+  } catch (e) {
+    const data = getShopeeErrData(e);
+    const status = e?.response?.status || e?.statusCode || 500;
+
+    return res.status(status).json({
+      error: "seo_shopee_recommended_failed",
+      message: String(e?.message || e),
+      details: data,
+    });
+  }
+}
+
+module.exports = { suggest, keywords, refProducts, shopeeRecommendedKeywords };

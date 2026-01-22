@@ -23,6 +23,9 @@ router.use(sessionRoutes);
 // Attach auth context for API routes (optional, but good)
 router.use(sessionAuth);
 
+// ✅ rotas SEO autenticadas (produto ref + Shopee Ads)
+router.use(require("./seo.authed"));
+
 router.use(healthRoutes);
 router.use(authLocalRoutes);
 router.use(authRoutes);
