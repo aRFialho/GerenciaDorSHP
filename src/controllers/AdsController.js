@@ -837,10 +837,8 @@ async function roasRealApprox(req, res, next) {
     }
 
     const tzOffset = process.env.SHOPEE_REPORT_TZ_OFFSET || "-03:00";
-    const h = hourIndexInOffset(order.shopeeCreateTime, tzOffset);
-    hourly[h].gmvCents += order.itemsSubtotalCents;
 
-    // intervalo no “dia local” do relatório (mesmo offset usado no snapshot)
+    // intervalo no “dia local” do relatório
     const start = new Date(`${dateFrom}T00:00:00.000${tzOffset}`);
     const end = new Date(`${dateTo}T23:59:59.999${tzOffset}`);
 
@@ -862,13 +860,13 @@ async function roasRealApprox(req, res, next) {
 
     const spendCents = Number(spendAgg?._sum?.spendCents || 0);
 
-    // 2) “GMV atribuído” aproximado = soma do amountCents dos pedidos matched (filtrando status negativos)
+    // 2) “GMV atribuído” aproximado
     const attrAgg = await prisma.orderAdsAttribution.aggregate({
       where: {
         shopId: shop.id,
         channel: "CPC",
         matchedHour: { gte: start, lte: end },
-        order: { is: paidOrderWhere() }, // aplica notIn CANCELLED/UNPAID/TO_RETURN etc
+        order: { is: paidOrderWhere() },
       },
       _sum: { amountCents: true },
       _count: { id: true },
