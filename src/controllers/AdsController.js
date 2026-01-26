@@ -865,7 +865,7 @@ async function roasRealApprox(req, res, next) {
         shopId: shop.id,
         channel: "CPC",
         matchedHour: { gte: start, lte: end },
-        order: paidOrderWhere(), // aplica notIn CANCELLED/UNPAID/TO_RETURN etc
+        order: { is: paidOrderWhere() }, // aplica notIn CANCELLED/UNPAID/TO_RETURN etc
       },
       _sum: { amountCents: true },
       _count: { id: true },
@@ -886,6 +886,11 @@ async function roasRealApprox(req, res, next) {
       counts: { ordersMatched },
     });
   } catch (e) {
+    console.error("[AdsController.roasRealApprox] failed", {
+      message: e?.message,
+      code: e?.code,
+      meta: e?.meta,
+    });
     return next(e);
   }
 }
