@@ -146,11 +146,15 @@ async function dailyPerformance(req, res, next) {
       });
     }
 
-    const raw = await ShopeeAdsService.get_all_cpc_ads_daily_performance({
-      accessToken,
-      shopId: shop.shopId,
-      startDate,
-      endDate,
+    const raw = await callAdsWithAutoRefresh({
+      shop,
+      call: (accessToken) =>
+        ShopeeAdsService.get_all_cpc_ads_daily_performance({
+          accessToken,
+          shopId: shop.shopId,
+          startDate,
+          endDate,
+        }),
     });
 
     const rows = Array.isArray(raw?.response) ? raw.response : [];
@@ -187,7 +191,7 @@ async function dailyPerformance(req, res, next) {
         broad_gmv: 0,
         direct_order: 0,
         broad_order: 0,
-      }
+      },
     );
 
     res.json({
@@ -356,7 +360,7 @@ async function campaignsDailyPerformance(req, res, next) {
               broad_gmv: 0,
               direct_order: 0,
               broad_order: 0,
-            }
+            },
           );
 
           campaigns.push({
@@ -511,7 +515,7 @@ async function campaignSettings(req, res, next) {
       products.map((p) => [
         String(p.itemId),
         { title: p.title || null, image_url: p.images?.[0]?.url || null },
-      ])
+      ]),
     );
 
     // Agora anexa linked_items em cada campanha
@@ -525,7 +529,7 @@ async function campaignSettings(req, res, next) {
         ? c.auto_product_ads_info
         : [];
       const autoMap = new Map(
-        autoInfo.filter((x) => x?.item_id).map((x) => [String(x.item_id), x])
+        autoInfo.filter((x) => x?.item_id).map((x) => [String(x.item_id), x]),
       );
 
       const linked_items = itemIds.map((itemId) => {
@@ -613,7 +617,7 @@ async function campaignItemsPerformance(req, res, next) {
     const autoMap = new Map(
       autoInfo
         .filter((x) => x?.item_id != null)
-        .map((x) => [String(x.item_id), x])
+        .map((x) => [String(x.item_id), x]),
     );
 
     // 2) Enrichment no DB (title + 1 imagem)
@@ -640,7 +644,7 @@ async function campaignItemsPerformance(req, res, next) {
       products.map((p) => [
         String(p.itemId),
         { title: p.title || null, image_url: p.images?.[0]?.url || null },
-      ])
+      ]),
     );
 
     // 3) Monta items base (settings + DB). Métricas vêm na próxima etapa via Shopee endpoint de item-performance.
@@ -698,8 +702,8 @@ async function campaignItemsPerformance(req, res, next) {
           row?.item_id != null
             ? String(row.item_id)
             : row?.itemId != null
-            ? String(row.itemId)
-            : null;
+              ? String(row.itemId)
+              : null;
 
         if (!itemId) continue;
 
@@ -776,11 +780,45 @@ function toTsEnd(isoDate) {
   return Math.floor(d.getTime() / 1000);
 }
 
+async function hourlyPerformance(req, res, next) {
+  try {
+    const shop = await resolveShop(req, req.params.shopId);
+
+    const { dateFrom, dateTo } = req.query;
+    const startDate = toShopeeDate(dateFrom);
+    const endDate = toShopeeDate(dateTo);
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        error: { message: "dateFrom/dateTo inválidos. Use YYYY-MM-DD." },
+      });
+    }
+
+    // retorna RAW por enquanto (até você colar aqui o payload e a gente normalizar)
+    const raw = await callAdsWithAutoRefresh({
+      shop,
+      call: (accessToken) =>
+        ShopeeAdsService.get_all_cpc_ads_hourly_performance({
+          accessToken,
+          shopId: shop.shopId,
+          startDate,
+          endDate,
+        }),
+    });
+
+    return res.json(raw);
+  } catch (e) {
+    return next(e);
+  }
+}
+
 module.exports = {
   balance,
   dailyPerformance,
+  hourlyPerformance,
   listCampaignIds,
   campaignsDailyPerformance,
   campaignSettings,
   campaignItemsPerformance,
+  toTsEnd,
+  toTsStart,
 };

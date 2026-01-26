@@ -8,43 +8,45 @@ router.use(requireAuth);
 router.get("/shops/:shopId/ads/balance", AdsController.balance);
 router.get(
   "/shops/:shopId/ads/performance/daily",
-  AdsController.dailyPerformance
+  AdsController.dailyPerformance,
 );
 
 router.get("/shops/:shopId/ads/campaigns/ids", AdsController.listCampaignIds);
 router.get(
   "/shops/:shopId/ads/campaigns/settings",
-  AdsController.campaignSettings
+  AdsController.campaignSettings,
 );
+
+router.get("/shops/:shopId/ads/cpc/hourly", AdsController.hourlyPerformance);
 
 router.get(
   "/shops/:shopId/ads/campaigns/performance/daily",
-  AdsController.campaignsDailyPerformance
+  AdsController.campaignsDailyPerformance,
 );
 
 router.post(
   "/shops/:shopId/ads/campaigns/items/performance",
-  AdsController.campaignItemsPerformance
+  AdsController.campaignItemsPerformance,
 );
 
 router.get(
   "/shops/:shopId/ads/campaign-groups",
-  AdsCampaignGroupsController.list
+  AdsCampaignGroupsController.list,
 );
 
 router.post(
   "/shops/:shopId/ads/campaign-groups",
-  AdsCampaignGroupsController.create
+  AdsCampaignGroupsController.create,
 );
 
 router.put(
   "/shops/:shopId/ads/campaign-groups/:groupId",
-  AdsCampaignGroupsController.update
+  AdsCampaignGroupsController.update,
 );
 
 router.delete(
   "/shops/:shopId/ads/campaign-groups/:groupId",
-  AdsCampaignGroupsController.remove
+  AdsCampaignGroupsController.remove,
 );
 
 module.exports = router;

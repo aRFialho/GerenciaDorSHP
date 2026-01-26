@@ -316,7 +316,10 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
       hotListingOrder: detail.hot_listing_order ?? null,
       isBuyerShopCollection: detail.is_buyer_shop_collection ?? null,
       messageToSeller: detail.message_to_seller || null,
-      reverseShippingFee: detail.reverse_shipping_fee ?? null,
+      reverseShippingFee:
+        detail.reverse_shipping_fee != null
+          ? parseMoneyToCents(detail.reverse_shipping_fee)
+          : null,
       itemsSubtotalCents,
       shippingCents,
     },
@@ -341,7 +344,10 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
       hotListingOrder: detail.hot_listing_order ?? null,
       isBuyerShopCollection: detail.is_buyer_shop_collection ?? null,
       messageToSeller: detail.message_to_seller || null,
-      reverseShippingFee: detail.reverse_shipping_fee ?? null,
+      reverseShippingFee:
+        detail.reverse_shipping_fee != null
+          ? parseMoneyToCents(detail.reverse_shipping_fee)
+          : null,
     },
   });
   // ✅ salva itens do pedido para ranking por GMV do mês
