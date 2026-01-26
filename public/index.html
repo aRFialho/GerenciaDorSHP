@@ -290,7 +290,33 @@
               </div>
             </div>
           </div>
-
+          <div class="dash-card" style="margin-top: 12px">
+            <div class="dash-card-head">
+              <div class="dash-card-title">Ads (ROAS real aproximado)</div>
+              <div class="dash-card-right">
+                <span id="dashAdsBadge" class="badge badge--gray">—</span>
+              </div>
+            </div>
+            <div class="dash-card-body">
+              <div class="kpi-grid kpi-grid-sm">
+                <div class="kpi">
+                  <div class="kpi-label">Gasto (Ads)</div>
+                  <div class="kpi-value" id="dashAdsSpend">—</div>
+                </div>
+                <div class="kpi">
+                  <div class="kpi-label">GMV atribuído (aprox.)</div>
+                  <div class="kpi-value" id="dashAdsGmv">—</div>
+                </div>
+                <div class="kpi">
+                  <div class="kpi-label">ROAS</div>
+                  <div class="kpi-value" id="dashAdsRoas">—</div>
+                </div>
+              </div>
+              <div class="muted" id="dashAdsMeta" style="margin-top: 8px">
+                —
+              </div>
+            </div>
+          </div>
           <div id="dashMsg" class="muted" style="margin-top: 10px"></div>
         </section>
         <!-- AUTH -->
@@ -674,6 +700,15 @@
                     >
                       Vendas influenciadas pelo anúncio (atribuição indireta) /
                       GMV Total.
+                    </div>
+                    <div class="kpi">
+                      <div class="kpi-label">GMV atribuído (aprox.)</div>
+                      <div class="kpi-value" id="kpiCpcRealGmv">—</div>
+                    </div>
+
+                    <div class="kpi">
+                      <div class="kpi-label">ROAS real (aprox.)</div>
+                      <div class="kpi-value" id="kpiCpcRealRoas">—</div>
                     </div>
                   </div>
                 </div>

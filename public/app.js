@@ -1652,7 +1652,13 @@ async function loadDashboard(opts = {}) {
       const data = await apiGet(
         `/shops/${SHOP_PATH_PLACEHOLDER}/dashboard/today-sales`,
       );
+      const todayIso = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
+      const ads = await loadAdsRoasApprox({
+        dateFrom: todayIso,
+        dateTo: todayIso,
+      });
+      setAdsRoasUI(ads);
       // KPIs HOJE (IDs do seu HTML)
       setText(
         "dashTodayGmv",
@@ -1687,6 +1693,15 @@ async function loadDashboard(opts = {}) {
       });
 
       if (msg) msg.textContent = "";
+      try {
+        const today = isoLocalDate();
+        const ads = await loadAdsRoasApprox({ dateFrom: today, dateTo: today });
+        setDashAdsRoasUI(ads, { label: `Período Ads: ${today} (hoje)` });
+      } catch (e) {
+        setDashAdsRoasUI(null, {
+          label: `Ads indisponível: ${String(e?.message || e)}`,
+        });
+      }
       return;
     }
 
@@ -1694,7 +1709,20 @@ async function loadDashboard(opts = {}) {
     const data = await apiGet(
       `/shops/${SHOP_PATH_PLACEHOLDER}/dashboard/monthly-sales`,
     );
+    try {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const from = `${y}-${m}-01`;
+      const to = isoLocalDate(now);
 
+      const ads = await loadAdsRoasApprox({ dateFrom: from, dateTo: to });
+      setDashAdsRoasUI(ads, { label: `Período Ads: ${from} → ${to}` });
+    } catch (e) {
+      setDashAdsRoasUI(null, {
+        label: `Ads indisponível: ${String(e?.message || e)}`,
+      });
+    }
     const gmvMtdCents = Number(data?.metrics?.gmvMtdCents || 0);
     const projectionCents = Number(data?.metrics?.projectionCents || 0);
     const avgPerDayCents = Number(data?.metrics?.avgPerDayCents || 0);
@@ -3728,6 +3756,71 @@ async function adminRestoreDbBackup() {
         msg.textContent =
           "Backup restaurado. Recarregue as abas se necessário.";
     });
+}
+
+function setDashAdsRoasUI(data, { label }) {
+  const spendCents = Number(data?.metrics?.spendCents || 0);
+  const gmvCents = Number(data?.metrics?.attributedGmvCents || 0);
+  const roas = data?.metrics?.roas;
+
+  setText("dashAdsSpend", formatBRLCents(spendCents));
+  setText("dashAdsGmv", formatBRLCents(gmvCents));
+  setText("dashAdsRoas", roas == null ? "—" : `${Number(roas).toFixed(2)}x`);
+
+  const badge = document.getElementById("dashAdsBadge");
+  if (badge) {
+    badge.className =
+      "badge " + (spendCents > 0 ? "badge--top" : "badge--gray");
+    badge.textContent = spendCents > 0 ? "Ativo" : "Sem gasto";
+  }
+
+  setText("dashAdsMeta", label || "—");
+}
+
+async function loadAdsRoasApprox({ dateFrom, dateTo }) {
+  const qs = new URLSearchParams({
+    dateFrom: String(dateFrom || ""),
+    dateTo: String(dateTo || ""),
+  });
+  return apiGet(
+    `/shops/${SHOP_PATH_PLACEHOLDER}/ads/roas-real-aproximado?${qs}`,
+  );
+}
+
+function isoLocalDate(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+async function loadAdsRoasApprox({ dateFrom, dateTo }) {
+  const qs = new URLSearchParams({
+    dateFrom: String(dateFrom || ""),
+    dateTo: String(dateTo || ""),
+  });
+
+  return apiGet(
+    `/shops/${SHOP_PATH_PLACEHOLDER}/ads/roas-real-aproximado?${qs.toString()}`,
+  );
+}
+
+function setAdsRoasUI(data) {
+  const spendCents = Number(data?.metrics?.spendCents || 0);
+  const gmvCents = Number(data?.metrics?.attributedGmvCents || 0);
+  const roas = data?.metrics?.roas;
+
+  setText("dashAdsSpend", formatBRLCents(spendCents));
+  setText("dashAdsGmv", formatBRLCents(gmvCents));
+  setText("dashAdsRoas", roas == null ? "—" : Number(roas).toFixed(2) + "x");
+
+  // opcional: status visual
+  const badge = document.getElementById("dashAdsBadge");
+  if (badge) {
+    badge.className =
+      "badge " + (spendCents > 0 ? "badge--top" : "badge--gray");
+    badge.textContent = spendCents > 0 ? "Ads ativo" : "Sem gasto";
+  }
 }
 
 async function apiPatch(path, body) {

@@ -2,6 +2,8 @@ const ShopeeAdsService = require("../services/ShopeeAdsService");
 const { resolveShop } = require("../utils/resolveShop");
 const prisma = require("../config/db");
 const AuthService = require("../services/ShopeeAuthService"); // ajuste o caminho/nome real
+const { paidOrderWhere } = require("../utils/orderStatusFilters");
+
 function getShopeeErrData(e) {
   return e?.response?.data || e?.shopee || null;
 }
@@ -822,10 +824,77 @@ async function hourlyPerformance(req, res, next) {
   }
 }
 
+async function roasRealApprox(req, res, next) {
+  try {
+    const shop = await resolveShop(req, req.params.shopId);
+
+    const { dateFrom, dateTo } = req.query;
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({
+        error: { message: "dateFrom/dateTo são obrigatórios (YYYY-MM-DD)." },
+      });
+    }
+
+    const tzOffset = process.env.SHOPEE_REPORT_TZ_OFFSET || "-03:00";
+
+    // intervalo no “dia local” do relatório (mesmo offset usado no snapshot)
+    const start = new Date(`${dateFrom}T00:00:00.000${tzOffset}`);
+    const end = new Date(`${dateTo}T23:59:59.999${tzOffset}`);
+
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) {
+      return res.status(400).json({
+        error: { message: "dateFrom/dateTo inválidos. Use YYYY-MM-DD." },
+      });
+    }
+
+    // 1) Spend do Ads (CPC)
+    const spendAgg = await prisma.adsHourlyMetric.aggregate({
+      where: {
+        shopId: shop.id,
+        channel: "CPC",
+        dateHour: { gte: start, lte: end },
+      },
+      _sum: { spendCents: true },
+    });
+
+    const spendCents = Number(spendAgg?._sum?.spendCents || 0);
+
+    // 2) “GMV atribuído” aproximado = soma do amountCents dos pedidos matched (filtrando status negativos)
+    const attrAgg = await prisma.orderAdsAttribution.aggregate({
+      where: {
+        shopId: shop.id,
+        channel: "CPC",
+        matchedHour: { gte: start, lte: end },
+        order: paidOrderWhere(), // aplica notIn CANCELLED/UNPAID/TO_RETURN etc
+      },
+      _sum: { amountCents: true },
+      _count: { id: true },
+    });
+
+    const attributedGmvCents = Number(attrAgg?._sum?.amountCents || 0);
+    const ordersMatched = Number(attrAgg?._count?.id || 0);
+
+    const roas = spendCents > 0 ? attributedGmvCents / spendCents : null;
+
+    return res.json({
+      request: { dateFrom: String(dateFrom), dateTo: String(dateTo), tzOffset },
+      metrics: {
+        spendCents,
+        attributedGmvCents,
+        roas: roas == null ? null : Number(roas.toFixed(4)),
+      },
+      counts: { ordersMatched },
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
 module.exports = {
   balance,
   dailyPerformance,
   hourlyPerformance,
+  roasRealApprox,
   listCampaignIds,
   campaignsDailyPerformance,
   campaignSettings,

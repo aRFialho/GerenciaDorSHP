@@ -85,6 +85,10 @@ function fmtNumberBR(v) {
   return Number.isFinite(n) ? n.toLocaleString("pt-BR") : "—";
 }
 
+function fmtMoneyFromCents(cents) {
+  const n = Number(cents || 0) / 100;
+  return fmtMoneyBR(n);
+}
 /* ===========================
    Helpers
 =========================== */
@@ -375,6 +379,21 @@ function getDates() {
     dateFrom: fromEl ? fromEl.value : "",
     dateTo: toEl ? toEl.value : "",
   };
+}
+
+async function loadAdsRoasRealApproxForUi() {
+  const dateFrom = String(document.getElementById("adsDateFrom")?.value || "");
+  const dateTo = String(document.getElementById("adsDateTo")?.value || "");
+  if (!dateFrom || !dateTo) return;
+
+  const qs = new URLSearchParams({ dateFrom, dateTo });
+  const data = await apiGet(`/shops/active/ads/roas-real-aproximado?${qs}`);
+
+  const gmvCents = Number(data?.metrics?.attributedGmvCents || 0);
+  const roas = data?.metrics?.roas;
+
+  setText("kpiCpcRealGmv", fmtMoneyFromCents(gmvCents));
+  setText("kpiCpcRealRoas", roas == null ? "—" : `${Number(roas).toFixed(2)}x`);
 }
 
 function safeDestroyChart(ch) {
@@ -1046,6 +1065,13 @@ async function loadAdsAll() {
     if (btn) {
       btn.disabled = false;
       btn.textContent = "Atualizar";
+      try {
+        await loadAdsRoasRealApproxForUi();
+      } catch (e) {
+        // não quebra a aba Ads se o endpoint falhar
+        setText("kpiCpcRealGmv", "—");
+        setText("kpiCpcRealRoas", "—");
+      }
     }
     setLoading("cpcLoading", "");
   }

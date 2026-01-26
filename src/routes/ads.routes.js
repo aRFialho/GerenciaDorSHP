@@ -20,6 +20,11 @@ router.get(
 router.get("/shops/:shopId/ads/cpc/hourly", AdsController.hourlyPerformance);
 
 router.get(
+  "/shops/:shopId/ads/roas-real-aproximado",
+  AdsController.roasRealApprox,
+);
+
+router.get(
   "/shops/:shopId/ads/campaigns/performance/daily",
   AdsController.campaignsDailyPerformance,
 );
