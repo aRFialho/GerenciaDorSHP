@@ -1842,6 +1842,22 @@ async function loadDashboard(opts = {}) {
   }
 }
 
+function tzOffsetToMinutes(tzOffset) {
+  const s = String(tzOffset || "-03:00").trim();
+  const m = s.match(/^([+-])(\d{2}):(\d{2})$/);
+  if (!m) return -180;
+  const sign = m[1] === "-" ? -1 : 1;
+  return sign * (Number(m[2]) * 60 + Number(m[3]));
+}
+
+// dateUtc é Date (com Z) ou string ISO com Z
+function hourIndexInOffset(dateUtc, tzOffset) {
+  const offsetMin = tzOffsetToMinutes(tzOffset);
+  const d = dateUtc instanceof Date ? dateUtc : new Date(dateUtc);
+  const shiftedMs = d.getTime() + offsetMin * 60 * 1000;
+  return new Date(shiftedMs).getUTCHours(); // 0..23 (hora “local” do offset)
+}
+
 function setTrendArrow(arrowId, deltaPct) {
   const el = document.getElementById(arrowId);
   if (!el) return;

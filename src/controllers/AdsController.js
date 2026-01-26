@@ -836,6 +836,8 @@ async function roasRealApprox(req, res, next) {
     }
 
     const tzOffset = process.env.SHOPEE_REPORT_TZ_OFFSET || "-03:00";
+    const h = hourIndexInOffset(order.shopeeCreateTime, tzOffset);
+    hourly[h].gmvCents += order.itemsSubtotalCents;
 
     // intervalo no “dia local” do relatório (mesmo offset usado no snapshot)
     const start = new Date(`${dateFrom}T00:00:00.000${tzOffset}`);

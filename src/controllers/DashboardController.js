@@ -1,6 +1,44 @@
 const prisma = require("../config/db");
 const { paidOrderWhere } = require("../utils/orderStatusRules");
+const SHOPEE_TZ = process.env.SHOPEE_REPORT_TZ_OFFSET || "-03:00";
 
+function tzOffsetToMinutes(tzOffset) {
+  const s = String(tzOffset || "-03:00").trim();
+  const m = s.match(/^([+-])(\d{2}):(\d{2})$/);
+  if (!m) return -180;
+  const sign = m[1] === "-" ? -1 : 1;
+  return sign * (Number(m[2]) * 60 + Number(m[3]));
+}
+
+function hourIndexInOffset(dateUtc, tzOffset) {
+  const offsetMin = tzOffsetToMinutes(tzOffset);
+  const d = dateUtc instanceof Date ? dateUtc : new Date(dateUtc);
+  const shiftedMs = d.getTime() + offsetMin * 60 * 1000;
+  return new Date(shiftedMs).getUTCHours(); // 0..23 “na hora local do offset”
+}
+
+function isoDateInOffsetNow(tzOffset) {
+  const offsetMin = tzOffsetToMinutes(tzOffset);
+  const now = new Date();
+  const shifted = new Date(now.getTime() + offsetMin * 60 * 1000);
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(shifted.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`; // YYYY-MM-DD
+}
+
+function addDaysIso(isoYmd, deltaDays) {
+  const d = new Date(`${isoYmd}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function startOfIsoDayInOffset(isoYmd, tzOffset) {
+  return new Date(`${isoYmd}T00:00:00.000${tzOffset}`);
+}
 async function getActiveShopOrFail(req, res) {
   if (!req.auth) return res.status(401).json({ error: "unauthorized" });
   const shopDbId = req.auth.activeShopId || null;
@@ -185,13 +223,14 @@ async function todaySales(req, res) {
     if (!shop) return;
 
     const now = new Date();
-    const startToday = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-    );
-    const startYesterday = new Date(startToday);
-    startYesterday.setDate(startYesterday.getDate() - 1);
+
+    // “Hoje” e “ontem” no fuso do relatório (ex.: -03:00)
+    const todayIso = isoDateInOffsetNow(SHOPEE_TZ);
+    const yesterdayIso = addDaysIso(todayIso, -1);
+
+    // Início de hoje/ontem (instantes UTC equivalentes ao 00:00 local do offset)
+    const startToday = startOfIsoDayInOffset(todayIso, SHOPEE_TZ);
+    const startYesterday = startOfIsoDayInOffset(yesterdayIso, SHOPEE_TZ);
 
     const orders = await prisma.order.findMany({
       where: {
@@ -227,17 +266,19 @@ async function todaySales(req, res) {
       const cents = Number(o.gmvCents || 0);
 
       if (dt >= startToday) {
-        hourlyToday[dt.getHours()].gmvCents += cents;
+        const h = hourIndexInOffset(dt, SHOPEE_TZ);
+        hourlyToday[h].gmvCents += cents;
         gmvTodayCents += cents;
         ordersCountToday += 1;
       } else if (dt >= startYesterday && dt < startToday) {
-        hourlyYesterday[dt.getHours()].gmvCents += cents;
+        const h = hourIndexInOffset(dt, SHOPEE_TZ);
+        hourlyYesterday[h].gmvCents += cents;
         gmvYesterdayCents += cents;
         ordersCountYesterday += 1;
       }
     }
 
-    const currentHour = now.getHours();
+    const currentHour = hourIndexInOffset(now, SHOPEE_TZ);
 
     const sumUpToHour = (arr, h) =>
       arr.slice(0, h + 1).reduce((s, x) => s + Number(x.gmvCents || 0), 0);
@@ -262,7 +303,7 @@ async function todaySales(req, res) {
     res.json({
       period: {
         label: "Hoje",
-        dayLabel: now.toLocaleDateString("pt-BR"),
+        dayLabel: todayIso, // evita confusão de timezone no servidor
       },
       metrics: {
         gmvTodayCents,
