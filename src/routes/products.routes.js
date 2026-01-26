@@ -52,6 +52,27 @@ router.param("itemId", (req, res, next, itemId) => {
   }
   next();
 });
+
+router.get("/shops/active/products/:itemId", async (req, res, next) => {
+  try {
+    const shop = await resolveShop(req, "active");
+    req.params.shopId = String(shop.id); // DB id
+    return ProductsController.detail(req, res, next);
+  } catch (e) {
+    return next(e);
+  }
+});
+
+router.get("/shops/active/products/:itemId/full", async (req, res, next) => {
+  try {
+    const shop = await resolveShop(req, "active");
+    req.params.shopId = String(shop.id); // DB id
+    return ProductsController.fullDetail(req, res, next);
+  } catch (e) {
+    return next(e);
+  }
+});
+
 router.get(
   "/shops/:shopId/products/performance",
   ProductsController.performance,
