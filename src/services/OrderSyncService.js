@@ -161,6 +161,35 @@ function extractGmvCents(detail) {
   return Math.round(v * 100);
 }
 
+function extractItemsSubtotalCents(detail) {
+  const items = Array.isArray(detail?.item_list) ? detail.item_list : [];
+  if (!items.length) return null;
+
+  let sum = 0;
+
+  for (const it of items) {
+    const qty = Math.max(
+      0,
+      Number(it?.model_quantity_purchased ?? it?.quantity ?? 0) || 0,
+    );
+
+    // preferir preço "discounted" do modelo (mais próximo do subtotal de produtos)
+    const unit =
+      num(it?.model_discounted_price) ||
+      num(it?.item_price) ||
+      num(it?.original_price) ||
+      num(it?.model_original_price) ||
+      0;
+
+    if (qty <= 0 || unit <= 0) continue;
+
+    sum += Math.round(unit * 100) * qty; // unit em R$, vira centavos
+  }
+
+  // se não conseguiu calcular nada (itens sem preço), retorna null
+  return sum > 0 ? sum : null;
+}
+
 function parseMoneyToCents(v) {
   if (v == null) return 0;
 
@@ -207,7 +236,10 @@ async function persistOrderItems({ shopInternalId, order, detail }) {
   const totalWeight = weights.reduce((s, x) => s + x.weight, 0);
 
   // rateio com ajuste de arredondamento pra fechar exatamente no total do pedido
-  let remaining = Number(order.gmvCents || 0);
+  const orderBaseCents = Number(
+    order.itemsSubtotalCents ?? order.gmvCents ?? 0,
+  );
+  let remaining = orderBaseCents;
 
   const rows = weights.map((x, idx) => {
     const it = x.it;
@@ -228,9 +260,7 @@ async function persistOrderItems({ shopInternalId, order, detail }) {
         // último recebe o resto pra fechar
         gmvCents = remaining;
       } else {
-        gmvCents = Math.round(
-          (Number(order.gmvCents || 0) * x.weight) / totalWeight,
-        );
+        gmvCents = Math.round((orderBaseCents * x.weight) / totalWeight);
         remaining -= gmvCents;
       }
     }
@@ -254,6 +284,11 @@ async function persistOrderItems({ shopInternalId, order, detail }) {
 async function upsertOrderAndSnapshot(shopInternalId, detail) {
   const orderSn = String(detail.order_sn);
   const gmvCandidate = extractGmvCents(detail);
+  const itemsSubtotalCents = extractItemsSubtotalCents(detail);
+  const shippingCents =
+    itemsSubtotalCents != null && gmvCandidate != null
+      ? Math.max(0, gmvCandidate - itemsSubtotalCents)
+      : null;
   const shipByDate = detail.ship_by_date
     ? new Date(Number(detail.ship_by_date) * 1000)
     : null;
@@ -282,9 +317,13 @@ async function upsertOrderAndSnapshot(shopInternalId, detail) {
       isBuyerShopCollection: detail.is_buyer_shop_collection ?? null,
       messageToSeller: detail.message_to_seller || null,
       reverseShippingFee: detail.reverse_shipping_fee ?? null,
+      itemsSubtotalCents,
+      shippingCents,
     },
     update: {
       ...(gmvCandidate != null ? { gmvCents: gmvCandidate } : {}),
+      ...(itemsSubtotalCents != null ? { itemsSubtotalCents } : {}),
+      ...(shippingCents != null ? { shippingCents } : {}),
       orderStatus: detail.order_status || null,
       region: detail.region || null,
       currency: detail.currency || null,

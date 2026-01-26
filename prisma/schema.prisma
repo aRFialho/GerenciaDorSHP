@@ -14,6 +14,17 @@ enum Role {
   VIEWER
 }
 
+enum AdsChannel {
+  CPC
+  GMS
+}
+
+enum AdsMatchConfidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
 model Account {
   id   Int    @id @default(autoincrement())
   name String
@@ -73,18 +84,26 @@ model Shop {
   accountId Int?
   account   Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  shopId         BigInt             @unique
-  region         String?
-  status         String             @default("UNKNOWN")
-  geoAddresses   OrderGeoAddress[]
-  tokens         OAuthToken?
-  orders         Order[]
-  products       Product[]
-  orderItems     OrderItem[]
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  sessions       Session[]
+  shopId BigInt  @unique
+  region String?
+  status String  @default("UNKNOWN")
+
+  geoAddresses OrderGeoAddress[]
+  tokens       OAuthToken?
+  orders       Order[]
+  products     Product[]
+  orderItems   OrderItem[]
+
   campaignGroups AdsCampaignGroup[]
+
+  // Ads / ROAS real aproximado
+  adsHourlyMetrics     AdsHourlyMetric[]
+  orderAdsAttributions OrderAdsAttribution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
 
   @@index([accountId])
 }
@@ -130,11 +149,19 @@ model Order {
   geoAddress            OrderGeoAddress?
   reverseShippingFee    Int?
 
+  // Subtotal dos Produtos (itens) em centavos + debug
+  itemsSubtotalCents Int?
+  shippingCents      Int?
+
+  // Atribuição aproximada Ads ↔ Pedido
+  adsAttribution OrderAdsAttribution?
+
   addressSnapshots OrderAddressSnapshot[]
   addressAlerts    OrderAddressChangeAlert[]
   items            OrderItem[]
-  createdAt        DateTime                  @default(now())
-  updatedAt        DateTime                  @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([shopId, orderSn])
   @@index([shopId, orderStatus])
@@ -204,28 +231,30 @@ model Product {
   shopId Int
   shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  itemId         BigInt
-  status         String?
-  title          String?
-  description    String?   @db.Text
+  itemId      BigInt
+  status      String?
+  title       String?
+  description String? @db.Text
+
   ratingStar     Float?
   ratingCount    Int?
   ratingOver500  Boolean   @default(false)
   ratingSyncedAt DateTime?
-  currency       String?
-  priceMin       Int?
-  priceMax       Int?
-  itemSku        String?
-  stock          Int?
-  sold           Int?
-  attributes     Json?
-  logistics      Json?
-  dimension      Json?
-  weight         Float?
-  daysToShip     Int?
-  hasModel       Boolean?
-  brand          String?
-  categoryId     BigInt?
+
+  currency   String?
+  priceMin   Int?
+  priceMax   Int?
+  itemSku    String?
+  stock      Int?
+  sold       Int?
+  attributes Json?
+  logistics  Json?
+  dimension  Json?
+  weight     Float?
+  daysToShip Int?
+  hasModel   Boolean?
+  brand      String?
+  categoryId BigInt?
 
   shopeeCreateTime DateTime?
   shopeeUpdateTime DateTime?
@@ -233,8 +262,9 @@ model Product {
   images ProductImage[]
   models ProductModel[]
 
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   orderItems OrderItem[]
 
   @@unique([shopId, itemId])
@@ -316,8 +346,9 @@ model OrderAddressChangeAlert {
   oldHash String?
   newHash String
 
-  detectedAt             DateTime              @default(now())
-  resolvedAt             DateTime?
+  detectedAt DateTime  @default(now())
+  resolvedAt DateTime?
+
   orderAddressSnapshot   OrderAddressSnapshot? @relation(fields: [orderAddressSnapshotId], references: [id])
   orderAddressSnapshotId Int?
 
@@ -352,9 +383,67 @@ model OrderItem {
   productId Int?
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
-  // evita duplicar o mesmo item/model dentro do mesmo pedido
   @@unique([orderId, itemId, modelId])
   @@index([shopId, orderId])
   @@index([shopId, itemId])
   @@index([shopId, productId])
+}
+
+model AdsHourlyMetric {
+  id Int @id @default(autoincrement())
+
+  shopId Int
+  shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  channel AdsChannel @default(CPC)
+
+  // bucket exato (ex.: 2026-01-25 22:00:00)
+  dateHour DateTime
+
+  spendCents Int @default(0)
+
+  // valores do Ads (raw) e o delta (se necessário)
+  gmvRawCents   Int?
+  gmvDeltaCents Int?
+
+  // opcional: direct/broad (se existir no payload)
+  gmvDirectRawCents   Int?
+  gmvDirectDeltaCents Int?
+  gmvBroadRawCents    Int?
+  gmvBroadDeltaCents  Int?
+
+  raw Json?
+
+  capturedAt DateTime @default(now())
+
+  @@unique([shopId, channel, dateHour])
+  @@index([shopId, dateHour])
+}
+
+model OrderAdsAttribution {
+  id Int @id @default(autoincrement())
+
+  shopId Int
+  shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  orderId Int   @unique
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  channel AdsChannel @default(CPC)
+
+  // bucket de hora usado no match
+  matchedHour DateTime
+
+  // normalmente: Order.itemsSubtotalCents
+  amountCents Int
+
+  confidence AdsMatchConfidence @default(MEDIUM)
+
+  // metadados de debug/auditoria
+  orderCreateTime DateTime?
+  matchedAt       DateTime  @default(now())
+  rule            String? // ex.: "same_hour_high_15m", "same_hour_medium", "pm1h_low"
+
+  @@index([shopId, matchedHour])
+  @@index([shopId, confidence])
 }

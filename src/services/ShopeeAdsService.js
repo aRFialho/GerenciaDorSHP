@@ -227,10 +227,26 @@ async function get_recommended_keyword_list({
     },
   });
 }
-
+async function get_all_cpc_ads_hourly_performance({
+  accessToken,
+  shopId,
+  startDate,
+  endDate,
+}) {
+  return shopeeAdsGet({
+    path: "/api/v2/ads/get_all_cpc_ads_hourly_performance",
+    accessToken,
+    shopId,
+    query: {
+      start_date: startDate, // formato "DD-MM-YYYY" (assumindo igual ao daily)
+      end_date: endDate,
+    },
+  });
+}
 module.exports = {
   get_total_balance,
   get_all_cpc_ads_daily_performance,
+  get_all_cpc_ads_hourly_performance,
   get_product_level_campaign_id_list,
   get_product_campaign_daily_performance,
   get_product_level_campaign_setting_info,
