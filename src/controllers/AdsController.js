@@ -785,23 +785,34 @@ async function hourlyPerformance(req, res, next) {
     const shop = await resolveShop(req, req.params.shopId);
 
     const { dateFrom, dateTo } = req.query;
-    const startDate = toShopeeDate(dateFrom);
-    const endDate = toShopeeDate(dateTo);
-    if (!startDate || !endDate) {
+    if (!dateFrom || !dateTo) {
       return res.status(400).json({
-        error: { message: "dateFrom/dateTo inválidos. Use YYYY-MM-DD." },
+        error: { message: "dateFrom/dateTo são obrigatórios (YYYY-MM-DD)." },
+      });
+    }
+    if (String(dateFrom) !== String(dateTo)) {
+      return res.status(400).json({
+        error: {
+          message:
+            "Endpoint hourly aceita apenas 1 dia. Use dateFrom=dateTo (YYYY-MM-DD).",
+        },
       });
     }
 
-    // retorna RAW por enquanto (até você colar aqui o payload e a gente normalizar)
+    const performanceDate = toShopeeDate(dateFrom); // vira "DD-MM-YYYY"
+    if (!performanceDate) {
+      return res.status(400).json({
+        error: { message: "dateFrom inválido. Use YYYY-MM-DD." },
+      });
+    }
+
     const raw = await callAdsWithAutoRefresh({
       shop,
       call: (accessToken) =>
         ShopeeAdsService.get_all_cpc_ads_hourly_performance({
           accessToken,
           shopId: shop.shopId,
-          startDate,
-          endDate,
+          performanceDate,
         }),
     });
 

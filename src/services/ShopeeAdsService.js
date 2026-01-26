@@ -230,16 +230,14 @@ async function get_recommended_keyword_list({
 async function get_all_cpc_ads_hourly_performance({
   accessToken,
   shopId,
-  startDate,
-  endDate,
+  performanceDate, // "DD-MM-YYYY"
 }) {
   return shopeeAdsGet({
     path: "/api/v2/ads/get_all_cpc_ads_hourly_performance",
     accessToken,
     shopId,
     query: {
-      start_date: startDate, // formato "DD-MM-YYYY" (assumindo igual ao daily)
-      end_date: endDate,
+      performance_date: performanceDate,
     },
   });
 }
