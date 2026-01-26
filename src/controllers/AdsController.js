@@ -3,6 +3,7 @@ const { resolveShop } = require("../utils/resolveShop");
 const prisma = require("../config/db");
 const AuthService = require("../services/ShopeeAuthService"); // ajuste o caminho/nome real
 const { paidOrderWhere } = require("../utils/orderStatusRules");
+const { hourIndexInOffset } = require("../utils/timezone");
 
 function getShopeeErrData(e) {
   return e?.response?.data || e?.shopee || null;
