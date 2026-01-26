@@ -16,6 +16,8 @@ let DASH_CHART_TODAY = null;
 let DASH_CHART_MONTH_RATIO = null;
 let SEO_GOOGLE_CMP_CHART = null;
 let SEO_GOOGLE_CMP_BARS = null;
+let PRODUCTS_SORT_BOUND = false;
+let PRODUCTS_TOOLBAR_BOUND = false;
 
 // Para Opção A: manter rotas /shops/:shopId/... mas backend ignora.
 // Usamos um placeholder fixo só para completar a URL.
@@ -74,6 +76,25 @@ function setSeoRefProduct(p) {
       imageUrl: p.imageUrl || null,
     }),
   );
+}
+
+function initProductsSort() {
+  if (PRODUCTS_SORT_BOUND) return;
+  PRODUCTS_SORT_BOUND = true;
+
+  const sel = document.getElementById("products-sort");
+  if (!sel) return;
+
+  // valor inicial (respeita estado atual)
+  sel.value = `${PRODUCTS_SORT_BY}:${PRODUCTS_SORT_DIR}`;
+
+  sel.addEventListener("change", async () => {
+    const [by, dir] = String(sel.value || "updatedAt:desc").split(":");
+    PRODUCTS_SORT_BY = by || "updatedAt";
+    PRODUCTS_SORT_DIR = dir === "asc" ? "asc" : "desc";
+    PRODUCTS_PAGE = 1;
+    await loadProducts();
+  });
 }
 
 async function apiGet(path) {
@@ -324,7 +345,10 @@ function initTabs() {
         await ensureShopSelected();
       }
 
-      if (tab === "products") loadProducts();
+      if (tab === "products") {
+        initProductsSort();
+        loadProducts();
+      }
       if (tab === "orders") loadOrders();
       if (tab === "admin") loadAdmin();
       if (tab === "geo-sales") loadGeoSales();
