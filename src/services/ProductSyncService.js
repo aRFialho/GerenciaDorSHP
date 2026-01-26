@@ -1,5 +1,6 @@
 const prisma = require("../config/db");
 const ShopeeProductService = require("./ShopeeProductService");
+const { getItemRatingSummary } = require("./ShopeeProductCommentService");
 
 function chunk(arr, size) {
   const out = [];
@@ -25,6 +26,21 @@ async function mapLimit(list, limit, fn) {
   return Promise.allSettled(ret);
 }
 
+function toBigInt(v) {
+  return BigInt(String(v));
+}
+
+function asItemIdStr(v) {
+  return String(v ?? "").trim();
+}
+
+function isRatingFresh(ratingSyncedAt, ttlMs) {
+  if (!ratingSyncedAt) return false;
+  const t = new Date(ratingSyncedAt).getTime();
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t < ttlMs;
+}
+
 async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
   const shopRow = await prisma.shop.findUnique({
     where: { shopId: BigInt(String(shopeeShopId)) },
@@ -38,8 +54,15 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
 
   const MODEL_CONCURRENCY = Math.max(
     1,
-    Number(process.env.MODEL_FETCH_CONCURRENCY || 6)
+    Number(process.env.MODEL_FETCH_CONCURRENCY || 6),
   );
+
+  const COMMENT_CONCURRENCY = Math.max(
+    1,
+    Number(process.env.COMMENT_FETCH_CONCURRENCY || 4),
+  );
+
+  const RATING_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
   let offset = 0;
   let hasNext = true;
@@ -74,8 +97,87 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
       });
 
       const baseList = details?.response?.item_list || [];
+      if (!baseList.length) continue;
 
-      // 1) Pré-busca modelos em paralelo (apenas quem tem variação)
+      // 0) Pré-carrega do DB (pra TTL de 24h e fallback)
+      const baseItemIdsBig = baseList
+        .map((p) => (p?.item_id ? toBigInt(p.item_id) : null))
+        .filter(Boolean);
+
+      const existingRows = await prisma.product.findMany({
+        where: {
+          shopId: shopRow.id,
+          itemId: { in: baseItemIdsBig },
+        },
+        select: {
+          itemId: true,
+          ratingStar: true,
+          ratingCount: true,
+          ratingOver500: true,
+          ratingSyncedAt: true,
+        },
+      });
+
+      const existingByItemId = new Map();
+      for (const r of existingRows) {
+        existingByItemId.set(String(r.itemId), r);
+      }
+
+      // 1) Ratings por comentários (com TTL 24h)
+      const ratingResults = await mapLimit(
+        baseList,
+        COMMENT_CONCURRENCY,
+        async (p) => {
+          if (!p?.item_id) return null;
+
+          const itemIdStr = asItemIdStr(p.item_id);
+          const existing = existingByItemId.get(itemIdStr) || null;
+
+          // TTL: se está fresco, não chama Shopee
+          if (
+            existing &&
+            isRatingFresh(existing.ratingSyncedAt, RATING_TTL_MS)
+          ) {
+            return {
+              itemId: itemIdStr,
+              ok: true,
+              usedCache: true,
+              avgStar: existing.ratingStar ?? null,
+              ratingCount: existing.ratingCount ?? null,
+              over500: existing.ratingOver500 ?? false,
+            };
+          }
+
+          // Recalcular via get_comment
+          const r = await getItemRatingSummary({
+            shopId: String(shopeeShopId),
+            itemId: itemIdStr,
+            max: 500,
+            pageSize: 100,
+          });
+
+          return {
+            itemId: itemIdStr,
+            ok: true,
+            usedCache: false,
+            avgStar: Number.isFinite(r.avgStar) ? r.avgStar : 0,
+            ratingCount: Number.isInteger(r.ratingCount) ? r.ratingCount : 0,
+            over500: Boolean(r.over500),
+          };
+        },
+      );
+
+      const ratingByItemId = new Map();
+      const ratingComputedNow = new Set(); // itemIds que realmente recalcularam (não cache)
+
+      for (const r of ratingResults) {
+        if (r.status === "fulfilled" && r.value?.itemId && r.value?.ok) {
+          ratingByItemId.set(r.value.itemId, r.value);
+          if (!r.value.usedCache) ratingComputedNow.add(r.value.itemId);
+        }
+      }
+
+      // 2) Pré-busca modelos em paralelo (apenas quem tem variação)
       const withModel = baseList.filter((p) => p?.has_model && p?.item_id);
 
       const modelResults = await mapLimit(
@@ -86,17 +188,12 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
             shopId: shopeeShopId,
             itemId: p.item_id,
           });
-          if (String(p.item_id) === "23393415543") {
-            console.log(
-              "DEBUG model_list:",
-              JSON.stringify(resp?.response, null, 2)
-            );
-          }
+
           return {
             item_id: String(p.item_id),
             models: resp?.response?.model || [],
           };
-        }
+        },
       );
 
       const modelsByItemId = new Map();
@@ -106,12 +203,35 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
         }
       }
 
-      // 2) Persistência no DB
+      // 3) Persistência no DB
       for (const p of baseList) {
-        if (String(p.item_id) === "23393415543") {
-          console.log(JSON.stringify(p, null, 2));
-        }
-        const itemId = BigInt(String(p.item_id));
+        if (!p?.item_id) continue;
+
+        const itemIdStr = asItemIdStr(p.item_id);
+        const itemId = toBigInt(p.item_id);
+
+        const rr = ratingByItemId.get(itemIdStr) || null;
+        const existing = existingByItemId.get(itemIdStr) || null;
+
+        // Preferência:
+        // a) se rr existe -> usa rr (cache ou recalculado)
+        // b) se rr falhou -> usa existing
+        // c) senão -> cai no p.rating do Shopee (base info)
+        const ratingStarFinal =
+          rr && rr.avgStar !== null
+            ? rr.avgStar
+            : (existing?.ratingStar ?? p.rating?.rating_star ?? null);
+
+        const ratingCountFinal =
+          rr && rr.ratingCount !== null
+            ? rr.ratingCount
+            : (existing?.ratingCount ?? p.rating?.rating_count ?? null);
+
+        const ratingOver500Final = rr
+          ? Boolean(rr.over500)
+          : Boolean(existing?.ratingOver500 ?? false);
+
+        const shouldUpdateRatingSyncedAt = ratingComputedNow.has(itemIdStr);
 
         const product = await prisma.product.upsert({
           where: { shopId_itemId: { shopId: shopRow.id, itemId } },
@@ -136,10 +256,14 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
             priceMax: p.price_info?.[0]?.current_price ?? null,
             stock: p.stock_info_v2?.summary_info?.total_available_stock ?? null,
             sold: p.sold ?? null,
-            ratingStar: p.rating?.rating_star ?? null,
-            ratingCount: p.rating?.rating_count ?? null,
+
+            ratingStar: ratingStarFinal,
+            ratingCount: ratingCountFinal,
+            ratingOver500: ratingOver500Final,
+            ratingSyncedAt: shouldUpdateRatingSyncedAt ? new Date() : null,
+
             hasModel: p.has_model ?? null,
-            categoryId: p.category_id ? BigInt(String(p.category_id)) : null,
+            categoryId: p.category_id ? toBigInt(p.category_id) : null,
             shopeeUpdateTime: p.update_time
               ? new Date(Number(p.update_time) * 1000)
               : null,
@@ -164,10 +288,16 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
             stock:
               p.stock_info_v2?.summary_info?.total_available_stock ?? undefined,
             sold: p.sold ?? undefined,
-            ratingStar: p.rating?.rating_star ?? null,
-            ratingCount: p.rating?.rating_count ?? null,
+
+            ratingStar: ratingStarFinal,
+            ratingCount: ratingCountFinal,
+            ratingOver500: ratingOver500Final,
+            ...(shouldUpdateRatingSyncedAt
+              ? { ratingSyncedAt: new Date() }
+              : {}),
+
             hasModel: p.has_model ?? undefined,
-            categoryId: p.category_id ? BigInt(String(p.category_id)) : null,
+            categoryId: p.category_id ? toBigInt(p.category_id) : null,
             shopeeUpdateTime: p.update_time
               ? new Date(Number(p.update_time) * 1000)
               : null,
@@ -199,13 +329,13 @@ async function syncProductsForShop({ shopeeShopId, pageSize = 50 }) {
         });
 
         if (p.has_model) {
-          const modelList = modelsByItemId.get(String(p.item_id)) || [];
+          const modelList = modelsByItemId.get(itemIdStr) || [];
 
           if (modelList.length) {
             await prisma.productModel.createMany({
               data: modelList.map((m) => ({
                 productId: product.id,
-                modelId: BigInt(String(m.model_id)),
+                modelId: toBigInt(m.model_id),
                 name: m.model_name || null,
                 sku: m.sku || null,
                 price: m.price_info?.[0]?.current_price ?? null,

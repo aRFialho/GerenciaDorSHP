@@ -204,26 +204,28 @@ model Product {
   shopId Int
   shop   Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
 
-  itemId      BigInt
-  status      String?
-  title       String?
-  description String?  @db.Text
-  ratingStar  Float?
-  ratingCount Int?
-  currency    String?
-  priceMin    Int?
-  priceMax    Int?
-  itemSku     String?
-  stock       Int?
-  sold        Int?
-  attributes  Json?
-  logistics   Json?
-  dimension   Json?
-  weight      Float?
-  daysToShip  Int?
-  hasModel    Boolean?
-  brand       String?
-  categoryId  BigInt?
+  itemId         BigInt
+  status         String?
+  title          String?
+  description    String?   @db.Text
+  ratingStar     Float?
+  ratingCount    Int?
+  ratingOver500  Boolean   @default(false)
+  ratingSyncedAt DateTime?
+  currency       String?
+  priceMin       Int?
+  priceMax       Int?
+  itemSku        String?
+  stock          Int?
+  sold           Int?
+  attributes     Json?
+  logistics      Json?
+  dimension      Json?
+  weight         Float?
+  daysToShip     Int?
+  hasModel       Boolean?
+  brand          String?
+  categoryId     BigInt?
 
   shopeeCreateTime DateTime?
   shopeeUpdateTime DateTime?
