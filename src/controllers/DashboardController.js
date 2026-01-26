@@ -1,22 +1,7 @@
 const prisma = require("../config/db");
 const { paidOrderWhere } = require("../utils/orderStatusRules");
 const SHOPEE_TZ = process.env.SHOPEE_REPORT_TZ_OFFSET || "-03:00";
-const { hourIndexInOffset } = require("../utils/timezone");
-
-function tzOffsetToMinutes(tzOffset) {
-  const s = String(tzOffset || "-03:00").trim();
-  const m = s.match(/^([+-])(\d{2}):(\d{2})$/);
-  if (!m) return -180;
-  const sign = m[1] === "-" ? -1 : 1;
-  return sign * (Number(m[2]) * 60 + Number(m[3]));
-}
-
-function hourIndexInOffset(dateUtc, tzOffset) {
-  const offsetMin = tzOffsetToMinutes(tzOffset);
-  const d = dateUtc instanceof Date ? dateUtc : new Date(dateUtc);
-  const shiftedMs = d.getTime() + offsetMin * 60 * 1000;
-  return new Date(shiftedMs).getUTCHours(); // 0..23 “na hora local do offset”
-}
+const { hourIndexInOffset, tzOffsetToMinutes } = require("../utils/timezone");
 
 function isoDateInOffsetNow(tzOffset) {
   const offsetMin = tzOffsetToMinutes(tzOffset);
