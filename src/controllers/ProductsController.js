@@ -128,11 +128,19 @@ async function list(req, res) {
     "createdAt",
     "shopeeCreateTime",
     "sold",
+    "ratingStar",
+    "ratingCount",
   ]);
 
-  const orderBy = allowedSort.has(sortBy)
-    ? { [sortBy]: sortDir }
-    : { updatedAt: "desc" };
+  let orderBy;
+
+  if (!allowedSort.has(sortBy)) {
+    orderBy = { updatedAt: "desc" };
+  } else if (sortBy === "ratingStar" || sortBy === "ratingCount") {
+    orderBy = { [sortBy]: { sort: sortDir, nulls: "last" } };
+  } else {
+    orderBy = { [sortBy]: sortDir };
+  }
 
   const where = {
     shopId: shop.id,
@@ -161,6 +169,7 @@ async function list(req, res) {
         sold: true,
         ratingStar: true,
         ratingCount: true,
+        ratingOver500: true,
         priceMin: true,
         priceMax: true,
         currency: true,
@@ -180,7 +189,7 @@ async function list(req, res) {
   const items = rows.map((p) => {
     const totalStock = p.hasModel
       ? (p.models || []).reduce((acc, m) => acc + (Number(m.stock) || 0), 0)
-      : p.stock ?? null;
+      : (p.stock ?? null);
 
     const { models, ...rest } = p;
     return { ...rest, totalStock };
@@ -514,7 +523,7 @@ async function performance(req, res, next) {
     const pageNo = Math.max(1, Number(req.query.page || 1));
     const pageSize = Math.min(
       20,
-      Math.max(1, Number(req.query.pageSize || 20))
+      Math.max(1, Number(req.query.pageSize || 20)),
     );
 
     const orderType = String(req.query.orderType || "ConfirmedOrder");
@@ -556,7 +565,7 @@ async function fullDetail(req, res) {
 
   const totalStock = product.hasModel
     ? (product.models || []).reduce((acc, m) => acc + (Number(m.stock) || 0), 0)
-    : product.stock ?? null;
+    : (product.stock ?? null);
 
   let description = product.description || null;
   try {
