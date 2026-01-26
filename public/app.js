@@ -1503,12 +1503,11 @@ function renderMonthRatioChart({
   });
 }
 
-renderTodayChartCompare({
-  hourlyBarsToday: data?.hourlyBarsToday || [],
-  hourlyBarsYesterday: data?.hourlyBarsYesterday || [],
-  currentHour: new Date().getHours(), // ✅ local
-});
-{
+function renderTodayChartCompare({
+  hourlyBarsToday = [],
+  hourlyBarsYesterday = [],
+  currentHour,
+}) {
   const canvas = document.getElementById("dashTodayChart");
   const ctx = canvas?.getContext?.("2d");
   if (!ctx || !window.Chart) return;
