@@ -89,6 +89,14 @@ function fmtMoneyFromCents(cents) {
   const n = Number(cents || 0) / 100;
   return fmtMoneyBR(n);
 }
+
+function isoLocalDate(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /* ===========================
    Helpers
 =========================== */
@@ -367,8 +375,8 @@ function ensureDefaultDates() {
     const to = new Date(now);
     const from = new Date(now);
     from.setDate(from.getDate() - 14);
-    toEl.value = to.toISOString().slice(0, 10);
-    fromEl.value = from.toISOString().slice(0, 10);
+    toEl.value = isoLocalDate(to);
+    fromEl.value = isoLocalDate(from);
   }
 }
 
@@ -1042,8 +1050,8 @@ async function loadAdsAll() {
       const cutTo = new Date(to);
       const cutFrom = new Date(to);
       cutFrom.setDate(cutFrom.getDate() - 30);
-      cpcDateTo = cutTo.toISOString().slice(0, 10);
-      cpcDateFrom = cutFrom.toISOString().slice(0, 10);
+      cpcDateTo = isoLocalDate(cutTo);
+      cpcDateFrom = isoLocalDate(cutFrom);
     }
 
     await Promise.all([

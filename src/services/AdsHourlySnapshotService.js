@@ -85,9 +85,16 @@ async function callAdsWithAutoRefresh({ shop, call }) {
 }
 
 async function listTargetShops() {
-  // versão simples: todas as lojas com token
+  const tokenRows = await prisma.oAuthToken.findMany({
+    where: { accessToken: { not: null } },
+    select: { shopId: true },
+  });
+
+  const shopIds = tokenRows.map((t) => t.shopId).filter(Boolean);
+  if (!shopIds.length) return [];
+
   return prisma.shop.findMany({
-    where: { tokens: { isNot: null } },
+    where: { id: { in: shopIds } },
     select: { id: true, shopId: true, region: true },
   });
 }

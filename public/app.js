@@ -1503,11 +1503,12 @@ function renderMonthRatioChart({
   });
 }
 
-function renderTodayChartCompare({
-  hourlyBarsToday,
-  hourlyBarsYesterday,
-  currentHour,
-}) {
+renderTodayChartCompare({
+  hourlyBarsToday: data?.hourlyBarsToday || [],
+  hourlyBarsYesterday: data?.hourlyBarsYesterday || [],
+  currentHour: new Date().getHours(), // ✅ local
+});
+{
   const canvas = document.getElementById("dashTodayChart");
   const ctx = canvas?.getContext?.("2d");
   if (!ctx || !window.Chart) return;
@@ -1652,13 +1653,19 @@ async function loadDashboard(opts = {}) {
       const data = await apiGet(
         `/shops/${SHOP_PATH_PLACEHOLDER}/dashboard/today-sales`,
       );
-      const todayIso = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const todayIso = isoLocalDate();
 
-      const ads = await loadAdsRoasApprox({
-        dateFrom: todayIso,
-        dateTo: todayIso,
-      });
-      setAdsRoasUI(ads);
+      try {
+        const ads = await loadAdsRoasApprox({
+          dateFrom: todayIso,
+          dateTo: todayIso,
+        });
+        setDashAdsRoasUI(ads, { label: `Período Ads: ${todayIso} (hoje)` });
+      } catch (e) {
+        setDashAdsRoasUI(null, {
+          label: `Ads indisponível: ${String(e?.message || e)}`,
+        });
+      }
       // KPIs HOJE (IDs do seu HTML)
       setText(
         "dashTodayGmv",
@@ -1689,7 +1696,7 @@ async function loadDashboard(opts = {}) {
       renderTodayChartCompare({
         hourlyBarsToday: data?.hourlyBarsToday || [],
         hourlyBarsYesterday: data?.hourlyBarsYesterday || [],
-        currentHour: data?.metrics?.currentHour,
+        currentHour: new Date().getHours(),
       });
 
       if (msg) msg.textContent = "";
@@ -3775,16 +3782,6 @@ function setDashAdsRoasUI(data, { label }) {
   }
 
   setText("dashAdsMeta", label || "—");
-}
-
-async function loadAdsRoasApprox({ dateFrom, dateTo }) {
-  const qs = new URLSearchParams({
-    dateFrom: String(dateFrom || ""),
-    dateTo: String(dateTo || ""),
-  });
-  return apiGet(
-    `/shops/${SHOP_PATH_PLACEHOLDER}/ads/roas-real-aproximado?${qs}`,
-  );
 }
 
 function isoLocalDate(d = new Date()) {
